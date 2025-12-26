@@ -1,0 +1,317 @@
+"""
+Translation Quality Benchmark using BLEU Scores
+
+Benchmarks translation quality by comparing model outputs to reference translations
+using BLEU (Bilingual Evaluation Understudy) scores.
+
+Benchmark data format (JSON):
+[
+    {
+        "source": "English text to translate",
+        "target": "Reference translation",
+        "context": "Optional previous dialogue for context"
+    },
+    ...
+]
+
+Usage:
+    python benchmark.py data/ro_benchmark.json [--glossary data/ro_glossary.json]
+    python benchmark.py data/de_benchmark.json --glossary data/de_glossary.json
+"""
+
+import sys
+import json
+from pathlib import Path
+from typing import List, Dict, Tuple
+import re
+
+# Try to import BLEU from nltk
+try:
+    from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
+    NLTK_AVAILABLE = True
+except ImportError:
+    NLTK_AVAILABLE = False
+    print("WARNING: nltk not installed. Install with: pip install nltk")
+    print("Falling back to simple word-match accuracy")
+
+# Fix Windows PATH for CUDA DLLs
+if sys.platform == "win32":
+    import os
+    torch_lib = str(Path(__file__).parent.parent / "venv" / "Lib" / "site-packages" / "torch" / "lib")
+    if os.path.exists(torch_lib) and torch_lib not in os.environ["PATH"]:
+        os.environ["PATH"] = torch_lib + os.pathsep + os.environ["PATH"]
+
+# Add src directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+from core import Aya23Translator
+
+
+def tokenize(text: str) -> List[str]:
+    """Simple tokenization: split on whitespace and punctuation"""
+    # Remove Ren'Py tags and variables for fair comparison
+    text = re.sub(r'\{[^}]+\}', '', text)  # Remove {color=...}, etc.
+    text = re.sub(r'\[[^\]]+\]', '', text)  # Remove [name], etc.
+
+    # Tokenize
+    return text.lower().split()
+
+
+def calculate_bleu(reference: str, hypothesis: str) -> float:
+    """
+    Calculate BLEU score between reference and hypothesis
+
+    Returns score between 0.0 (worst) and 1.0 (perfect match)
+    """
+    if not NLTK_AVAILABLE:
+        # Fallback: simple word overlap accuracy
+        ref_words = set(tokenize(reference))
+        hyp_words = set(tokenize(hypothesis))
+        if not ref_words:
+            return 0.0
+        overlap = len(ref_words & hyp_words)
+        return overlap / len(ref_words)
+
+    # NLTK BLEU with smoothing (for short sentences)
+    ref_tokens = tokenize(reference)
+    hyp_tokens = tokenize(hypothesis)
+
+    smoothing = SmoothingFunction().method1
+    return sentence_bleu([ref_tokens], hyp_tokens, smoothing_function=smoothing)
+
+
+def load_benchmark_data(data_path: Path) -> List[Dict]:
+    """Load benchmark data from JSON file"""
+    with open(data_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    if not isinstance(data, list):
+        raise ValueError("Benchmark data must be a JSON array")
+
+    # Validate format
+    for i, item in enumerate(data):
+        if 'source' not in item or 'target' not in item:
+            raise ValueError(f"Item {i} missing 'source' or 'target' field")
+
+    return data
+
+
+def load_glossary(glossary_path: Path) -> Dict:
+    """Load glossary from JSON file"""
+    if not glossary_path.exists():
+        return {}
+
+    with open(glossary_path, 'r', encoding='utf-8') as f:
+        glossary = json.load(f)
+
+    # Filter out comment entries (starting with _)
+    return {k: v for k, v in glossary.items() if not k.startswith('_')}
+
+
+def detect_language_from_filename(filename: str) -> str:
+    """
+    Detect language from filename (e.g., 'ro_benchmark.json' → 'Romanian')
+    """
+    lang_map = {
+        'ro': 'Romanian',
+        'es': 'Spanish',
+        'fr': 'French',
+        'de': 'German',
+        'it': 'Italian',
+        'pt': 'Portuguese',
+        'ru': 'Russian',
+        'tr': 'Turkish',
+        'cs': 'Czech',
+        'pl': 'Polish',
+        'uk': 'Ukrainian',
+        'bg': 'Bulgarian',
+        'zh': 'Chinese',
+        'ja': 'Japanese',
+        'ko': 'Korean',
+        'vi': 'Vietnamese',
+        'th': 'Thai',
+        'id': 'Indonesian',
+        'ar': 'Arabic',
+        'he': 'Hebrew',
+        'fa': 'Persian',
+        'hi': 'Hindi',
+        'bn': 'Bengali',
+    }
+
+    # Extract language code from filename
+    for code, lang in lang_map.items():
+        if filename.startswith(f'{code}_') or f'_{code}_' in filename:
+            return lang
+
+    # Default to Romanian
+    return 'Romanian'
+
+
+def run_benchmark(data_path: Path, glossary_path: Path = None) -> Dict:
+    """
+    Run translation quality benchmark
+
+    Returns:
+        Statistics dict with scores and examples
+    """
+    print("=" * 70)
+    print("Translation Quality Benchmark")
+    print("=" * 70)
+
+    # Detect target language
+    target_language = detect_language_from_filename(data_path.name)
+    print(f"\nTarget language: {target_language}")
+    print(f"Benchmark data: {data_path}")
+
+    # Load data
+    print("\nLoading benchmark data...")
+    benchmark_data = load_benchmark_data(data_path)
+    print(f"  Loaded {len(benchmark_data)} test cases")
+
+    # Load glossary
+    glossary = {}
+    if glossary_path and glossary_path.exists():
+        print(f"\nLoading glossary: {glossary_path}")
+        glossary = load_glossary(glossary_path)
+        print(f"  Loaded {len(glossary)} terms")
+
+    # Initialize translator
+    project_root = Path(__file__).parent.parent
+    model_path = project_root / "models" / "aya-23-8B-GGUF" / "aya-23-8B-Q4_K_M.gguf"
+
+    print(f"\nInitializing translator...")
+    translator = Aya23Translator(str(model_path), target_language=target_language)
+
+    # Run translations and calculate scores
+    print("\n" + "=" * 70)
+    print("Running translations...")
+    print("=" * 70)
+
+    scores = []
+    results = []
+
+    for i, item in enumerate(benchmark_data, 1):
+        source = item['source']
+        reference = item['target']
+        context = item.get('context', None)
+
+        print(f"\n[{i}/{len(benchmark_data)}]")
+        print(f"  Source: {source}")
+
+        # Parse context (can be string or list)
+        context_list = None
+        if context:
+            if isinstance(context, str):
+                context_list = [context]
+            elif isinstance(context, list):
+                context_list = context
+
+        # Translate
+        hypothesis = translator.translate(
+            source,
+            glossary=glossary,
+            context=context_list
+        )
+
+        # Calculate BLEU
+        score = calculate_bleu(reference, hypothesis)
+        scores.append(score)
+
+        print(f"  Reference:  {reference}")
+        print(f"  Hypothesis: {hypothesis}")
+        print(f"  BLEU Score: {score:.4f}")
+
+        results.append({
+            'source': source,
+            'reference': reference,
+            'hypothesis': hypothesis,
+            'score': score
+        })
+
+    # Calculate statistics
+    avg_score = sum(scores) / len(scores) if scores else 0.0
+    min_score = min(scores) if scores else 0.0
+    max_score = max(scores) if scores else 0.0
+
+    print("\n" + "=" * 70)
+    print("RESULTS")
+    print("=" * 70)
+    print(f"\nTotal test cases: {len(benchmark_data)}")
+    print(f"Average BLEU:     {avg_score:.4f}")
+    print(f"Min BLEU:         {min_score:.4f}")
+    print(f"Max BLEU:         {max_score:.4f}")
+
+    # Show best and worst examples
+    sorted_results = sorted(results, key=lambda x: x['score'])
+
+    print("\n" + "-" * 70)
+    print("WORST TRANSLATION:")
+    worst = sorted_results[0]
+    print(f"  Source:     {worst['source']}")
+    print(f"  Reference:  {worst['reference']}")
+    print(f"  Hypothesis: {worst['hypothesis']}")
+    print(f"  Score:      {worst['score']:.4f}")
+
+    print("\n" + "-" * 70)
+    print("BEST TRANSLATION:")
+    best = sorted_results[-1]
+    print(f"  Source:     {best['source']}")
+    print(f"  Reference:  {best['reference']}")
+    print(f"  Hypothesis: {best['hypothesis']}")
+    print(f"  Score:      {best['score']:.4f}")
+
+    print("\n" + "=" * 70)
+
+    return {
+        'total': len(benchmark_data),
+        'average_bleu': avg_score,
+        'min_bleu': min_score,
+        'max_bleu': max_score,
+        'results': results
+    }
+
+
+def main():
+    """CLI entry point"""
+    if len(sys.argv) < 2:
+        print(__doc__)
+        print("\nExamples:")
+        print("  python benchmark.py data/ro_benchmark.json")
+        print("  python benchmark.py data/ro_uncensored_benchmark.json --glossary data/ro_uncensored_glossary.json")
+        print("  python benchmark.py data/de_benchmark.json --glossary data/de_glossary.json")
+        sys.exit(1)
+
+    # Parse arguments
+    data_path = Path(sys.argv[1])
+    glossary_path = None
+
+    # Check for --glossary parameter
+    for i, arg in enumerate(sys.argv[2:], start=2):
+        if arg == '--glossary' and i + 1 < len(sys.argv):
+            glossary_path = Path(sys.argv[i + 1])
+
+    if not data_path.exists():
+        print(f"ERROR: Benchmark data not found: {data_path}")
+        sys.exit(1)
+
+    # Auto-detect glossary if not specified
+    if glossary_path is None:
+        # Try to find matching glossary (e.g., ro_benchmark.json → ro_glossary.json)
+        lang_code = data_path.stem.split('_')[0]  # Extract 'ro' from 'ro_benchmark'
+
+        # Try uncensored first, then regular
+        uncensored_glossary = data_path.parent / f"{lang_code}_uncensored_glossary.json"
+        regular_glossary = data_path.parent / f"{lang_code}_glossary.json"
+
+        if uncensored_glossary.exists():
+            glossary_path = uncensored_glossary
+            print(f"Auto-detected glossary: {glossary_path}")
+        elif regular_glossary.exists():
+            glossary_path = regular_glossary
+            print(f"Auto-detected glossary: {glossary_path}")
+
+    # Run benchmark
+    run_benchmark(data_path, glossary_path)
+
+
+if __name__ == "__main__":
+    main()

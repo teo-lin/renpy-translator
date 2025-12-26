@@ -1,0 +1,32 @@
+{
+  "description": "External tools and models configuration",
+  "version": "1.0.0",
+
+  "models": {
+    "aya-23-8b": {
+      "repo": "bartowski/aya-23-8B-GGUF",
+      "file": "aya-23-8B-Q4_K_M.gguf",
+      "size": "4.8GB",
+      "destination": "models/aya-23-8B-GGUF/aya-23-8B-Q4_K_M.gguf"
+    }
+  },
+
+  "tools": {
+    "renpy": {
+      "version": "8.2.0",
+      "url": "https://www.renpy.org/dl/8.2.0/renpy-8.2.0-sdk.zip",
+      "destination": "renpy/",
+      "description": "Ren'Py SDK for generate-translations command"
+    },
+    "rpaextract": {
+      "url": "https://github.com/Lattyware/rpaextract/releases/latest/download/rpaExtract.exe",
+      "destination": "tools/rpaExtract.exe",
+      "description": "Extract RPA archives from Ren'Py games"
+    },
+    "unren": {
+      "url": "https://github.com/sam-m888/unren-forpy3/archive/refs/heads/main.zip",
+      "destination": "tools/unren/",
+      "description": "UnRen.bat for extracting and decompiling Ren'Py games"
+    }
+  }
+}

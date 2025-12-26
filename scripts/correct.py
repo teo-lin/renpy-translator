@@ -1,0 +1,641 @@
+r"""
+Romanian Translation Correction Script - Combined Pattern & LLM
+
+Corrects existing Romanian translations in Ren'Py .rpy files using:
+1. Pattern-based corrections (fast, reliable, from JSON file)
+2. LLM-based corrections (slow, intelligent, using Aya-23-8B)
+
+Usage:
+    python correct.py <input_file_or_dir> [options]
+
+Options:
+    --patterns-only     Use only pattern-based corrections (fast)
+    --llm-only          Use only LLM corrections (slow)
+    --dry-run           Preview changes without writing files
+    (default)           Use both: patterns first, then LLM
+
+Examples:
+    # Fast pattern-based corrections only
+    python correct.py "game\tl\romanian" --patterns-only
+
+    # Intelligent LLM corrections only
+    python correct.py "game\tl\romanian" --llm-only
+
+    # Combined approach (patterns first, then LLM)
+    python correct.py "game\tl\romanian"
+
+    # Preview without writing
+    python correct.py "game\tl\romanian" --dry-run
+"""
+
+import re
+import sys
+import os
+import json
+import io
+from pathlib import Path
+from typing import List, Tuple, Dict, Optional
+import time
+
+# Fix Windows PATH for CUDA DLLs and console encoding
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    torch_lib = str(Path(__file__).parent.parent / "venv" / "Lib" / "site-packages" / "torch" / "lib")
+    if os.path.exists(torch_lib) and torch_lib not in os.environ["PATH"]:
+        os.environ["PATH"] = torch_lib + os.pathsep + os.environ["PATH"]
+
+# Add src directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+
+def show_progress(current, total, start_time, prefix=""):
+    """Display simple progress bar with >>> characters and time labels"""
+    percentage = (current / total) * 100 if total > 0 else 0
+    elapsed = time.time() - start_time
+
+    # Calculate ETA
+    if current > 0 and elapsed > 0:
+        rate = current / elapsed
+        remaining = (total - current) / rate if rate > 0 else 0
+    else:
+        remaining = 0
+
+    # Format time strings
+    elapsed_str = f"{int(elapsed // 60)}m {int(elapsed % 60)}s" if elapsed >= 60 else f"{int(elapsed)}s"
+    remaining_str = f"{int(remaining // 60)}m {int(remaining % 60)}s" if remaining >= 60 else f"{int(remaining)}s"
+
+    # Create progress bar with >>> characters
+    bar_width = 50
+    filled = int(bar_width * current / total) if total > 0 else 0
+    bar = ">" * filled + " " * (bar_width - filled)
+
+    # Display with labels
+    print(f"\r{prefix}[{bar}] {current}/{total} ({percentage:.0f}%) | Elapsed: {elapsed_str} | ETA: {remaining_str}",
+          end='', flush=True)
+
+
+class PatternBasedCorrector:
+    """Fast, reliable corrections using predefined patterns"""
+
+    def __init__(self, corrections_file: str):
+        """Load correction patterns from JSON file"""
+        with open(corrections_file, 'r', encoding='utf-8') as f:
+            self.corrections = json.load(f)
+
+        self.protected_words = set(self.corrections.get('protected_words', []))
+        print(f"[OK] Loaded pattern-based corrections")
+        if self.protected_words:
+            print(f"  Protected words: {', '.join(self.protected_words)}")
+
+    def correct_text(self, text: str) -> Tuple[str, List[Dict]]:
+        """
+        Apply pattern-based corrections to text
+
+        Returns:
+            (corrected_text, list_of_changes_made)
+        """
+        corrected = text
+        changes = []
+
+        # Apply exact replacements first
+        for wrong, right in self.corrections.get('exact_replacements', {}).items():
+            if wrong in corrected:
+                if not self._is_protected(wrong, corrected):
+                    corrected = corrected.replace(wrong, right)
+                    changes.append({
+                        'type': 'exact',
+                        'old': wrong,
+                        'new': right
+                    })
+
+        # Apply verb conjugation patterns
+        for pattern_def in self.corrections.get('verb_conjugations', []):
+            pattern = pattern_def['pattern']
+            replacement = pattern_def['replacement']
+
+            regex = re.compile(pattern)
+            matches = list(regex.finditer(corrected))
+
+            for match in reversed(matches):
+                old_text = match.group(0)
+                if not any(word in old_text for word in self.protected_words):
+                    corrected = corrected[:match.start()] + replacement + corrected[match.end():]
+                    changes.append({
+                        'type': 'verb_conjugation',
+                        'old': old_text,
+                        'new': replacement
+                    })
+
+        # Apply gender agreement patterns
+        for pattern_def in self.corrections.get('gender_agreement', []):
+            pattern = pattern_def['pattern']
+            replacement = pattern_def['replacement']
+
+            regex = re.compile(pattern)
+            matches = list(regex.finditer(corrected))
+
+            for match in reversed(matches):
+                old_text = match.group(0)
+                corrected = corrected[:match.start()] + replacement + corrected[match.end():]
+                changes.append({
+                    'type': 'gender_agreement',
+                    'old': old_text,
+                    'new': replacement
+                })
+
+        return corrected, changes
+
+    def _is_protected(self, text: str, context: str) -> bool:
+        """Check if text is part of a protected word"""
+        for protected in self.protected_words:
+            if protected.lower() in context.lower():
+                return True
+        return False
+
+
+class LLMBasedCorrector:
+    """Intelligent, context-aware corrections using Aya-23-8B"""
+
+    TAG_PATTERN = re.compile(r'\{[^}]+\}')
+    VAR_PATTERN = re.compile(r'\[[^\]]+\]')
+
+    def __init__(self, model_path: str):
+        """Initialize LLM corrector with Aya-23-8B model"""
+        from core import Aya23Translator
+        print("Initializing LLM-based correction system...")
+        self.translator = Aya23Translator(model_path)
+        print("[OK] Ready for LLM corrections\n")
+
+    def extract_tags(self, text: str) -> Tuple[str, List[Tuple[int, str]]]:
+        """Extract Ren'Py tags/variables, return clean text and tag positions"""
+        tags = []
+        clean_text = text
+
+        # Find all tags and variables
+        all_matches = []
+        for match in self.TAG_PATTERN.finditer(text):
+            all_matches.append((match.start(), match.group()))
+        for match in self.VAR_PATTERN.finditer(text):
+            all_matches.append((match.start(), match.group()))
+
+        # Sort by position (reverse order for removal)
+        all_matches.sort(key=lambda x: x[0], reverse=True)
+
+        # Remove tags from text and store positions
+        for pos, tag in all_matches:
+            before_tag = text[:pos]
+            tags.insert(0, (len(before_tag), tag))
+            clean_text = clean_text[:pos] + clean_text[pos + len(tag):]
+
+        return clean_text.strip(), tags
+
+    def restore_tags(self, corrected_text: str, tags: List[Tuple[int, str]], original_text: str) -> str:
+        """Restore tags into corrected text based on relative positions"""
+        if not tags:
+            return corrected_text
+
+        result = corrected_text
+        original_len = len(original_text)
+        corrected_len = len(corrected_text)
+
+        sorted_tags = sorted(tags, key=lambda x: x[0], reverse=True)
+
+        for orig_pos, tag in sorted_tags:
+            if original_len > 0:
+                ratio = orig_pos / original_len
+                new_pos = int(ratio * corrected_len)
+            else:
+                new_pos = 0
+
+            new_pos = max(0, min(new_pos, len(result)))
+            result = result[:new_pos] + tag + result[new_pos:]
+
+        return result
+
+    def create_correction_prompt(self, romanian_text: str) -> str:
+        """Create prompt for correcting Romanian text"""
+        prompt = f"""You are a Romanian grammar expert. Correct ONLY the grammatical errors in this Romanian text.
+
+CRITICAL RULES - YOU MUST FOLLOW THESE EXACTLY:
+1. Fix verb conjugations (especially subjunctive mood with "să")
+   Example: "să merge" → "să meargă" or "să vadă" instead of "să vede"
+2. Fix reflexive pronouns (te, se, mă, ne, vă) when grammatically required
+   Example: "Vreau să spăl" → "Vreau să mă spăl" (reflexive: to wash oneself)
+3. Fix gender/number agreement (adjectives must match nouns)
+4. Fix diacritics (adica → adică, etc.)
+5. Fix spelling errors (nici una → niciuna)
+
+ABSOLUTE PROHIBITIONS - NEVER DO THESE:
+1. NEVER change proper names (names of people, places) - keep capitalized words EXACTLY as-is
+2. NEVER change punctuation (keep ..., ?!?, !!, etc. exactly as written)
+3. NEVER remove or add words unless fixing grammar (keep meaning 100% identical)
+4. NEVER change sentence structure unless grammatically wrong
+5. NEVER add or remove spaces around ... or other punctuation
+6. If text is already grammatically correct, return it UNCHANGED
+7. Do NOT translate to English
+8. Do NOT add explanations
+
+Romanian text to correct: {romanian_text}
+Corrected Romanian:"""
+        return prompt
+
+    def correct_text(self, romanian_text: str) -> Tuple[str, bool]:
+        """
+        Correct Romanian grammar/conjugation errors using LLM
+
+        Returns:
+            (corrected_text, was_changed)
+        """
+        # Safety check: Skip malformed tags
+        if re.search(r'\{[^}]*\{', romanian_text) or re.search(r'\}[^{]*\}(?![^{]*$)', romanian_text):
+            return romanian_text, False
+
+        # Extract tags first
+        clean_text, tags = self.extract_tags(romanian_text)
+
+        if not clean_text.strip():
+            return romanian_text, False
+
+        # Create correction prompt
+        prompt = self.create_correction_prompt(clean_text)
+
+        # Get correction from model
+        output = self.translator.llm(
+            prompt,
+            max_tokens=512,
+            temperature=0.2,
+            top_p=0.9,
+            repeat_penalty=1.1,
+            stop=["English:", "\n\n", "Romanian text to correct:", "Corrected Romanian:"],
+            echo=False
+        )
+
+        corrected = output['choices'][0]['text'].strip()
+
+        # Clean up artifacts
+        corrected = self._clean_output(corrected)
+
+        # Restore tags
+        final_text = self.restore_tags(corrected, tags, clean_text)
+
+        # Verify tag restoration
+        original_tag_count = len(re.findall(r'\{[^}]+\}|\[[^\]]+\]', romanian_text))
+        corrected_tag_count = len(re.findall(r'\{[^}]+\}|\[[^\]]+\]', final_text))
+        if original_tag_count != corrected_tag_count:
+            return romanian_text, False
+
+        # Validate correction
+        if not self._validate_correction(romanian_text, final_text):
+            return romanian_text, False
+
+        # Fix spacing around variables
+        final_text = re.sub(r'(\S)(\[[\w\s]+\])', r'\1 \2', final_text)
+        final_text = re.sub(r'(\[[\w\s]+\])([a-zA-Z]+)',
+                           lambda m: m.group(1) + (' ' + m.group(2) if m.group(2) not in ['u', 'a', 'i'] else ''),
+                           final_text)
+
+        was_changed = (final_text != romanian_text)
+        return final_text, was_changed
+
+    def _validate_correction(self, original: str, corrected: str) -> bool:
+        """Validate that correction doesn't violate rules"""
+        # Don't allow proper name changes
+        original_caps = set(re.findall(r'\b[A-Z][a-z]+', original))
+        corrected_caps = set(re.findall(r'\b[A-Z][a-z]+', corrected))
+        if original_caps != corrected_caps:
+            return False
+
+        # Don't allow punctuation changes
+        orig_punct = re.findall(r'[.!?,;:\-—…]', original)
+        corr_punct = re.findall(r'[.!?,;:\-—…]', corrected)
+        if orig_punct != corr_punct:
+            return False
+
+        # Don't allow quote style changes
+        if original.count("'") != corrected.count("'"):
+            return False
+        if original.count('"') != corrected.count('"'):
+            return False
+
+        # Word count shouldn't change drastically
+        orig_words = len(original.split())
+        corr_words = len(corrected.split())
+        if abs(orig_words - corr_words) > 2:
+            return False
+
+        # Spacing around variables
+        if ' [' in original and ' [' not in corrected:
+            return False
+
+        # Text length shouldn't change drastically
+        if len(corrected) > len(original) * 1.3 or len(corrected) < len(original) * 0.7:
+            return False
+
+        return True
+
+    def _clean_output(self, text: str) -> str:
+        """Clean up model output artifacts"""
+        for prefix in ["Corrected Romanian:", "Romanian:", "Translation:", "Corected:"]:
+            if text.startswith(prefix):
+                text = text[len(prefix):].strip()
+
+        lines = text.split('\n')
+        if lines:
+            text = lines[0].strip()
+
+        text = text.strip('"').strip("'")
+        return text
+
+
+class CombinedCorrector:
+    """Combines pattern-based and LLM-based corrections"""
+
+    def __init__(self,
+                 patterns_corrector: Optional[PatternBasedCorrector] = None,
+                 llm_corrector: Optional[LLMBasedCorrector] = None):
+        """
+        Initialize combined corrector
+
+        Args:
+            patterns_corrector: Pattern-based corrector (or None to skip)
+            llm_corrector: LLM-based corrector (or None to skip)
+        """
+        self.patterns = patterns_corrector
+        self.llm = llm_corrector
+
+    def correct_text(self, text: str) -> Tuple[str, Dict]:
+        """
+        Apply corrections in order: patterns first, then LLM
+
+        Returns:
+            (corrected_text, changes_dict)
+        """
+        corrected = text
+        changes = {
+            'pattern_changes': [],
+            'llm_changed': False,
+            'pattern_corrected': text,
+            'llm_corrected': text
+        }
+
+        # Step 1: Pattern-based corrections (fast)
+        if self.patterns:
+            corrected, pattern_changes = self.patterns.correct_text(corrected)
+            changes['pattern_changes'] = pattern_changes
+            changes['pattern_corrected'] = corrected
+
+        # Step 2: LLM-based corrections (slow)
+        if self.llm:
+            corrected, llm_changed = self.llm.correct_text(corrected)
+            changes['llm_changed'] = llm_changed
+            changes['llm_corrected'] = corrected
+
+        return corrected, changes
+
+
+class RenpyFileCorrector:
+    """Parse and correct Ren'Py translation files"""
+
+    TRANSLATE_BLOCK_PATTERN = re.compile(
+        r'(# game/[^\n]+\n'
+        r'translate \w+ \w+:\s*\n'
+        r'\s*# [^\n]+\n'
+        r'\s*\w+ ")([^"]*?)(")',
+        re.MULTILINE
+    )
+
+    STRING_BLOCK_PATTERN = re.compile(
+        r'(# game/[^\n]+\n'
+        r'\s*old "[^\n]*?"\s*\n'
+        r'\s*new ")([^"]*?)(")',
+        re.MULTILINE
+    )
+
+    def __init__(self, corrector: CombinedCorrector, dry_run: bool = False):
+        self.corrector = corrector
+        self.dry_run = dry_run
+
+    def correct_file(self, file_path: Path) -> Dict:
+        """Correct all Romanian translations in a single .rpy file"""
+        print(f"\nProcessing: {file_path.name}")
+
+        content = file_path.read_text(encoding='utf-8')
+        original_content = content
+
+        all_changes = []
+        blocks_processed = 0
+        start_time = time.time()
+
+        # Count total blocks for progress
+        total_count = len(self.TRANSLATE_BLOCK_PATTERN.findall(content)) + \
+                     len(self.STRING_BLOCK_PATTERN.findall(content))
+
+        def correct_match(match, block_type):
+            nonlocal blocks_processed
+            blocks_processed += 1
+
+            prefix = match.group(1)
+            old_translation = match.group(2)
+            suffix = match.group(3)
+
+            if not old_translation.strip():
+                return match.group(0)
+
+            # Show progress
+            show_progress(blocks_processed, total_count, start_time, prefix="  ")
+
+            new_translation, change_info = self.corrector.correct_text(old_translation)
+
+            if new_translation != old_translation:
+                change_record = {
+                    'block_type': block_type,
+                    'block_number': blocks_processed,
+                    'old': old_translation,
+                    'new': new_translation,
+                    'pattern_changes': change_info.get('pattern_changes', []),
+                    'llm_changed': change_info.get('llm_changed', False)
+                }
+                all_changes.append(change_record)
+
+            return prefix + new_translation + suffix
+
+        # Apply corrections
+        content = self.TRANSLATE_BLOCK_PATTERN.sub(lambda m: correct_match(m, 'dialogue'), content)
+        content = self.STRING_BLOCK_PATTERN.sub(lambda m: correct_match(m, 'string'), content)
+
+        # Clear progress line and show completion
+        print()  # Newline after progress bar
+        print(f"  Processed {blocks_processed} blocks, made {len(all_changes)} corrections")
+
+        # Show corrections summary
+        if all_changes:
+            pattern_count = sum(1 for c in all_changes if c['pattern_changes'])
+            llm_count = sum(1 for c in all_changes if c['llm_changed'])
+
+            print(f"\n  Corrections made:")
+            print(f"    Pattern-based: {pattern_count}")
+            print(f"    LLM-based: {llm_count}")
+
+            for i, change in enumerate(all_changes[:5], 1):
+                print(f"\n    {i}. [{change['block_type']}]")
+                if change['pattern_changes']:
+                    for pc in change['pattern_changes']:
+                        print(f"       [PATTERN:{pc['type']}] {pc['old']} → {pc['new']}")
+                if change['llm_changed']:
+                    print(f"       [LLM] Grammar correction applied")
+                print(f"       OLD: {change['old'][:70]}")
+                print(f"       NEW: {change['new'][:70]}")
+
+            if len(all_changes) > 5:
+                print(f"\n    ... and {len(all_changes) - 5} more")
+
+            # Save corrections to file
+            corrections_file = file_path.with_suffix('.corrections.txt')
+            with open(corrections_file, 'w', encoding='utf-8') as f:
+                f.write(f"Corrections for: {file_path.name}\n")
+                f.write(f"Total corrections: {len(all_changes)}\n")
+                f.write(f"  Pattern-based: {pattern_count}\n")
+                f.write(f"  LLM-based: {llm_count}\n")
+                f.write("=" * 80 + "\n\n")
+
+                for i, change in enumerate(all_changes, 1):
+                    f.write(f"{i}. {change['block_type'].upper()}\n")
+                    if change['pattern_changes']:
+                        for pc in change['pattern_changes']:
+                            f.write(f"   [PATTERN:{pc['type']}] {pc['old']} → {pc['new']}\n")
+                    if change['llm_changed']:
+                        f.write(f"   [LLM] Grammar correction applied\n")
+                    f.write(f"   OLD: {change['old']}\n")
+                    f.write(f"   NEW: {change['new']}\n")
+                    f.write("-" * 80 + "\n")
+
+            print(f"  [SAVED] Full corrections list: {corrections_file}")
+
+        # Write or preview
+        if self.dry_run:
+            print(f"  [DRY RUN] Would write {len(all_changes)} corrections")
+        elif all_changes:
+            file_path.write_text(content, encoding='utf-8')
+            print(f"  [OK] Written {len(all_changes)} corrections")
+        else:
+            print(f"  [OK] No corrections needed")
+
+        return {
+            'total_blocks': blocks_processed,
+            'corrections': len(all_changes),
+            'changed': content != original_content
+        }
+
+    def correct_directory(self, directory: Path) -> Dict:
+        """Correct all .rpy files in a directory"""
+        rpy_files = list(directory.rglob("*.rpy"))
+
+        if not rpy_files:
+            print(f"No .rpy files found in {directory}")
+            return {'files': 0, 'total_blocks': 0, 'total_corrections': 0}
+
+        print(f"\nFound {len(rpy_files)} files to correct")
+        print("=" * 70)
+
+        total_stats = {
+            'files': 0,
+            'files_changed': 0,
+            'total_blocks': 0,
+            'total_corrections': 0
+        }
+
+        # Process files with progress tracking
+        dir_start_time = time.time()
+
+        for file_idx, rpy_file in enumerate(rpy_files):
+            # Show overall progress for multi-file correction
+            if len(rpy_files) > 1:
+                print()
+                show_progress(file_idx, len(rpy_files), dir_start_time, prefix="Overall: ")
+                print(f"\n[File {file_idx + 1}/{len(rpy_files)}]", flush=True)
+
+            stats = self.correct_file(rpy_file)
+
+            total_stats['files'] += 1
+            total_stats['total_blocks'] += stats['total_blocks']
+            total_stats['total_corrections'] += stats['corrections']
+            if stats['changed']:
+                total_stats['files_changed'] += 1
+
+        print("\n" + "=" * 70)
+        print("CORRECTION COMPLETE")
+        print(f"  Files processed: {total_stats['files']}")
+        print(f"  Files changed: {total_stats['files_changed']}")
+        print(f"  Blocks reviewed: {total_stats['total_blocks']}")
+        print(f"  Corrections made: {total_stats['total_corrections']}")
+
+        if self.dry_run:
+            print("\n  [DRY RUN] No files were modified")
+
+        return total_stats
+
+
+def main():
+    """CLI entry point"""
+    if len(sys.argv) < 2:
+        print(__doc__)
+        sys.exit(1)
+
+    input_path = Path(sys.argv[1])
+    dry_run = '--dry-run' in sys.argv
+    patterns_only = '--patterns-only' in sys.argv
+    llm_only = '--llm-only' in sys.argv
+
+    if not input_path.exists():
+        print(f"Error: Path not found: {input_path}")
+        sys.exit(1)
+
+    # Validate options
+    if patterns_only and llm_only:
+        print("Error: Cannot use both --patterns-only and --llm-only")
+        sys.exit(1)
+
+    # Setup paths
+    project_root = Path(__file__).parent.parent
+    corrections_file = project_root / "data" / "romanian_corrections.json"
+    model_path = project_root / "models" / "aya-23-8B-GGUF" / "aya-23-8B-Q4_K_M.gguf"
+
+    # Initialize correctors based on flags
+    patterns_corrector = None
+    llm_corrector = None
+
+    if not llm_only:
+        if not corrections_file.exists():
+            print(f"Error: Corrections file not found at {corrections_file}")
+            sys.exit(1)
+        patterns_corrector = PatternBasedCorrector(str(corrections_file))
+
+    if not patterns_only:
+        if not model_path.exists():
+            print(f"Error: Model not found at {model_path}")
+            sys.exit(1)
+        llm_corrector = LLMBasedCorrector(str(model_path))
+
+    # Create combined corrector
+    combined = CombinedCorrector(patterns_corrector, llm_corrector)
+    file_corrector = RenpyFileCorrector(combined, dry_run=dry_run)
+
+    # Show mode
+    mode = []
+    if patterns_corrector:
+        mode.append("Pattern-based")
+    if llm_corrector:
+        mode.append("LLM-based")
+    print(f"\nCorrection mode: {' + '.join(mode)}")
+    print("=" * 70)
+
+    # Correct files
+    if input_path.is_file():
+        file_corrector.correct_file(input_path)
+    else:
+        file_corrector.correct_directory(input_path)
+
+
+if __name__ == "__main__":
+    main()
