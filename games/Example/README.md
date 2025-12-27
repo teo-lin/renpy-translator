@@ -49,7 +49,7 @@ Translate directly using the original pipeline:
 
 ```powershell
 # Using interactive launcher (recommended)
-.\translate.ps1
+.\5-translate.ps1
 
 # Or directly with Python
 python src\translators\aya23_translator.py games\Example\game\tl\romanian\script.rpy --language ro
@@ -61,15 +61,15 @@ Use the new modular pipeline for better control:
 
 ```powershell
 # Step 1: Extract clean text and tags
-.\extract.ps1 -Source "script.rpy"
+.\4-extract.ps1 -Source "script.rpy"
 # Creates: script.parsed.yaml (human-editable) and script.tags.json (metadata)
 
 # Step 2: Translate (or manually edit the YAML file)
-.\translate.ps1
+.\5-translate.ps1
 # Updates: script.parsed.yaml with translations
 
 # Step 3: Merge back to .rpy format
-.\merge.ps1 -Source "script"
+.\7-merge.ps1 -Source "script"
 # Creates: script.translated.rpy (with tags restored and validation)
 ```
 
@@ -88,7 +88,7 @@ Run the automated test that translates and verifies:
 venv\Scripts\python.exe tests\test_example_game.py
 
 # Or use the test runner
-.\test.ps1
+.\2-test.ps1
 ```
 
 The test will:

@@ -98,7 +98,7 @@ class MADLAD400Translator:
         self.model.to(self.device)
         self.model.eval()
 
-        print("✓ Model loaded successfully!")
+        print("Model loaded successfully!")
 
     @property
     def target_language(self) -> str:

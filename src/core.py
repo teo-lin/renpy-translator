@@ -49,7 +49,7 @@ class Aya23Translator:
             verbose=False
         )
 
-        print("✓ Model loaded successfully!")
+        print("Model loaded successfully!")
         print(f"  Context window: {n_ctx} tokens")
         print(f"  GPU layers: {n_gpu_layers if n_gpu_layers != -1 else 'All'}")
 

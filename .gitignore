@@ -48,6 +48,12 @@ games/*
 !games/Example/
 !games/Example/**
 
+# Generated translation files
+*.parsed.yaml
+*.parsed.yml
+*.tags.json
+characters.json
+
 # Ren'Py - ignore all except specific files, unRen, and rpaExtract.exe
 renpy/
 !renpy/

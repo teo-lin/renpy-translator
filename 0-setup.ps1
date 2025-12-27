@@ -899,10 +899,10 @@ if ($allGood) {
     Write-Host "  1. Copy your Ren'Py game to the games/ folder" -ForegroundColor White
     Write-Host ""
     Write-Host "  2. Translate your game using the interactive launcher:" -ForegroundColor White
-    Write-Host "     .\translate.ps1" -ForegroundColor Gray
+    Write-Host "     .\5-translate.ps1" -ForegroundColor Gray
     Write-Host ""
     Write-Host "  3. (Optional) Correct grammar with:" -ForegroundColor White
-    Write-Host "     .\correct.ps1" -ForegroundColor Gray
+    Write-Host "     .\6-correct.ps1" -ForegroundColor Gray
     Write-Host ""
     Write-Host "  The interactive scripts will use your configuration:" -ForegroundColor DarkGray
     Write-Host "    - Languages: $($selectedLanguages.Count) configured during setup" -ForegroundColor DarkGray

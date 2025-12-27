@@ -1,5 +1,5 @@
 """
-Test the extract.ps1 PowerShell script using the Example game
+Test the 4-extract.ps1 PowerShell script using the Example game
 
 This test validates that the extraction PowerShell script correctly:
 1. Extracts translation files into YAML and JSON formats
@@ -25,15 +25,19 @@ yaml_output = example_tl / "Cell01_Academy.parsed.yaml"
 json_output = example_tl / "Cell01_Academy.tags.json"
 
 # PowerShell script
-extract_script = project_root / "extract.ps1"
+extract_script = project_root / "4-extract.ps1"
 
 
 def cleanup_output_files():
     """Remove any existing output files"""
+    characters_file = example_tl / "characters.json"
+
     if yaml_output.exists():
         yaml_output.unlink()
     if json_output.exists():
         json_output.unlink()
+    if characters_file.exists():
+        characters_file.unlink()
 
 
 def test_prerequisites():
@@ -45,8 +49,7 @@ def test_prerequisites():
     checks = [
         (example_game.exists(), f"Example game directory: {example_game}"),
         (test_file_path.exists(), f"Test file: {test_file_path}"),
-        (extract_script.exists(), f"Extract script: {extract_script}"),
-        ((example_tl / "characters.json").exists(), f"Characters config: {example_tl / 'characters.json'}")
+        (extract_script.exists(), f"Extract script: {extract_script}")
     ]
 
     all_passed = True
@@ -66,41 +69,70 @@ def test_prerequisites():
 
 
 def configure_example_game():
-    """Add Example game to configuration if not present"""
+    """Add Example game to configuration and create characters.json if needed"""
     print("\n" + "=" * 70)
     print("TEST: Configure Example Game")
     print("=" * 70)
 
     config_path = project_root / "models" / "local_config.json"
+    characters_file = example_tl / "characters.json"
+    stage_script = project_root / "3-stage.ps1"
 
     try:
         with open(config_path, 'r', encoding='utf-8-sig') as f:
             config = json.load(f)
 
         # Check if Example game already configured
-        if 'games' in config and 'Example' in config['games']:
+        game_configured = 'games' in config and 'Example' in config['games']
+
+        if not game_configured:
+            # Add Example game configuration
+            if 'games' not in config:
+                config['games'] = {}
+
+            config['games']['Example'] = {
+                "name": "Example",
+                "path": str(example_game),
+                "target_language": "romanian",
+                "source_language": "english",
+                "model": "Aya-23-8B",
+                "context_before": 3,
+                "context_after": 1
+            }
+
+            # Save updated config
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=4)
+
+            print("[OK] Example game added to configuration")
+        else:
             print("[OK] Example game already configured")
-            return True
 
-        # Add Example game configuration
-        if 'games' not in config:
-            config['games'] = {}
+        # Ensure characters.json exists (needed by 4-extract.ps1)
+        if not characters_file.exists():
+            print("[INFO] Creating characters.json...")
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy", "Bypass",
+                    "-File", str(stage_script),
+                    "-GamePath", str(example_game),
+                    "-Language", "romanian",
+                    "-Model", "Aya-23-8B"
+                ],
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
 
-        config['games']['Example'] = {
-            "name": "Example",
-            "path": str(example_game),
-            "target_language": "romanian",
-            "source_language": "english",
-            "model": "Aya-23-8B",
-            "context_before": 3,
-            "context_after": 1
-        }
+            if result.returncode != 0:
+                print(f"[FAIL] Failed to create characters.json")
+                return False
 
-        # Save updated config
-        with open(config_path, 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=4)
+            print("[OK] characters.json created")
+        else:
+            print("[OK] characters.json already exists")
 
-        print("[OK] Example game added to configuration")
         return True
 
     except Exception as e:
@@ -315,8 +347,16 @@ def main():
             results.append((test_name, False))
             break
 
-    # Final summary
+    # Final cleanup - remove all generated files
     print("\n" + "=" * 70)
+    print("CLEANUP")
+    print("=" * 70)
+    cleanup_output_files()
+    print("[OK] Removed generated YAML and JSON files")
+    print()
+
+    # Final summary
+    print("=" * 70)
     print("TEST SUMMARY")
     print("=" * 70)
 
@@ -331,9 +371,7 @@ def main():
 
     if failed == 0:
         print("\n\033[92m[SUCCESS] All tests passed!\033[0m")
-        print(f"\nOutput files generated:")
-        print(f"  - {yaml_output}")
-        print(f"  - {json_output}")
+        print("\nExample game restored to original state (no leftover files)")
         return 0
     else:
         print("\n\033[91m[FAILURE] Some tests failed.\033[0m")

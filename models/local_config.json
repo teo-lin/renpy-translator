@@ -1,73 +1,127 @@
-{
-    "models": [
-        {
-            "Name": "Aya-23-8B",
-            "Config": {
-                "name": "Aya-23-8B",
-                "repo": "bartowski/aya-23-8B-GGUF",
-                "file": "aya-23-8B-Q4_K_M.gguf",
-                "size": "4.8GB",
-                "destination": "models/aya-23-8B-GGUF/aya-23-8B-Q4_K_M.gguf",
-                "script": "scripts/translate_with_aya23.py",
-                "description": "Higher quality for 23 European and major Asian languages",
-                "languages": "ro es fr de it pt ru tr cs pl uk bg zh ja ko vi th id ar he hi nl fi"
-            },
-            "Description": "Higher quality for 23 European and major Asian languages",
-            "SupportedCount": 1,
-            "Key": "aya-23-8b",
-            "Languages": [
-                "ro",
-                "es",
-                "fr",
-                "de",
-                "it",
-                "pt",
-                "ru",
-                "tr",
-                "cs",
-                "pl",
-                "uk",
-                "bg",
-                "zh",
-                "ja",
-                "ko",
-                "vi",
-                "th",
-                "id",
-                "ar",
-                "he",
-                "hi",
-                "nl",
-                "fi"
-            ],
-            "Size": "4.8GB"
-        }
-    ],
-    "languages": [
-        {
-            "Code": "ro",
-            "Name": "Romanian"
-        }
-    ],
-    "games": {
-        "Once a Porn a Time 2": {
-            "target_language": "romanian",
-            "name": "Once a Porn a Time 2",
-            "context_after": 1,
-            "path": "C:\\_oxo_\\games\\Once a Porn a Time 2",
-            "source_language": "english",
-            "model": "Aya-23-8B",
-            "context_before": 3
-        },
-        "Example": {
-            "name": "Example",
-            "path": "C:\\_oxo_\\games\\Example",
-            "target_language": "romanian",
-            "source_language": "english",
-            "model": "Aya-23-8B",
-            "context_before": 3,
-            "context_after": 1
-        }
-    },
-    "current_game": "Once a Porn a Time 2"
+﻿{
+    "models":  [
+                   {
+                       "Name":  "Aya-23-8B",
+                       "Config":  {
+                                      "name":  "Aya-23-8B",
+                                      "repo":  "bartowski/aya-23-8B-GGUF",
+                                      "file":  "aya-23-8B-Q4_K_M.gguf",
+                                      "size":  "4.8GB",
+                                      "destination":  "models/aya-23-8B-GGUF/aya-23-8B-Q4_K_M.gguf",
+                                      "script":  "scripts/translate_with_aya23.py",
+                                      "description":  "Higher quality for 23 European and major Asian languages",
+                                      "languages":  "ro es fr de it pt ru tr cs pl uk bg zh ja ko vi th id ar he hi nl fi"
+                                  },
+                       "Description":  "Higher quality for 23 European and major Asian languages",
+                       "SupportedCount":  2,
+                       "Key":  "aya-23-8b",
+                       "Languages":  [
+                                         "ro",
+                                         "es",
+                                         "fr",
+                                         "de",
+                                         "it",
+                                         "pt",
+                                         "ru",
+                                         "tr",
+                                         "cs",
+                                         "pl",
+                                         "uk",
+                                         "bg",
+                                         "zh",
+                                         "ja",
+                                         "ko",
+                                         "vi",
+                                         "th",
+                                         "id",
+                                         "ar",
+                                         "he",
+                                         "hi",
+                                         "nl",
+                                         "fi"
+                                     ],
+                       "Size":  "4.8GB"
+                   },
+                   {
+                       "Name":  "MADLAD-400-3B",
+                       "Config":  {
+                                      "name":  "MADLAD-400-3B",
+                                      "repo":  "google/madlad400-3b-mt",
+                                      "file":  null,
+                                      "size":  "~6GB",
+                                      "destination":  "models/madlad400-3b-mt",
+                                      "script":  "scripts/translate_with_madlad.py",
+                                      "description":  "Supports 400+ languages (30 pre-configured with language codes)",
+                                      "languages":  "ro es fr de it pt ru tr cs pl uk bg zh ja ko vi th id ar he fa hi bn nl sv no da fi el hu",
+                                      "huggingface_download":  true
+                                  },
+                       "Description":  "Supports 400+ languages (30 pre-configured with language codes)",
+                       "SupportedCount":  2,
+                       "Key":  "madlad-400-3b",
+                       "Languages":  [
+                                         "ro",
+                                         "es",
+                                         "fr",
+                                         "de",
+                                         "it",
+                                         "pt",
+                                         "ru",
+                                         "tr",
+                                         "cs",
+                                         "pl",
+                                         "uk",
+                                         "bg",
+                                         "zh",
+                                         "ja",
+                                         "ko",
+                                         "vi",
+                                         "th",
+                                         "id",
+                                         "ar",
+                                         "he",
+                                         "fa",
+                                         "hi",
+                                         "bn",
+                                         "nl",
+                                         "sv",
+                                         "no",
+                                         "da",
+                                         "fi",
+                                         "el",
+                                         "hu"
+                                     ],
+                       "Size":  "~6GB"
+                   }
+               ],
+    "languages":  [
+                      {
+                          "Code":  "ro",
+                          "Name":  "Romanian"
+                      },
+                      {
+                          "Code":  "es",
+                          "Name":  "Spanish"
+                      }
+                  ],
+    "games":  {
+                  "Example":  {
+                                  "target_language":  "romanian",
+                                  "name":  "Example",
+                                  "context_after":  1,
+                                  "path":  "C:\\_oxo_\\games\\Example",
+                                  "source_language":  "english",
+                                  "model":  "Aya-23-8B",
+                                  "context_before":  3
+                              },
+                  "Once a Porn a Time 2":  {
+                                               "target_language":  "romanian",
+                                               "name":  "Once a Porn a Time 2",
+                                               "context_after":  1,
+                                               "path":  "C:\\_oxo_\\games\\Once a Porn a Time 2",
+                                               "source_language":  "english",
+                                               "model":  "Aya-23-8B",
+                                               "context_before":  3
+                                           }
+              },
+    "current_game":  "Once a Porn a Time 2"
 }

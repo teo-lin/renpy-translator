@@ -30,17 +30,17 @@ This system supports **two translation workflows**:
 Simple, automated translation in a single step. Best for quick translations.
 
 ```powershell
-.\translate.ps1  # Processes .rpy files directly
+.\5-5-translate.ps1  # Processes .rpy files directly
 ```
 
 ### 2. **Modular Workflow** (NEW - Recommended for Control)
 Three-phase pipeline with human review checkpoints. Better for quality and collaboration.
 
 ```powershell
-.\characters.ps1  # Phase 0: Setup (one-time)
-.\extract.ps1     # Phase 1: Extract clean text
+.\3-stage.ps1  # Phase 0: Setup (one-time)
+.\4-4-extract.ps1     # Phase 1: Extract clean text
 # → Edit .parsed.yaml files manually or translate
-.\merge.ps1       # Phase 2: Merge back to .rpy
+.\7-7-merge.ps1       # Phase 2: Merge back to .rpy
 ```
 
 **Benefits of Modular Workflow:**
@@ -74,10 +74,10 @@ The easiest way to translate games is using the interactive PowerShell launchers
 .\setup.ps1
 
 # Step 2: Translate your game (interactive menus guide you)
-.\translate.ps1
+.\5-5-translate.ps1
 
 # Step 3 (Optional): Correct grammar/conjugation errors
-.\correct.ps1
+.\6-correct.ps1
 ```
 
 The interactive scripts will:
@@ -138,7 +138,7 @@ Run the automated setup script which will guide you through an interactive confi
 5. **Language Configuration** - Select which languages you'll work with
    - Only shows languages supported by your selected models
    - Saves to `data/local_languages.json`
-   - Used to filter language choices in `translate.ps1` and `correct.ps1`
+   - Used to filter language choices in `5-translate.ps1` and `6-correct.ps1`
 
 6. **Verification** - Tests all components:
    - Verifies Python packages can actually import (not just installed)
@@ -243,7 +243,7 @@ python scripts\translate_with_aya23.py "path\to\file.rpy"
 python scripts\translate_with_aya23.py "path\to\game\game\tl\<language>"
 
 # Or use interactive launcher (recommended)
-.\translate.ps1
+.\5-5-translate.ps1
 ```
 
 ### Translation Script: `scripts\translate_with_madlad.py` (MADLAD-400-3B)
@@ -285,13 +285,13 @@ Corrects grammar, conjugations, and gender agreement in translated files.
 **Usage:**
 ```powershell
 # Fast pattern corrections only
-.\correct.ps1 "path\to\game\game\tl\<language>" --patterns-only
+.\6-correct.ps1 "path\to\game\game\tl\<language>" --patterns-only
 
 # Full correction (patterns + LLM)
-.\correct.ps1 "path\to\game\game\tl\<language>"
+.\6-correct.ps1 "path\to\game\game\tl\<language>"
 
 # Preview changes without modifying files
-.\correct.ps1 "path\to\game\game\tl\<language>" --dry-run
+.\6-correct.ps1 "path\to\game\game\tl\<language>" --dry-run
 ```
 
 ### Benchmark Script: `scripts\benchmark.py`
@@ -319,13 +319,13 @@ Create `data/<language>_benchmark.json` with reference translations:
 **Usage:**
 ```powershell
 # Run benchmark with auto-detected glossary
-.\benchmark.ps1 data\ro_benchmark.json
+.\1-benchmark.ps1 data\ro_benchmark.json
 
 # Run with explicit glossary
-.\benchmark.ps1 data\ro_uncensored_benchmark.json --glossary data\ro_uncensored_glossary.json
+.\1-benchmark.ps1 data\ro_uncensored_benchmark.json --glossary data\ro_uncensored_glossary.json
 
 # Run for other languages
-.\benchmark.ps1 data\de_benchmark.json
+.\1-benchmark.ps1 data\de_benchmark.json
 ```
 
 **Template Files:**
@@ -461,7 +461,7 @@ Measure translation quality against reference translations:
 
 ```powershell
 # Run benchmark (requires nltk: pip install nltk)
-.\benchmark.ps1 data\ro_benchmark.json
+.\1-benchmark.ps1 data\ro_benchmark.json
 ```
 
 Create your own benchmark data files with source/target pairs to track quality improvements over time.
@@ -481,10 +481,10 @@ python scripts\translate_with_aya23.py "data\test.rpy"
 renpy.exe "path\to\game" generate-translations romanian
 
 # Step 2: Translate all files
-.\translate.ps1 "path\to\game\game\tl\romanian"
+.\5-5-translate.ps1 "path\to\game\game\tl\romanian"
 
 # Step 3: Correct grammar (optional)
-.\correct.ps1 "path\to\game\game\tl\romanian"
+.\6-correct.ps1 "path\to\game\game\tl\romanian"
 ```
 
 ### Benchmark Translation Quality
@@ -494,7 +494,7 @@ Test your translations against reference data:
 ```powershell
 # Create benchmark data (data/ro_benchmark.json with source/target pairs)
 # Then run benchmark
-.\benchmark.ps1 data\ro_benchmark.json
+.\1-benchmark.ps1 data\ro_benchmark.json
 
 # Example output:
 # Average BLEU: 0.7234
@@ -548,10 +548,10 @@ Mixed line endings (LF vs CRLF) or UTF-8 encoding issues. This can happen when:
 ```powershell
 # View git's line ending configuration
 git config core.autocrlf
-git ls-files --eol characters.ps1
+git ls-files --eol 3-stage.ps1
 
 # Check actual file encoding
-file characters.ps1
+file 3-stage.ps1
 ```
 
 2. **Fix line endings for all PowerShell scripts:**
@@ -727,13 +727,14 @@ translator = Aya23Translator(model_path, n_gpu_layers=30)  # Instead of -1
 │           ├── *.tags.json            # Tags and metadata (NEW)
 │           └── *.translated.rpy       # Merged output (NEW)
 ├── requirements.txt       # Python dependencies
-├── setup.ps1              # Automated setup script
-├── translate.ps1          # Interactive launcher (selects model, language, game)
-├── correct.ps1            # Interactive launcher for grammar correction
-├── benchmark.ps1          # PowerShell launcher for benchmark.py
-├── characters.ps1         # Character discovery & game setup (NEW)
-├── extract.ps1            # Extract .rpy → YAML/JSON (NEW)
-├── merge.ps1              # Merge YAML/JSON → .rpy (NEW)
+├── 0-setup.ps1            # Automated setup script
+├── 1-benchmark.ps1        # PowerShell launcher for benchmark.py
+├── 2-test.ps1             # Test runner
+├── 3-stage.ps1            # Character discovery & game setup (NEW)
+├── 4-extract.ps1          # Extract .rpy → YAML/JSON (NEW)
+├── 5-translate.ps1        # Interactive launcher (selects model, language, game)
+├── 6-correct.ps1          # Interactive launcher for grammar correction
+├── 7-merge.ps1            # Merge YAML/JSON → .rpy (NEW)
 ├── PIPELINE_USAGE.md      # Modular pipeline user guide (NEW)
 ├── MODULARISATION_PLAN.md # Technical specification (NEW)
 └── IMPLEMENTATION_SUMMARY.md # Implementation details (NEW)
@@ -787,7 +788,7 @@ This separation provides:
 
 ```powershell
 # 1. Discover characters and configure game
-.\characters.ps1
+.\3-stage.ps1
 
 # This will:
 # - Let you select a game from games/ folder
@@ -808,10 +809,10 @@ This separation provides:
 
 ```powershell
 # Extract a single file
-.\extract.ps1 -Source "Cell01_JM.rpy"
+.\4-4-extract.ps1 -Source "Cell01_JM.rpy"
 
 # Extract all files in the game
-.\extract.ps1 -All
+.\4-4-extract.ps1 -All
 ```
 
 **What happens:**
@@ -844,8 +845,8 @@ This separation provides:
 ### Phase 2: Translation
 
 ```powershell
-# Use existing translate.ps1 (works with the current pipeline)
-.\translate.ps1
+# Use existing 5-translate.ps1 (works with the current pipeline)
+.\5-5-translate.ps1
 
 # The script will:
 # - Prompt for game selection
@@ -865,13 +866,13 @@ You can manually edit the `.parsed.yaml` files to add translations, then skip to
 
 ```powershell
 # Merge a single file
-.\merge.ps1 -Source "Cell01_JM"
+.\7-7-merge.ps1 -Source "Cell01_JM"
 
 # Merge all files
-.\merge.ps1 -All
+.\7-7-merge.ps1 -All
 
 # Skip validation (faster, but not recommended)
-.\merge.ps1 -Source "Cell01_JM" -SkipValidation
+.\7-7-merge.ps1 -Source "Cell01_JM" -SkipValidation
 ```
 
 **What happens:**
@@ -910,19 +911,19 @@ game/tl/romanian/
 
 ```powershell
 # Step 1: Configure game
-.\characters.ps1
+.\3-stage.ps1
 # Select game, language, model
 # Edit game/tl/romanian/characters.json manually
 
 # Step 2: Extract all files
-.\extract.ps1 -All
+.\4-4-extract.ps1 -All
 
 # Step 3: Translate
-.\translate.ps1
+.\5-5-translate.ps1
 # Select same game
 
 # Step 4: Merge all
-.\merge.ps1 -All
+.\7-7-merge.ps1 -All
 
 # Step 5: Test in game, then replace originals
 ```
@@ -931,12 +932,12 @@ game/tl/romanian/
 
 ```powershell
 # Extract
-.\extract.ps1 -Source "Cell01_JM.rpy"
+.\4-4-extract.ps1 -Source "Cell01_JM.rpy"
 
 # Manually edit Cell01_JM.parsed.yaml to fix translations
 
 # Merge
-.\merge.ps1 -Source "Cell01_JM"
+.\7-7-merge.ps1 -Source "Cell01_JM"
 
 # Review Cell01_JM.translated.rpy
 ```
@@ -945,13 +946,13 @@ game/tl/romanian/
 
 ```powershell
 # Extract all files (preserves existing translations)
-.\extract.ps1 -All
+.\4-4-extract.ps1 -All
 
 # Translate only untranslated blocks
-.\translate.ps1
+.\5-5-translate.ps1
 
 # Merge all
-.\merge.ps1 -All
+.\7-7-merge.ps1 -All
 ```
 
 ---
@@ -1018,10 +1019,10 @@ This is configured in `models/local_config.json` per game.
 ## Troubleshooting
 
 ### "Configuration file not found"
-**Solution:** Run `.\characters.ps1` first to set up the game.
+**Solution:** Run `.\3-stage.ps1` first to set up the game.
 
 ### "No .parsed.yaml files found"
-**Solution:** Run `.\extract.ps1 -All` first.
+**Solution:** Run `.\4-4-extract.ps1 -All` first.
 
 ### "Validation errors found"
 **Solution:** Review the error report. Common issues:
@@ -1029,7 +1030,7 @@ This is configured in `models/local_config.json` per game.
 - Unmatched `{color}` tags
 - Missing `[variable]` placeholders
 
-Fix in the `.parsed.yaml` file and re-run `.\merge.ps1`.
+Fix in the `.parsed.yaml` file and re-run `.\7-7-merge.ps1`.
 
 ### "Python not found"
 **Solution:** The scripts use the system Python. Install Python 3.8+ or run `.\setup.ps1` to create a venv.
@@ -1040,11 +1041,11 @@ Fix in the `.parsed.yaml` file and re-run `.\merge.ps1`.
 
 ### Manual Translation Workflow
 
-1. Extract files: `.\extract.ps1 -All`
+1. Extract files: `.\4-4-extract.ps1 -All`
 2. Send `.parsed.yaml` files to human translators
 3. Translators edit YAML files directly (easy to read/edit)
 4. Receive completed YAML files
-5. Merge: `.\merge.ps1 -All`
+5. Merge: `.\7-7-merge.ps1 -All`
 
 ### Git Integration
 
@@ -1062,16 +1063,16 @@ Process multiple games:
 
 ```powershell
 # Game 1
-.\characters.ps1  # Select Game 1
-.\extract.ps1 -All
-.\translate.ps1
-.\merge.ps1 -All
+.\3-stage.ps1  # Select Game 1
+.\4-4-extract.ps1 -All
+.\5-5-translate.ps1
+.\7-7-merge.ps1 -All
 
 # Game 2
-.\characters.ps1  # Select Game 2
-.\extract.ps1 -All
-.\translate.ps1
-.\merge.ps1 -All
+.\3-stage.ps1  # Select Game 2
+.\4-4-extract.ps1 -All
+.\5-5-translate.ps1
+.\7-7-merge.ps1 -All
 ```
 
 ---

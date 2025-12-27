@@ -6,7 +6,7 @@ import argparse # Import argparse
 
 # Project paths
 project_root = Path(__file__).parent.parent
-example_file = project_root / "games" / "Example" / "game" / "tl" / "romanian" / "script.rpy"
+example_file = project_root / "games" / "Example" / "game" / "tl" / "romanian" / "Cell01_Academy.rpy"
 backup_file = example_file.with_suffix(".rpy.backup")
 python_exe = project_root / "venv" / "Scripts" / "python.exe"
 
@@ -119,11 +119,27 @@ def test_example_game_translation():
     if final_count < 15:  # Should have at least 15 out of 20 translated
         print(f"[FAIL] WARNING: Expected more translations, only got {final_count}")
 
-    # Step 5: Restore original file
-    print("\n[5/5] Restoring original file for next test run...")
+    # Step 5: Restore original file and cleanup
+    print("\n[5/5] Restoring original file and cleaning up...")
     shutil.copy2(backup_file, example_file)
     backup_file.unlink()  # Delete backup
-    print("[OK] Original file restored (3 sample translations)")
+    print("[OK] Original file restored")
+
+    # Clean up any generated files
+    example_dir = example_file.parent
+    cleanup_files = [
+        example_dir / "Cell01_Academy.parsed.yaml",
+        example_dir / "Cell01_Academy.tags.json",
+        example_dir / "Cell01_Academy.translated.rpy",
+        example_dir / "characters.json"
+    ]
+
+    for cleanup_file in cleanup_files:
+        if cleanup_file.exists():
+            cleanup_file.unlink()
+            print(f"[OK] Removed: {cleanup_file.name}")
+
+    print("[OK] Example game restored to original state")
 
     # Final summary
     print("\n" + "=" * 70)
@@ -131,7 +147,7 @@ def test_example_game_translation():
     print(f"  - Started with: {initial_count} translations")
     print(f"  - Ended with: {final_count} translations")
     print(f"  - Added: {added} new translations")
-    print(f"  - File restored to original state")
+    print(f"  - All generated files cleaned up")
     print("=" * 70)
 
     return True
@@ -146,11 +162,25 @@ if __name__ == "__main__":
         import traceback
         traceback.print_exc()
 
-        # Try to restore backup if it exists
+        # Try to restore backup and cleanup if it exists
         if backup_file.exists():
-            print("\nRestoring backup file...")
+            print("\nRestoring backup file and cleaning up...")
             shutil.copy2(backup_file, example_file)
             backup_file.unlink()
             print("[OK] Backup restored")
+
+            # Clean up any generated files
+            example_dir = example_file.parent
+            cleanup_files = [
+                example_dir / "Cell01_Academy.parsed.yaml",
+                example_dir / "Cell01_Academy.tags.json",
+                example_dir / "Cell01_Academy.translated.rpy",
+                example_dir / "characters.json"
+            ]
+
+            for cleanup_file in cleanup_files:
+                if cleanup_file.exists():
+                    cleanup_file.unlink()
+                    print(f"[OK] Removed: {cleanup_file.name}")
 
         sys.exit(1)
