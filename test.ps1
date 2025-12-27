@@ -200,8 +200,9 @@ foreach ($testFile in $testFiles) {
 # Print summary
 Write-Header "TEST SUMMARY"
 
-$passedCount = ($results | Where-Object { $_.Passed }).Count
-$failedCount = ($results | Where-Object { -not $_.Passed }).Count
+# Force results into arrays to ensure .Count works even with single items
+$passedCount = @($results | Where-Object { $_.Passed }).Count
+$failedCount = @($results | Where-Object { -not $_.Passed }).Count
 $totalDuration = [TimeSpan]::Zero
 foreach ($result in $results) {
     $totalDuration += $result.Duration
@@ -225,7 +226,8 @@ Write-Host "Total: $($results.Count) tests | " -NoNewline
 Write-Host "Passed: $passedCount" -ForegroundColor Green -NoNewline
 Write-Host " | " -NoNewline
 if ($failedCount -gt 0) {
-    Write-Host "Failed: $failedCount" -ForegroundColor Red -NoNewline
+    Write-Host "Failed: " -NoNewline
+    Write-Host "$failedCount" -ForegroundColor Red -NoNewline
 } else {
     Write-Host "Failed: $failedCount" -NoNewline
 }

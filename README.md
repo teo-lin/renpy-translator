@@ -11,6 +11,7 @@ Translate **any Ren'Py visual novel** into **400+ languages** using state-of-the
 ## Features
 
 ✅ **Dual Model Support** - Choose between Aya-23-8B (23 languages) or MADLAD-400-3B (400+ languages)
+✅ **Modular Pipeline** - Extract → Translate → Merge workflow for better control and performance
 ✅ **Local Translation** - No cloud services, complete privacy
 ✅ **Preserves Ren'Py Formatting** - Keeps `{color=...}`, `{size=...}`, `[variables]` intact
 ✅ **Glossary Support** - Consistent terminology across your translations
@@ -18,6 +19,40 @@ Translate **any Ren'Py visual novel** into **400+ languages** using state-of-the
 ✅ **Quality Benchmarking** - BLEU score testing against reference translations
 ✅ **Batch Processing** - Translate entire games automatically
 ✅ **Full GPU Acceleration** - Fast translation with CUDA support
+✅ **Human Review Workflow** - Edit translations in YAML format before merging
+✅ **Git-Friendly** - Track translation changes with clean diffs
+
+## Translation Workflows
+
+This system supports **two translation workflows**:
+
+### 1. **All-in-One Workflow** (Original)
+Simple, automated translation in a single step. Best for quick translations.
+
+```powershell
+.\translate.ps1  # Processes .rpy files directly
+```
+
+### 2. **Modular Workflow** (NEW - Recommended for Control)
+Three-phase pipeline with human review checkpoints. Better for quality and collaboration.
+
+```powershell
+.\characters.ps1  # Phase 0: Setup (one-time)
+.\extract.ps1     # Phase 1: Extract clean text
+# → Edit .parsed.yaml files manually or translate
+.\merge.ps1       # Phase 2: Merge back to .rpy
+```
+
+**Benefits of Modular Workflow:**
+- ✅ **Human review** - Edit YAML files between steps
+- ✅ **Better performance** - Batch translation instead of sequential
+- ✅ **Git-friendly** - YAML diffs show exactly what changed
+- ✅ **Token efficiency** - LLM only sees clean text, no tags
+- ✅ **Integrity validation** - Syntax checking before final output
+
+📖 **Detailed Guide:** See [PIPELINE_USAGE.md](PIPELINE_USAGE.md) for complete modular workflow documentation.
+
+---
 
 ## Requirements
 
@@ -404,6 +439,9 @@ python tests\test_end_to_end.py
 
 # Unit tests for tag preservation (fast, no model required)
 python tests\test_renpy_tags.py
+
+# Modular pipeline tests (extraction/merge)
+python tests\test_extraction_merge.py
 ```
 
 The tests verify:
@@ -413,6 +451,9 @@ The tests verify:
 - ✅ Tag preservation (`{color=...}`, `[variables]`)
 - ✅ Glossary usage
 - ✅ Output format validation
+- ✅ Extraction → YAML/JSON conversion
+- ✅ Merge → .rpy reconstruction
+- ✅ Integrity validation (quotes, brackets, variables)
 
 ### BLEU Benchmarking
 
@@ -502,16 +543,24 @@ translator = Aya23Translator(model_path, n_gpu_layers=30)  # Instead of -1
 
 ```
 ├── src/                    # Core translation modules
-│   ├── core.py            # Aya23Translator class
+│   ├── models.py          # Type-safe data structures for modular pipeline
+│   ├── extraction.py      # Extract .rpy → clean YAML + tags JSON
+│   ├── merger.py          # Merge YAML + JSON → .rpy with validation
+│   ├── batch_translator.py # Context-aware batch translation
+│   ├── renpy_utils.py     # Ren'Py parsing and tag handling utilities
+│   ├── core.py            # Aya23Translator class (original pipeline)
 │   └── prompts.py         # Translation/correction prompts
 ├── scripts/               # Translation engine scripts (called by launchers)
 │   ├── translate_with_aya23.py     # Aya-23-8B translation engine
 │   ├── translate_with_madlad.py    # MADLAD-400-3B translation engine
 │   ├── correct_with_aya23.py       # Aya-23-8B grammar correction engine
-│   └── benchmark.py       # BLEU benchmark script
+│   ├── benchmark.py       # BLEU benchmark script
+│   ├── common.ps1         # Shared PowerShell functions
+│   └── user_selection.ps1 # Interactive game/language selection
 ├── tests/                 # Automated tests
-│   ├── test_end_to_end.py
-│   └── test_renpy_tags.py
+│   ├── test_end_to_end.py           # End-to-end translation tests
+│   ├── test_renpy_tags.py           # Tag preservation tests
+│   └── test_extraction_merge.py     # Modular pipeline tests (NEW)
 ├── data/                  # Prompts, glossaries, benchmarks, and correction rules
 │   ├── prompts/
 │   │   ├── translate.txt              # Translation prompt template (customizable)
@@ -522,15 +571,30 @@ translator = Aya23Translator(model_path, n_gpu_layers=30)  # Instead of -1
 │   ├── ro_uncensored_glossary.json   # Example uncensored glossary (gitignored)
 │   ├── ro_benchmark.json         # Example benchmark data template
 │   └── ro_uncensored_corrections.json # Example correction rules (gitignored)
-├── models/                # Downloaded models (gitignored)
+├── models/                # Downloaded models and configuration
+│   └── local_config.json  # Per-game configuration (NEW)
 ├── tools/                 # External tools (gitignored)
 ├── renpy/                 # Ren'Py SDK (gitignored)
 │   └── tools_config.json  # External tools configuration
+├── games/                 # Game directories (gitignored)
+│   └── <Game>/
+│       └── game/tl/<language>/
+│           ├── characters.json        # Character mappings (NEW)
+│           ├── *.rpy                  # Original translation files
+│           ├── *.parsed.yaml          # Clean text for editing (NEW)
+│           ├── *.tags.json            # Tags and metadata (NEW)
+│           └── *.translated.rpy       # Merged output (NEW)
 ├── requirements.txt       # Python dependencies
 ├── setup.ps1              # Automated setup script
 ├── translate.ps1          # Interactive launcher (selects model, language, game)
 ├── correct.ps1            # Interactive launcher for grammar correction
-└── benchmark.ps1          # PowerShell launcher for benchmark.py
+├── benchmark.ps1          # PowerShell launcher for benchmark.py
+├── characters.ps1         # Character discovery & game setup (NEW)
+├── extract.ps1            # Extract .rpy → YAML/JSON (NEW)
+├── merge.ps1              # Merge YAML/JSON → .rpy (NEW)
+├── PIPELINE_USAGE.md      # Modular pipeline user guide (NEW)
+├── MODULARISATION_PLAN.md # Technical specification (NEW)
+└── IMPLEMENTATION_SUMMARY.md # Implementation details (NEW)
 
 ```
 
@@ -553,3 +617,374 @@ MIT License - Use for any purpose, including commercial projects.
 - **Frameworks:**
   - [llama-cpp-python](https://github.com/abetlen/llama-cpp-python) (Aya-23-8B)
   - [transformers](https://github.com/huggingface/transformers) (MADLAD-400-3B)
+
+
+
+# Modular Translation Pipeline - Usage Guide
+
+## Overview
+
+The modular translation pipeline separates the translation workflow into three distinct phases:
+
+1. **Extraction**: Parse .rpy files → Extract clean text + tags
+2. **Translation**: Translate clean text using LLMs
+3. **Merge**: Reconstruct .rpy files with tags restored
+
+This separation provides:
+- ✅ **Better performance**: Batch translation instead of sequential
+- ✅ **Human review**: Edit YAML files between phases
+- ✅ **Token efficiency**: LLM only sees clean text
+- ✅ **Git-friendly**: YAML diffs show exactly what changed
+- ✅ **Integrity validation**: Syntax checking before final output
+
+---
+
+## Quick Start
+
+### Phase 0: Initial Setup (One-Time)
+
+```powershell
+# 1. Discover characters and configure game
+.\characters.ps1
+
+# This will:
+# - Let you select a game from games/ folder
+# - Select target language
+# - Select translation model
+# - Auto-discover character variables
+# - Save configuration to models/local_config.json
+# - Save characters.json to game/tl/<language>/
+```
+
+**After this step:**
+- Edit `game/tl/<language>/characters.json` to add proper character names
+- Update gender, type, and descriptions
+
+---
+
+### Phase 1: Extraction
+
+```powershell
+# Extract a single file
+.\extract.ps1 -Source "Cell01_JM.rpy"
+
+# Extract all files in the game
+.\extract.ps1 -All
+```
+
+**What happens:**
+- Reads `Cell01_JM.rpy`
+- Extracts clean English and Romanian text
+- Removes all tags (`{color=#fff}`, `[name]`, etc.)
+- Creates two files:
+  - `Cell01_JM.parsed.yaml` - Human-readable, editable
+  - `Cell01_JM.tags.json` - Machine-readable metadata
+
+**Output Example (`Cell01_JM.parsed.yaml`):**
+```yaml
+"1-Jasmine":
+  en: "See you later. Bye!"
+  ro: "Ne vedem mai târziu. Ciao!"
+
+"2-Amelia":
+  en: "It could help us speed up her corruption."
+  ro: ""
+
+"3-Choice":
+  en: "I'd like to show you Sherazade's unicorn horn"
+  ro: ""
+```
+
+**✋ STOP HERE - Review the YAML files for any parsing issues!**
+
+---
+
+### Phase 2: Translation
+
+```powershell
+# Use existing translate.ps1 (works with the current pipeline)
+.\translate.ps1
+
+# The script will:
+# - Prompt for game selection
+# - Load the model
+# - Translate only untranslated blocks (ro: "")
+# - Update the .rpy files directly
+```
+
+**Alternative (Manual YAML editing):**
+You can manually edit the `.parsed.yaml` files to add translations, then skip to Phase 3.
+
+**✋ STOP HERE - Review translations in YAML files!**
+
+---
+
+### Phase 3: Merge
+
+```powershell
+# Merge a single file
+.\merge.ps1 -Source "Cell01_JM"
+
+# Merge all files
+.\merge.ps1 -All
+
+# Skip validation (faster, but not recommended)
+.\merge.ps1 -Source "Cell01_JM" -SkipValidation
+```
+
+**What happens:**
+- Reads `Cell01_JM.parsed.yaml` and `Cell01_JM.tags.json`
+- Restores tags to translated text
+- Reconstructs .rpy file structure
+- Validates syntax (quotes, brackets, variables)
+- Creates `Cell01_JM.translated.rpy`
+
+**Validation checks:**
+- ✅ Unmatched quotes
+- ✅ Unmatched braces/brackets
+- ✅ Missing character variables
+- ✅ Missing variables from original in translation
+
+---
+
+## File Structure
+
+After running the pipeline, your `game/tl/<language>/` directory will contain:
+
+```
+game/tl/romanian/
+├── characters.json           # Character name mappings
+├── Cell01_JM.rpy            # Original translation file
+├── Cell01_JM.parsed.yaml    # Clean text for editing/translation
+├── Cell01_JM.tags.json      # Tags and metadata
+└── Cell01_JM.translated.rpy # Final output (after merge)
+```
+
+---
+
+## Workflow Examples
+
+### Example 1: New Game Setup
+
+```powershell
+# Step 1: Configure game
+.\characters.ps1
+# Select game, language, model
+# Edit game/tl/romanian/characters.json manually
+
+# Step 2: Extract all files
+.\extract.ps1 -All
+
+# Step 3: Translate
+.\translate.ps1
+# Select same game
+
+# Step 4: Merge all
+.\merge.ps1 -All
+
+# Step 5: Test in game, then replace originals
+```
+
+### Example 2: Update Single File
+
+```powershell
+# Extract
+.\extract.ps1 -Source "Cell01_JM.rpy"
+
+# Manually edit Cell01_JM.parsed.yaml to fix translations
+
+# Merge
+.\merge.ps1 -Source "Cell01_JM"
+
+# Review Cell01_JM.translated.rpy
+```
+
+### Example 3: Batch Re-translation
+
+```powershell
+# Extract all files (preserves existing translations)
+.\extract.ps1 -All
+
+# Translate only untranslated blocks
+.\translate.ps1
+
+# Merge all
+.\merge.ps1 -All
+```
+
+---
+
+## Configuration
+
+### models/local_config.json
+
+Stores game-specific configuration:
+
+```json
+{
+  "games": {
+    "Once.a.Porn.a.Time.2": {
+      "name": "Once.a.Porn.a.Time.2",
+      "path": "C:\\_oxo_\\games\\Once.a.Porn.a.Time.2",
+      "target_language": "romanian",
+      "source_language": "english",
+      "model": "Aya-23-8B",
+      "context_before": 3,
+      "context_after": 1
+    }
+  },
+  "current_game": "Once.a.Porn.a.Time.2"
+}
+```
+
+### game/tl/<language>/characters.json
+
+Maps character variables to display names:
+
+```json
+{
+  "jm": {
+    "name": "Jasmine",
+    "gender": "female",
+    "type": "main",
+    "description": "Main quest character"
+  },
+  "u": {
+    "name": "Prince",
+    "gender": "male",
+    "type": "protagonist",
+    "description": "Player character"
+  }
+}
+```
+
+---
+
+## Context Strategy
+
+The translation engine uses asymmetric context (from `MODULARISATION_PLAN.md`):
+
+- **Cell files** (character dialogue): 3 lines before, 1 line after
+- **Room files** (environment): 2 lines before, 1 line after
+- **Expedition files** (gameplay): 1 line before only
+- **Common.rpy** (system): No context
+
+This is configured in `models/local_config.json` per game.
+
+---
+
+## Troubleshooting
+
+### "Configuration file not found"
+**Solution:** Run `.\characters.ps1` first to set up the game.
+
+### "No .parsed.yaml files found"
+**Solution:** Run `.\extract.ps1 -All` first.
+
+### "Validation errors found"
+**Solution:** Review the error report. Common issues:
+- Missing quotes in translation
+- Unmatched `{color}` tags
+- Missing `[variable]` placeholders
+
+Fix in the `.parsed.yaml` file and re-run `.\merge.ps1`.
+
+### "Python not found"
+**Solution:** The scripts use the system Python. Install Python 3.8+ or run `.\setup.ps1` to create a venv.
+
+---
+
+## Advanced Features
+
+### Manual Translation Workflow
+
+1. Extract files: `.\extract.ps1 -All`
+2. Send `.parsed.yaml` files to human translators
+3. Translators edit YAML files directly (easy to read/edit)
+4. Receive completed YAML files
+5. Merge: `.\merge.ps1 -All`
+
+### Git Integration
+
+YAML files are git-friendly:
+
+```bash
+git diff Cell01_JM.parsed.yaml
+```
+
+Shows exactly which translations changed, without tag noise.
+
+### Batch Processing
+
+Process multiple games:
+
+```powershell
+# Game 1
+.\characters.ps1  # Select Game 1
+.\extract.ps1 -All
+.\translate.ps1
+.\merge.ps1 -All
+
+# Game 2
+.\characters.ps1  # Select Game 2
+.\extract.ps1 -All
+.\translate.ps1
+.\merge.ps1 -All
+```
+
+---
+
+## File Format Details
+
+### .parsed.yaml Format
+
+```yaml
+# Cell01_JM.rpy - Parsed Translations
+# Generated: 2025-12-27 10:30:00
+
+"1-Jasmine":
+  en: "See you later. Bye!"
+  ro: "Ne vedem mai târziu. Ciao!"
+
+"2-Narrator":
+  en: "You don't have any mail!"
+  ro: ""
+
+"separator-1":
+  type: separator
+
+"3-Choice":
+  en: "I'd like to show you Sherazade's unicorn horn"
+  ro: ""
+```
+
+**Key points:**
+- Composite keys: `"blockID-CharacterName"`
+- `en`: English text (always present, tags removed)
+- `ro`: Romanian translation (empty if untranslated)
+- `separator` blocks preserve structure
+
+### .tags.json Format
+
+Contains complete metadata for reconstruction. See `src/models.py` for full structure.
+
+---
+
+## Next Steps
+
+- [ ] Test the pipeline on a single file
+- [ ] Extract all files for your game
+- [ ] Review and edit `characters.json`
+- [ ] Run full translation pipeline
+- [ ] Test in-game
+- [ ] Report any issues
+
+---
+
+## Support
+
+For issues or questions:
+1. Check validation error messages
+2. Review this guide
+3. Check `MODULARISATION_PLAN.md` for technical details
+4. Inspect the generated YAML files manually

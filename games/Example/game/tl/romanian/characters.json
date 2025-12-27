@@ -1,0 +1,26 @@
+{
+  "narrator": {
+    "name": "Narrator",
+    "gender": "neutral",
+    "type": "narrator",
+    "description": "Story narrator"
+  },
+  "mc": {
+    "name": "MainCharacter",
+    "gender": "neutral",
+    "type": "protagonist",
+    "description": "Player character"
+  },
+  "sarah": {
+    "name": "Sarah",
+    "gender": "female",
+    "type": "main",
+    "description": "Helpful student who shows the academy"
+  },
+  "alex": {
+    "name": "Alex",
+    "gender": "neutral",
+    "type": "supporting",
+    "description": "Sarah's best friend"
+  }
+}

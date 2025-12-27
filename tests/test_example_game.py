@@ -33,14 +33,23 @@ def count_translations(file_path):
     content = file_path.read_text(encoding='utf-8')
     lines = content.split('\n')
 
-
     count = 0
     for i, line in enumerate(lines):
-        # Look for character lines with non-empty strings
         stripped = line.strip()
-        if stripped and not stripped.startswith('#') and '"' in stripped:
-            # Extract what's in quotes
-            if '""' not in stripped:  # Not an empty translation
+
+        # Skip comments
+        if not stripped or stripped.startswith('#'):
+            continue
+
+        # Skip "old" lines (source text, not translations)
+        if stripped.startswith('old '):
+            continue
+
+        # Count character dialogue lines with non-empty translations
+        # Format: character_var "translation text"
+        if '"' in stripped and '""' not in stripped:
+            # Check if it's a character line (starts with identifier) or "new" line
+            if stripped.startswith('new ') or (not stripped.startswith('translate') and ' "' in stripped):
                 count += 1
 
     return count
@@ -66,8 +75,8 @@ def test_example_game_translation():
     initial_count = count_translations(example_file)
     print(f"[OK] Initial translations: {initial_count}")
 
-    if initial_count != 3:
-        print(f"[FAIL] WARNING: Expected 3 initial translations, found {initial_count}")
+    if initial_count != 4:
+        print(f"[FAIL] WARNING: Expected 4 initial translations, found {initial_count}")
 
     # Step 3: Run translation
     print("\n[3/5] Running translation...")

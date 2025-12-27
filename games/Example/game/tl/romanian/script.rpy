@@ -119,3 +119,29 @@ translate romanian chapter_complete:
 
     # narrator "{size=24}{color=#4169e1}Chapter 1 Complete{/color}{/size}"
     narrator ""
+
+translate romanian strings:
+
+    # game/script.rpy:10
+    old "What's your name?"
+    new ""
+
+    # game/script.rpy:10
+    old "{color=#4169e1}Explore the academy{/color}"
+    new ""
+
+    # game/script.rpy:10
+    old "{color=#ff69b4}Talk to Sarah{/color}"
+    new "{color=#ff69b4}Vorbește cu Sarah{/color}"
+
+    # game/script.rpy:10
+    old "Go to the library"
+    new ""
+
+    # game/script.rpy:33
+    old "Order pasta"
+    new ""
+
+    # game/script.rpy:33
+    old "Order salad"
+    new ""

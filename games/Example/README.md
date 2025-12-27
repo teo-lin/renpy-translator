@@ -1,20 +1,24 @@
 # Example Ren'Py Game - Translation Demo
 
-This is a mock Ren'Py game used to demonstrate the translation system.
+This is a **minimal example Ren'Py visual novel** used for testing translation workflows.
 
 ## Structure
 
 ```
 Example/
+├── README.md                    # This file
 └── game/
+    ├── script.rpy              # Source Ren'Py script (English)
     └── tl/
         └── romanian/
-            └── script.rpy     # Romanian translations (3 samples + 17 empty)
+            ├── script.rpy      # Romanian translation file
+            ├── characters.json # Character mappings (for modular pipeline)
+            └── script.rpy.backup # Backup (created by tests)
 ```
 
 ## What's Included
 
-This example contains **20 dialogue lines** featuring:
+This example contains **20 dialogue blocks + 6 string blocks (menu choices)** featuring:
 
 ### Characters
 - **narrator** - Story narration
@@ -39,17 +43,41 @@ A new student arrives at an academy and meets Sarah, who gives them a tour. They
 
 ## Usage
 
-### Manual Translation
+### Option 1: Original Pipeline (All-in-One)
 
-You can translate the file manually:
+Translate directly using the original pipeline:
 
 ```powershell
 # Using interactive launcher (recommended)
 .\translate.ps1
 
 # Or directly with Python
-venv\Scripts\python.exe scripts\translate_with_aya23.py games\Example\game\tl\romanian
+python src\translators\aya23_translator.py games\Example\game\tl\romanian\script.rpy --language ro
 ```
+
+### Option 2: Modular Pipeline (Extract → Translate → Merge)
+
+Use the new modular pipeline for better control:
+
+```powershell
+# Step 1: Extract clean text and tags
+.\extract.ps1 -Source "script.rpy"
+# Creates: script.parsed.yaml (human-editable) and script.tags.json (metadata)
+
+# Step 2: Translate (or manually edit the YAML file)
+.\translate.ps1
+# Updates: script.parsed.yaml with translations
+
+# Step 3: Merge back to .rpy format
+.\merge.ps1 -Source "script"
+# Creates: script.translated.rpy (with tags restored and validation)
+```
+
+**Benefits of modular approach:**
+- Human review between steps
+- Edit YAML files manually
+- Git-friendly diffs
+- Integrity validation before final output
 
 ### Automated Test
 
@@ -71,11 +99,18 @@ The test will:
 
 ### File State
 
-The Romanian file contains:
-- **3 translated strings** - Sample translations to show the format
-- **17 empty strings** - Ready to be filled by the translation system
+The Romanian translation file (`game/tl/romanian/script.rpy`) contains:
+- **Total blocks:** 26 (20 dialogue + 6 string/menu choices)
+- **Translated:** 4 blocks (3 dialogue + 1 string) ≈ 15%
+- **Untranslated:** 22 blocks (17 dialogue + 5 strings) ≈ 85%
 
-After running translation, all 20 strings will be filled. The automated test restores it back to 3 samples for the next run.
+This mix allows testing:
+- Skipping already-translated blocks
+- Processing untranslated blocks
+- Preserving existing translations
+- Handling both dialogue and string block types
+
+After running translation, all 26 blocks will be filled. The automated test restores it back to the original state (4 translated) for the next run.
 
 ## Notes
 

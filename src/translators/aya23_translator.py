@@ -190,3 +190,104 @@ class Aya23Translator:
                 break
 
         return text
+
+
+if __name__ == "__main__":
+    """
+    CLI entry point for standalone translation script usage.
+
+    Usage:
+        python aya23_translator.py <input_file> --language <language>
+
+    Example:
+        python aya23_translator.py script.rpy --language ro
+    """
+    import sys
+    import json
+    from pathlib import Path
+
+    # Add parent directory to path for imports
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+
+    from translation_pipeline import RenpyTranslationPipeline
+
+    if len(sys.argv) < 3:
+        print("Usage: python aya23_translator.py <input_file> --language <lang_code>")
+        print("Example: python aya23_translator.py script.rpy --language ro")
+        sys.exit(1)
+
+    # Parse arguments
+    input_file = Path(sys.argv[1])
+    target_language = None
+
+    # Check for --language parameter
+    for i, arg in enumerate(sys.argv[2:], start=2):
+        if arg == '--language' and i + 1 < len(sys.argv):
+            target_language_code = sys.argv[i + 1]
+            # Map language codes to names
+            lang_map = {
+                'ro': 'Romanian', 'es': 'Spanish', 'fr': 'French',
+                'de': 'German', 'it': 'Italian', 'pt': 'Portuguese',
+                'ru': 'Russian', 'ar': 'Arabic', 'zh': 'Chinese',
+                'ja': 'Japanese', 'ko': 'Korean'
+            }
+            target_language = lang_map.get(target_language_code, target_language_code.capitalize())
+            break
+
+    if not target_language:
+        print("Error: --language parameter is required")
+        sys.exit(1)
+
+    if not input_file.exists():
+        print(f"Error: Input file not found: {input_file}")
+        sys.exit(1)
+
+    # Default paths
+    project_root = Path(__file__).parent.parent.parent
+    model_path = project_root / "models" / "aya-23-8B-GGUF" / "aya-23-8B-Q4_K_M.gguf"
+
+    if not model_path.exists():
+        print(f"Error: Model file not found: {model_path}")
+        sys.exit(1)
+
+    # Try to load glossary
+    glossary = None
+    lang_code = target_language_code
+    for glossary_variant in [f"{lang_code}_uncensored_glossary.json", f"{lang_code}_glossary.json"]:
+        glossary_path = project_root / "data" / glossary_variant
+        if glossary_path.exists():
+            with open(glossary_path, 'r', encoding='utf-8') as f:
+                glossary = json.load(f)
+            print(f"[OK] Using glossary: {glossary_variant}")
+            break
+
+    # Load prompt template
+    prompt_template = None
+    prompt_template_path = project_root / "data" / "prompts" / "translate_uncensored.txt"
+    if not prompt_template_path.exists():
+        prompt_template_path = project_root / "data" / "prompts" / "translate.txt"
+
+    if prompt_template_path.exists():
+        with open(prompt_template_path, 'r', encoding='utf-8') as f:
+            prompt_template = f.read()
+
+    # Initialize translator
+    translator = Aya23Translator(
+        model_path=str(model_path),
+        target_language=target_language,
+        prompt_template=prompt_template,
+        glossary=glossary
+    )
+
+    # Initialize pipeline
+    pipeline = RenpyTranslationPipeline(translator)
+
+    # Translate file
+    try:
+        pipeline.translate_file(input_file, output_path=None)
+        sys.exit(0)
+    except Exception as e:
+        print(f"Error during translation: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
