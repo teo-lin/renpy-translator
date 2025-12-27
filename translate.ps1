@@ -2,218 +2,159 @@
 # Guided workflow: Model -> Language -> Game selection
 
 param(
+    [int]$Model = 0,      # Model number (1-based), 0 = prompt user
+    [int]$Language = 0,   # Language number (1-based), 0 = prompt user
+    [int]$Game = 0,       # Game number (1-based), 0 = prompt user
+    [switch]$Yes,         # Skip confirmation prompt
     [Parameter(ValueFromRemainingArguments=$true)]
-    [string[]]$Arguments
+    [string[]]$Arguments  # Additional arguments to pass to Python script
 )
 
+$ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+# Source the shared user selection module
+. (Join-Path $scriptDir "scripts\user_selection.ps1")
+
 $pythonExe = Join-Path $scriptDir "venv\Scripts\python.exe"
 $gamesFolder = Join-Path $scriptDir "games"
-
-# Define available translation models
-$models = @(
-    @{
-        Name = "Aya-23-8B"
-        Description = "23 languages, higher quality (Romanian, Spanish, French, German, etc.)"
-        Script = Join-Path $scriptDir "scripts\translate_with_aya23.py"
-        Details = "Best for: European languages | Speed: ~2-3s/sentence | VRAM: ~5.8GB"
-    },
-    @{
-        Name = "MADLAD-400-3B"
-        Description = "400+ languages, broader coverage (includes rare languages)"
-        Script = Join-Path $scriptDir "scripts\translate_with_madlad.py"
-        Details = "Best for: Asian/rare languages | Speed: ~1-2s/sentence | VRAM: ~4GB"
-    }
-)
-
-# Load configured languages from setup
 $configFile = Join-Path $scriptDir "models\local_config.json"
 
-if (Test-Path $configFile) {
-    try {
-        $savedConfig = Get-Content $configFile | ConvertFrom-Json
-        $languages = $savedConfig.languages
-        Write-Host "Loaded $($languages.Count) configured language(s) from setup" -ForegroundColor DarkGray
-    }
-    catch {
-        Write-Host "WARNING: Could not load language configuration. Using all languages." -ForegroundColor Yellow
-        # Fallback to all languages
-        $languages = @(
-            @{Name = "Romanian"; Code = "ro"},
-            @{Name = "Spanish"; Code = "es"},
-            @{Name = "French"; Code = "fr"},
-            @{Name = "German"; Code = "de"},
-            @{Name = "Italian"; Code = "it"},
-            @{Name = "Portuguese"; Code = "pt"},
-            @{Name = "Russian"; Code = "ru"},
-            @{Name = "Turkish"; Code = "tr"},
-            @{Name = "Czech"; Code = "cs"},
-            @{Name = "Polish"; Code = "pl"},
-            @{Name = "Ukrainian"; Code = "uk"},
-            @{Name = "Bulgarian"; Code = "bg"},
-            @{Name = "Chinese"; Code = "zh"},
-            @{Name = "Japanese"; Code = "ja"},
-            @{Name = "Korean"; Code = "ko"},
-            @{Name = "Vietnamese"; Code = "vi"},
-            @{Name = "Thai"; Code = "th"},
-            @{Name = "Indonesian"; Code = "id"},
-            @{Name = "Arabic"; Code = "ar"},
-            @{Name = "Hebrew"; Code = "he"},
-            @{Name = "Persian"; Code = "fa"},
-            @{Name = "Hindi"; Code = "hi"},
-            @{Name = "Bengali"; Code = "bn"},
-            @{Name = "Dutch"; Code = "nl"},
-            @{Name = "Swedish"; Code = "sv"},
-            @{Name = "Norwegian"; Code = "no"},
-            @{Name = "Danish"; Code = "da"},
-            @{Name = "Finnish"; Code = "fi"},
-            @{Name = "Greek"; Code = "el"},
-            @{Name = "Hungarian"; Code = "hu"}
-        )
-    }
-}
-else {
-    Write-Host "WARNING: Configuration not found at models\local_config.json" -ForegroundColor Yellow
-    Write-Host "Please run setup.ps1 first. Using all 30 languages as fallback..." -ForegroundColor DarkGray
-    # Fallback to all languages
-    $languages = @(
-        @{Name = "Romanian"; Code = "ro"},
-        @{Name = "Spanish"; Code = "es"},
-        @{Name = "French"; Code = "fr"},
-        @{Name = "German"; Code = "de"},
-        @{Name = "Italian"; Code = "it"},
-        @{Name = "Portuguese"; Code = "pt"},
-        @{Name = "Russian"; Code = "ru"},
-        @{Name = "Turkish"; Code = "tr"},
-        @{Name = "Czech"; Code = "cs"},
-        @{Name = "Polish"; Code = "pl"},
-        @{Name = "Ukrainian"; Code = "uk"},
-        @{Name = "Bulgarian"; Code = "bg"},
-        @{Name = "Chinese"; Code = "zh"},
-        @{Name = "Japanese"; Code = "ja"},
-        @{Name = "Korean"; Code = "ko"},
-        @{Name = "Vietnamese"; Code = "vi"},
-        @{Name = "Thai"; Code = "th"},
-        @{Name = "Indonesian"; Code = "id"},
-        @{Name = "Arabic"; Code = "ar"},
-        @{Name = "Hebrew"; Code = "he"},
-        @{Name = "Persian"; Code = "fa"},
-        @{Name = "Hindi"; Code = "hi"},
-        @{Name = "Bengali"; Code = "bn"},
-        @{Name = "Dutch"; Code = "nl"},
-        @{Name = "Swedish"; Code = "sv"},
-        @{Name = "Norwegian"; Code = "no"},
-        @{Name = "Danish"; Code = "da"},
-        @{Name = "Finnish"; Code = "fi"},
-        @{Name = "Greek"; Code = "el"},
-        @{Name = "Hungarian"; Code = "hu"}
-    )
+# Add PyTorch lib directory to PATH for CUDA DLLs (needed by llama-cpp-python)
+$torchLibPath = Join-Path $scriptDir "venv\Lib\site-packages\torch\lib"
+if (Test-Path $torchLibPath) {
+    $env:PATH += ";$torchLibPath"
 }
 
-# Helper function to display menu and get selection
-function Show-Menu {
-    param(
-        [string]$Title,
-        [array]$Items,
-        [scriptblock]$DisplayItem
-    )
+# Set UTF-8 encoding for Python
+$env:PYTHONIOENCODING = "utf-8"
 
-    Write-Host ""
-    Write-Host "=================================================================" -ForegroundColor Cyan
-    Write-Host "       $Title" -ForegroundColor Cyan
-    Write-Host "=================================================================" -ForegroundColor Cyan
-    Write-Host ""
+# Check Python exists
+if (-not (Test-Path $pythonExe)) {
+    Write-Host "ERROR: Python executable not found at $pythonExe" -ForegroundColor Red
+    Write-Host "Please run setup.ps1 to install the virtual environment." -ForegroundColor Yellow
+    exit 1
+}
 
-    for ($i = 0; $i -lt $Items.Count; $i++) {
-        $num = $i + 1
-        & $DisplayItem $Items[$i] $num
-    }
+# Load configuration
+if (-not (Test-Path $configFile)) {
+    Write-Host "ERROR: Configuration not found at models\local_config.json" -ForegroundColor Red
+    Write-Host "Please run setup.ps1 first." -ForegroundColor Yellow
+    exit 1
+}
 
-    Write-Host "  [Q] Quit" -ForegroundColor Red
-    Write-Host ""
+$config = Get-Content $configFile | ConvertFrom-Json
 
-    while ($true) {
-        $selection = Read-Host "Select (1-$($Items.Count) or Q)"
+# Get models as an array
+if ($config.models -is [array]) {
+    $allModels = $config.models
+} else {
+    $allModels = @($config.models)
+}
 
-        if ($selection -eq "Q" -or $selection -eq "q") {
-            Write-Host "Cancelled by user." -ForegroundColor Yellow
-            exit 0
-        }
-
-        try {
-            $index = [int]$selection - 1
-            if ($index -ge 0 -and $index -lt $Items.Count) {
-                return $Items[$index]
-            }
-            else {
-                Write-Host "Invalid selection. Please enter a number between 1 and $($Items.Count)." -ForegroundColor Red
-            }
-        }
-        catch {
-            Write-Host "Invalid input. Please enter a number or Q to quit." -ForegroundColor Red
-        }
+# Filter to only include downloaded models
+$installedModels = @()
+foreach ($modelItem in $allModels) {
+    $modelPath = Join-Path $scriptDir $modelItem.Config.destination
+    if (Test-Path $modelPath) {
+        $installedModels += $modelItem
     }
 }
 
-# Step 1: Select Model
+# Get languages as an array
+if ($config.languages -is [array]) {
+    $languages = $config.languages
+} else {
+    $languages = @($config.languages)
+}
+
+# Banner
 Write-Host ""
 Write-Host "=================================================================" -ForegroundColor Green
 Write-Host "       Ren'Py Translation - Interactive Setup                   " -ForegroundColor Green
 Write-Host "=================================================================" -ForegroundColor Green
 
-if ($installedModels.Count -eq 0) {
-    Write-Host ""
-    Write-Host "ERROR: No translation models found!" -ForegroundColor Red
-    Write-Host "Please run setup.ps1 to install models." -ForegroundColor Yellow
-    exit 1
-} elseif ($installedModels.Count -eq 1) {
-    $selectedModel = $installedModels[0]
-    Write-Host ""
-    Write-Host "Auto-selecting the only available model: $($selectedModel.Name)" -ForegroundColor Cyan
-} else {
-    $selectedModel = Show-Menu -Title "Step 1: Select Translation Model" -Items $installedModels -DisplayItem {
-        param($model, $num)
-        Write-Host "  [$num] " -NoNewline -ForegroundColor Yellow
-        Write-Host $model.Name -NoNewline -ForegroundColor Green
-        Write-Host " - $($model.Description)" -ForegroundColor White
-        Write-Host "      $($model.Details)" -ForegroundColor DarkGray
+# Step 1: Select Model
+if ($Model -gt 0) {
+    if ($Model -le $installedModels.Count) {
+        $selectedModel = $installedModels[$Model - 1]
         Write-Host ""
+        Write-Host "Auto-selecting model $Model`: $($selectedModel.Name)" -ForegroundColor Cyan
+    } else {
+        Write-Host "ERROR: Invalid model number: $Model. Available models: 1-$($installedModels.Count)" -ForegroundColor Red
+        exit 1
+    }
+} else {
+    try {
+        $selectedModel = Select-Item `
+            -Title "Step 1: Select Translation Model" `
+            -ItemTypeName "model" `
+            -Items $installedModels `
+            -DisplayItem {
+                param($model, $num)
+                Write-Host "  [$num] " -NoNewline -ForegroundColor Yellow
+                Write-Host $model.Name -NoNewline -ForegroundColor Green
+                Write-Host " - $($model.Description)" -ForegroundColor White
+                Write-Host "      Size: $($model.Size)" -ForegroundColor DarkGray
+                Write-Host ""
+            }
+    } catch {
+        Write-Host "Selection cancelled." -ForegroundColor Yellow
+        exit 0
     }
 }
 
 # Step 2: Select Language
-if ($languages.Count -eq 1) {
-    $selectedLanguage = $languages[0]
-    Write-Host ""
-    Write-Host "Auto-selecting the only available language: $($selectedLanguage.Name) ($($selectedLanguage.Code))" -ForegroundColor Cyan
+if ($Language -gt 0) {
+    if ($Language -le $languages.Count) {
+        $selectedLanguage = $languages[$Language - 1]
+        Write-Host ""
+        Write-Host "Auto-selecting language $Language`: $($selectedLanguage.Name) ($($selectedLanguage.Code))" -ForegroundColor Cyan
+    } else {
+        Write-Host "ERROR: Invalid language number: $Language. Available languages: 1-$($languages.Count)" -ForegroundColor Red
+        exit 1
+    }
 } else {
-    $selectedLanguage = Show-Menu -Title "Step 2: Select Target Language" -Items $languages -DisplayItem {
-        param($lang, $num)
-        Write-Host "  [$num] " -NoNewline -ForegroundColor Yellow
-        Write-Host "$($lang.Name) " -NoNewline -ForegroundColor Green
-        Write-Host "($($lang.Code))" -ForegroundColor DarkGray
+    try {
+        $selectedLanguage = Select-Item `
+            -Title "Step 2: Select Target Language" `
+            -ItemTypeName "language" `
+            -Items $languages `
+            -DisplayItem {
+                param($lang, $num)
+                Write-Host "  [$num] " -NoNewline -ForegroundColor Yellow
+                Write-Host "$($lang.Name) " -NoNewline -ForegroundColor Green
+                Write-Host "($($lang.Code))" -ForegroundColor DarkGray
+            }
+    } catch {
+        Write-Host "Selection cancelled." -ForegroundColor Yellow
+        exit 0
     }
 }
+
 # Step 3: Scan games and select game
 Write-Host ""
 Write-Host "Scanning games folder for $($selectedLanguage.Name) translations..." -ForegroundColor Cyan
 
-$gameInfo = Get-GamesWithLanguage -LanguageFolder $selectedLanguage.Name.ToLower()
-
-# Show warning if any games are missing the language
-if ($gameInfo.Missing.Count -gt 0) {
-    Write-Host ""
-    Write-Host "WARNING: The following games do not have $($selectedLanguage.Name) translations:" -ForegroundColor Yellow
-    foreach ($gameName in $gameInfo.Missing) {
-        Write-Host "  - $gameName" -ForegroundColor DarkYellow
+# Scan games folder
+$games = @()
+if (Test-Path $gamesFolder) {
+    $gameFolders = Get-ChildItem -Path $gamesFolder -Directory
+    foreach ($gameFolder in $gameFolders) {
+        $tlPath = Join-Path $gameFolder.FullName "game\tl\$($selectedLanguage.Name.ToLower())"
+        if (Test-Path $tlPath) {
+            $renpyFiles = Get-ChildItem -Path $tlPath -Filter "*.rpy" -Recurse
+            if ($renpyFiles.Count -gt 0) {
+                $games += @{
+                    Name = $gameFolder.Name
+                    Path = $tlPath
+                }
+            }
+        }
     }
-    Write-Host ""
-    Write-Host "To add $($selectedLanguage.Name) translations to these games, run:" -ForegroundColor DarkGray
-    Write-Host "  renpy.exe `"path\to\game`" generate-translations $($selectedLanguage.Name.ToLower())" -ForegroundColor DarkGray
 }
 
-# Check if any games are available
-if ($gameInfo.Available.Count -eq 0) {
+if ($games.Count -eq 0) {
     Write-Host ""
     Write-Host "ERROR: No games found with $($selectedLanguage.Name) translations!" -ForegroundColor Red
     Write-Host ""
@@ -223,11 +164,31 @@ if ($gameInfo.Available.Count -eq 0) {
     exit 1
 }
 
-$selectedGame = Show-Menu -Title "Step 3: Select Game to Translate" -Items $gameInfo.Available -DisplayItem {
-    param($game, $num)
-    Write-Host "  [$num] " -NoNewline -ForegroundColor Yellow
-    Write-Host $game.Name -ForegroundColor Green
-    Write-Host "      Path: $($game.Path)" -ForegroundColor DarkGray
+if ($Game -gt 0) {
+    if ($Game -le $games.Count) {
+        $selectedGame = $games[$Game - 1]
+        Write-Host ""
+        Write-Host "Auto-selecting game $Game`: $($selectedGame.Name)" -ForegroundColor Cyan
+    } else {
+        Write-Host "ERROR: Invalid game number: $Game. Available games: 1-$($games.Count)" -ForegroundColor Red
+        exit 1
+    }
+} else {
+    try {
+        $selectedGame = Select-Item `
+            -Title "Step 3: Select Game to Translate" `
+            -ItemTypeName "game" `
+            -Items $games `
+            -DisplayItem {
+                param($game, $num)
+                Write-Host "  [$num] " -NoNewline -ForegroundColor Yellow
+                Write-Host $game.Name -ForegroundColor Green
+                Write-Host "      Path: $($game.Path)" -ForegroundColor DarkGray
+            }
+    } catch {
+        Write-Host "Selection cancelled." -ForegroundColor Yellow
+        exit 0
+    }
 }
 
 # Summary
@@ -246,29 +207,26 @@ Write-Host $selectedGame.Path -ForegroundColor Green
 Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host ""
 
-$confirm = Read-Host "Proceed with translation? (Y/N)"
-if ($confirm -ne "Y" -and $confirm -ne "y") {
-    Write-Host "Cancelled by user." -ForegroundColor Yellow
-    exit 0
+if (-not $Yes) {
+    $confirm = Read-Host "Proceed with translation? (Y/N)"
+    if ($confirm -ne "Y" -and $confirm -ne "y") {
+        Write-Host "Cancelled by user." -ForegroundColor Yellow
+        exit 0
+    }
 }
 
-# Check if Python executable exists
-if (-not (Test-Path $pythonExe)) {
-    Write-Host ""
-    Write-Host "ERROR: Python executable not found at $pythonExe" -ForegroundColor Red
-    Write-Host "Please run setup.ps1 to install the virtual environment." -ForegroundColor Yellow
-    exit 1
-}
+# Get the model script path
+$modelScript = Join-Path $scriptDir $selectedModel.Config.script
 
 # Check if script exists
-if (-not (Test-Path $selectedModel.Script)) {
+if (-not (Test-Path $modelScript)) {
     Write-Host ""
-    Write-Host "ERROR: Translation script not found at $($selectedModel.Script)" -ForegroundColor Red
+    Write-Host "ERROR: Translation script not found at $modelScript" -ForegroundColor Red
     exit 1
 }
 
 # Build arguments
-$scriptArgs = @($selectedGame.Path, "--language", $selectedLanguage.Name)
+$scriptArgs = @($selectedGame.Path, "--language", $selectedLanguage.Code)
 if ($Arguments.Count -gt 0) {
     $scriptArgs += $Arguments
 }
@@ -278,7 +236,7 @@ Write-Host ""
 Write-Host "Starting translation with $($selectedModel.Name)..." -ForegroundColor Cyan
 Write-Host ""
 
-& $pythonExe $selectedModel.Script $scriptArgs
+& $pythonExe $modelScript $scriptArgs
 
 # Check exit code
 if ($LASTEXITCODE -ne 0) {

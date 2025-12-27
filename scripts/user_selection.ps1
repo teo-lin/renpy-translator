@@ -21,7 +21,7 @@ function Select-Item {
     if ($Items.Count -eq 1) {
         $selectedItem = $Items[0]
         Write-Host ""
-        Write-Host "Auto-selecting the only available $ItemTypeName: ${selectedItem.Name}" -ForegroundColor Cyan
+        Write-Host "Auto-selecting the only available $ItemTypeName`: $($selectedItem.Name)" -ForegroundColor Cyan
         return $selectedItem
     }
 

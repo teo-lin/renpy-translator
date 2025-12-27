@@ -9,7 +9,19 @@
 
 .EXAMPLE
     .\test.ps1
+
+.EXAMPLE
+    .\test.ps1 -Model 1
 #>
+
+param(
+    [int]$Model = 0  # Model number to test (1-based), 0 = prompt user
+)
+
+$ErrorActionPreference = "Stop"
+
+# Source the shared user selection module
+. (Join-Path $PSScriptRoot "scripts\user_selection.ps1")
 
 # Color output helpers
 function Write-Success {
@@ -36,57 +48,20 @@ function Write-Header {
     Write-Host $separator -ForegroundColor Yellow
 }
 
-# Helper function to display menu and get selection
-function Show-Menu {
-    param(
-        [string]$Title,
-        [array]$Items,
-        [scriptblock]$DisplayItem
-    )
-
-    Write-Host ""
-    Write-Host "=================================================================" -ForegroundColor Cyan
-    Write-Host "       $Title" -ForegroundColor Cyan
-    Write-Host "=================================================================" -ForegroundColor Cyan
-    Write-Host ""
-
-    for ($i = 0; $i -lt $Items.Count; $i++) {
-        $num = $i + 1
-        & $DisplayItem $Items[$i] $num
-    }
-
-    Write-Host "  [Q] Quit" -ForegroundColor Red
-    Write-Host ""
-
-    while ($true) {
-        $selection = Read-Host "Select (1-$($Items.Count) or Q)"
-
-        if ($selection -eq "Q" -or $selection -eq "q") {
-            Write-Host "Cancelled by user." -ForegroundColor Yellow
-            exit 0
-        }
-
-        try {
-            $index = [int]$selection - 1
-            if ($index -ge 0 -and $index -lt $Items.Count) {
-                return $Items[$index]
-            }
-            else {
-                Write-Host "Invalid selection. Please enter a number between 1 and $($Items.Count)." -ForegroundColor Red
-            }
-        }
-        catch {
-            Write-Host "Invalid input. Please enter a number or Q to quit." -ForegroundColor Red
-        }
-    }
-}
-
 # Main script
-$ErrorActionPreference = "Stop"
 $testDir = Join-Path $PSScriptRoot "tests"
 $pythonExe = Join-Path $PSScriptRoot "venv\Scripts\python.exe"
 $configFile = Join-Path $PSScriptRoot "models\local_config.json"
 $results = @()
+
+# Add PyTorch lib directory to PATH for CUDA DLLs (needed by llama-cpp-python)
+$torchLibPath = Join-Path $PSScriptRoot "venv\Lib\site-packages\torch\lib"
+if (Test-Path $torchLibPath) {
+    $env:PATH += ";$torchLibPath"
+}
+
+# Set UTF-8 encoding for Python
+$env:PYTHONIOENCODING = "utf-8"
 
 # Check if venv Python exists
 if (-not (Test-Path $pythonExe)) {
@@ -103,7 +78,24 @@ if (-not (Test-Path $configFile)) {
 }
 $config = Get-Content $configFile | ConvertFrom-Json
 
-$installedModels = $config.models
+# Get models as an array
+if ($config.models -is [array]) {
+    $allModels = $config.models
+} else {
+    $allModels = @($config.models)
+}
+
+# Filter to only include models that have been downloaded
+$installedModels = @()
+foreach ($modelItem in $allModels) {
+    $modelPath = Join-Path $PSScriptRoot $modelItem.Config.destination
+    if (Test-Path $modelPath) {
+        $installedModels += $modelItem
+    } else {
+        Write-Info "Skipping model $($modelItem.Name) - not yet downloaded"
+    }
+}
+
 $selectedLanguage = $config.languages | Where-Object { $_.Code -eq 'ro' } | Select-Object -First 1
 
 if (-not $selectedLanguage) {
@@ -117,17 +109,32 @@ Write-Header "RUNNING ALL STANDALONE TESTS"
 if ($installedModels.Count -eq 0) {
     Write-Failure "ERROR: No translation models found in $configFile"
     exit 1
-} elseif ($installedModels.Count -eq 1) {
-    $selectedModel = $installedModels[0]
-    Write-Info "Auto-selecting the only available model: $($selectedModel.Name)"
+} elseif ($Model -gt 0) {
+    # Model specified via parameter
+    if ($Model -le $installedModels.Count) {
+        $selectedModel = $installedModels[$Model - 1]
+        Write-Info "Auto-selecting model $Model`: $($selectedModel.Name)"
+    } else {
+        Write-Failure "Invalid model number: $Model. Available models: 1-$($installedModels.Count)"
+        exit 1
+    }
 } else {
-    $selectedModel = Show-Menu -Title "Select Translation Model for Testing" -Items $installedModels -DisplayItem {
-        param($model, $num)
-        Write-Host "  [$num] " -NoNewline -ForegroundColor Yellow
-        Write-Host $model.Name -NoNewline -ForegroundColor Green
-        Write-Host " - $($model.Description)" -ForegroundColor White
-        Write-Host "      $($model.Details)" -ForegroundColor DarkGray
-        Write-Host ""
+    try {
+        $selectedModel = Select-Item `
+            -Title "Select Translation Model for Testing" `
+            -ItemTypeName "model" `
+            -Items $installedModels `
+            -DisplayItem {
+                param($model, $num)
+                Write-Host "  [$num] " -NoNewline -ForegroundColor Yellow
+                Write-Host $model.Name -NoNewline -ForegroundColor Green
+                Write-Host " - $($model.Description)" -ForegroundColor White
+                Write-Host "      Size: $($model.Size)" -ForegroundColor DarkGray
+                Write-Host ""
+            }
+    } catch {
+        Write-Failure "Selection cancelled."
+        exit 0
     }
 }
 
@@ -156,8 +163,8 @@ foreach ($testFile in $testFiles) {
 
             # Build arguments
             Write-Host "DEBUG: PSScriptRoot is: $PSScriptRoot"
-            Write-Host "DEBUG: selectedModel.Script is: $($selectedModel.Script)"
-            $modelScriptPath = "$PSScriptRoot\$($selectedModel.Script)" # More robust string concatenation
+            Write-Host "DEBUG: selectedModel.Config.script is: $($selectedModel.Config.script)"
+            $modelScriptPath = Join-Path $PSScriptRoot $selectedModel.Config.script
             Write-Host "DEBUG: modelScriptPath (constructed) is: $modelScriptPath"
         
             $scriptArgs = @(

@@ -4,7 +4,9 @@
 param(
     [switch]$SkipPython,
     [switch]$SkipTools,
-    [switch]$SkipModel
+    [switch]$SkipModel,
+    [string]$Languages = "",  # Comma-separated language codes (e.g., "ro,es,fr") or "all"
+    [string]$Models = ""      # Comma-separated model numbers (e.g., "1,2") or "all"
 )
 
 $ErrorActionPreference = "Stop"
@@ -197,50 +199,89 @@ Write-Host ""
 
 $selectedLanguages = @()
 
-while ($selectedLanguages.Count -eq 0) {
-    $selection = Read-Host "Enter your selection (numbers separated by commas, or A for all)"
-
-    if ($selection -eq "A" -or $selection -eq "a") {
+# Check if Languages parameter was provided
+if ($Languages -ne "") {
+    if ($Languages -eq "all" -or $Languages -eq "A") {
         $selectedLanguages = $allLanguages
-        Write-Host "  Selected: All languages" -ForegroundColor Green
-        break
+        Write-Host "  Auto-selected: All languages" -ForegroundColor Green
     }
+    else {
+        # Parse language codes from parameter
+        $langCodes = $Languages -split ',' | ForEach-Object { $_.Trim().ToLower() }
+        $selectedCodes = @()
 
-    # Parse comma-separated numbers
-    $numbers = $selection -split ',' | ForEach-Object { $_.Trim() }
-    $validSelections = @()
-    $selectedCodes = @()
-
-    foreach ($num in $numbers) {
-        try {
-            $index = [int]$num - 1
-            if ($index -ge 0 -and $index -lt $allLanguages.Count) {
-                $lang = $allLanguages[$index]
-                # Only add if not already selected
+        foreach ($code in $langCodes) {
+            $lang = $allLanguages | Where-Object { $_.Code -eq $code }
+            if ($lang) {
                 if ($selectedCodes -notcontains $lang.Code) {
-                    $validSelections += $lang
+                    $selectedLanguages += $lang
                     $selectedCodes += $lang.Code
                 }
             }
             else {
-                Write-Host "  Invalid selection: $num (out of range)" -ForegroundColor Red
+                Write-Host "  WARNING: Unknown language code: $code (skipping)" -ForegroundColor Yellow
             }
         }
-        catch {
-            Write-Host "  Invalid input: $num (not a number)" -ForegroundColor Red
-        }
-    }
 
-    if ($validSelections.Count -gt 0) {
-        $selectedLanguages = $validSelections
-        Write-Host "  Selected $($selectedLanguages.Count) language(s):" -ForegroundColor Green
-        foreach ($lang in $selectedLanguages) {
-            Write-Host "    - $($lang.Name) ($($lang.Code))" -ForegroundColor Gray
+        if ($selectedLanguages.Count -gt 0) {
+            Write-Host "  Auto-selected $($selectedLanguages.Count) language(s):" -ForegroundColor Green
+            foreach ($lang in $selectedLanguages) {
+                Write-Host "    - $($lang.Name) ($($lang.Code))" -ForegroundColor Gray
+            }
+        }
+        else {
+            Write-Host "  ERROR: No valid languages selected from parameter: $Languages" -ForegroundColor Red
+            exit 1
         }
     }
-    else {
-        Write-Host "  No valid languages selected. Please try again." -ForegroundColor Red
-        exit 1
+}
+else {
+    # Interactive mode
+    while ($selectedLanguages.Count -eq 0) {
+        $selection = Read-Host "Enter your selection (numbers separated by commas, or A for all)"
+
+        if ($selection -eq "A" -or $selection -eq "a") {
+            $selectedLanguages = $allLanguages
+            Write-Host "  Selected: All languages" -ForegroundColor Green
+            break
+        }
+
+        # Parse comma-separated numbers
+        $numbers = $selection -split ',' | ForEach-Object { $_.Trim() }
+        $validSelections = @()
+        $selectedCodes = @()
+
+        foreach ($num in $numbers) {
+            try {
+                $index = [int]$num - 1
+                if ($index -ge 0 -and $index -lt $allLanguages.Count) {
+                    $lang = $allLanguages[$index]
+                    # Only add if not already selected
+                    if ($selectedCodes -notcontains $lang.Code) {
+                        $validSelections += $lang
+                        $selectedCodes += $lang.Code
+                    }
+                }
+                else {
+                    Write-Host "  Invalid selection: $num (out of range)" -ForegroundColor Red
+                }
+            }
+            catch {
+                Write-Host "  Invalid input: $num (not a number)" -ForegroundColor Red
+            }
+        }
+
+        if ($validSelections.Count -gt 0) {
+            $selectedLanguages = $validSelections
+            Write-Host "  Selected $($selectedLanguages.Count) language(s):" -ForegroundColor Green
+            foreach ($lang in $selectedLanguages) {
+                Write-Host "    - $($lang.Name) ($($lang.Code))" -ForegroundColor Gray
+            }
+        }
+        else {
+            Write-Host "  No valid languages selected. Please try again." -ForegroundColor Red
+            exit 1
+        }
     }
 }
 
@@ -321,50 +362,97 @@ if (-not $SkipModel) {
 
     $selectedModels = @()
 
-    while ($selectedModels.Count -eq 0) {
-        $selection = Read-Host "Enter your selection (numbers separated by commas, or A for all)"
-
-        if ($selection -eq "A" -or $selection -eq "a") {
+    # Check if Models parameter was provided
+    if ($Models -ne "") {
+        if ($Models -eq "all" -or $Models -eq "A") {
             $selectedModels = $availableModels
-            Write-Host "  Selected: All models" -ForegroundColor Green
-            break
-        }
-
-        # Parse comma-separated numbers
-        $numbers = $selection -split ',' | ForEach-Object { $_.Trim() }
-        $validSelections = @()
-        $selectedKeys = @()
-
-        foreach ($num in $numbers) {
-            try {
-                $index = [int]$num - 1
-                if ($index -ge 0 -and $index -lt $availableModels.Count) {
-                    $model = $availableModels[$index]
-                    # Only add if not already selected
-                    if ($selectedKeys -notcontains $model.Key) {
-                        $validSelections += $model
-                        $selectedKeys += $model.Key
-                    }
-                }
-                else {
-                    Write-Host "  Invalid selection: $num (out of range)" -ForegroundColor Red
-                }
-            }
-            catch {
-                Write-Host "  Invalid input: $num (not a number)" -ForegroundColor Red
-            }
-        }
-
-        if ($validSelections.Count -gt 0) {
-            $selectedModels = $validSelections
-            Write-Host "  Selected $($selectedModels.Count) model(s):" -ForegroundColor Green
-            foreach ($model in $selectedModels) {
-                Write-Host "    - $($model.Name) ($($model.Size))" -ForegroundColor Gray
-            }
+            Write-Host "  Auto-selected: All models" -ForegroundColor Green
         }
         else {
-            Write-Host "  No valid models selected. Please try again." -ForegroundColor Red
-            exit 1
+            # Parse model numbers from parameter
+            $modelNumbers = $Models -split ',' | ForEach-Object { $_.Trim() }
+            $validSelections = @()
+            $selectedKeys = @()
+
+            foreach ($num in $modelNumbers) {
+                try {
+                    $index = [int]$num - 1
+                    if ($index -ge 0 -and $index -lt $availableModels.Count) {
+                        $model = $availableModels[$index]
+                        if ($selectedKeys -notcontains $model.Key) {
+                            $validSelections += $model
+                            $selectedKeys += $model.Key
+                        }
+                    }
+                    else {
+                        Write-Host "  WARNING: Invalid model number: $num (out of range)" -ForegroundColor Yellow
+                    }
+                }
+                catch {
+                    Write-Host "  WARNING: Invalid model number: $num (not a number)" -ForegroundColor Yellow
+                }
+            }
+
+            if ($validSelections.Count -gt 0) {
+                $selectedModels = $validSelections
+                Write-Host "  Auto-selected $($selectedModels.Count) model(s):" -ForegroundColor Green
+                foreach ($model in $selectedModels) {
+                    Write-Host "    - $($model.Name) ($($model.Size))" -ForegroundColor Gray
+                }
+            }
+            else {
+                Write-Host "  ERROR: No valid models selected from parameter: $Models" -ForegroundColor Red
+                exit 1
+            }
+        }
+    }
+    else {
+        # Interactive mode
+        while ($selectedModels.Count -eq 0) {
+            $selection = Read-Host "Enter your selection (numbers separated by commas, or A for all)"
+
+            if ($selection -eq "A" -or $selection -eq "a") {
+                $selectedModels = $availableModels
+                Write-Host "  Selected: All models" -ForegroundColor Green
+                break
+            }
+
+            # Parse comma-separated numbers
+            $numbers = $selection -split ',' | ForEach-Object { $_.Trim() }
+            $validSelections = @()
+            $selectedKeys = @()
+
+            foreach ($num in $numbers) {
+                try {
+                    $index = [int]$num - 1
+                    if ($index -ge 0 -and $index -lt $availableModels.Count) {
+                        $model = $availableModels[$index]
+                        # Only add if not already selected
+                        if ($selectedKeys -notcontains $model.Key) {
+                            $validSelections += $model
+                            $selectedKeys += $model.Key
+                        }
+                    }
+                    else {
+                        Write-Host "  Invalid selection: $num (out of range)" -ForegroundColor Red
+                    }
+                }
+                catch {
+                    Write-Host "  Invalid input: $num (not a number)" -ForegroundColor Red
+                }
+            }
+
+            if ($validSelections.Count -gt 0) {
+                $selectedModels = $validSelections
+                Write-Host "  Selected $($selectedModels.Count) model(s):" -ForegroundColor Green
+                foreach ($model in $selectedModels) {
+                    Write-Host "    - $($model.Name) ($($model.Size))" -ForegroundColor Gray
+                }
+            }
+            else {
+                Write-Host "  No valid models selected. Please try again." -ForegroundColor Red
+                exit 1
+            }
         }
     }
 
@@ -473,6 +561,12 @@ if (-not $SkipPython) {
     }
 
     if ($needsLlamaCpp) {
+        # Add PyTorch lib directory to PATH for CUDA DLLs (needed by llama-cpp-python)
+        $torchLibPath = Join-Path $scriptDir "venv\Lib\site-packages\torch\lib"
+        if (Test-Path $torchLibPath) {
+            $env:PATH += ";$torchLibPath"
+        }
+
         # Check if llama-cpp-python with CUDA is properly installed
         $llamaCppWorking = $false
         try {
@@ -613,7 +707,8 @@ if (-not $SkipModel -and $selectedModels) {
 
                 # Download using transformers snapshot_download
                 $venvPython = Join-Path $scriptDir "venv\Scripts\python.exe"
-                & $venvPython -c "from transformers import AutoModelForSeq2SeqLM, AutoTokenizer; model = AutoModelForSeq2SeqLM.from_pretrained('$($modelConfig.repo)'); tokenizer = AutoTokenizer.from_pretrained('$($modelConfig.repo)'); model.save_pretrained('$modelPath'); tokenizer.save_pretrained('$modelPath')"
+                $modelPathUnix = $modelPath -replace '\\', '/'
+                & $venvPython -c "from transformers import AutoModelForSeq2SeqLM, AutoTokenizer; model = AutoModelForSeq2SeqLM.from_pretrained('$($modelConfig.repo)'); tokenizer = AutoTokenizer.from_pretrained('$($modelConfig.repo)'); model.save_pretrained('$modelPathUnix'); tokenizer.save_pretrained('$modelPathUnix')"
 
                 if (Test-Path $modelPath) {
                     Write-Host "    Downloaded successfully!" -ForegroundColor Green
@@ -638,7 +733,8 @@ if (-not $SkipModel -and $selectedModels) {
 
                 # Download using huggingface-cli
                 $venvPython = Join-Path $scriptDir "venv\Scripts\python.exe"
-                & $venvPython -c "from huggingface_hub import hf_hub_download; hf_hub_download(repo_id='$($modelConfig.repo)', filename='$($modelConfig.file)', local_dir='$modelDir')"
+                $modelDirUnix = $modelDir -replace '\\', '/'
+                & $venvPython -c "from huggingface_hub import hf_hub_download; hf_hub_download(repo_id='$($modelConfig.repo)', filename='$($modelConfig.file)', local_dir='$modelDirUnix')"
 
                 if (Test-Path $modelPath) {
                     Write-Host "    Downloaded successfully!" -ForegroundColor Green
@@ -718,6 +814,12 @@ Write-Host "[5/6] Verifying installation..." -ForegroundColor Green
 
 $allGood = $true
 $venvPython = Join-Path $scriptDir "venv\Scripts\python.exe"
+
+# Add PyTorch lib directory to PATH for CUDA DLLs (needed by llama-cpp-python)
+$torchLibPath = Join-Path $scriptDir "venv\Lib\site-packages\torch\lib"
+if (Test-Path $torchLibPath) {
+    $env:PATH += ";$torchLibPath"
+}
 
 # Check Python packages
 Write-Host "  Checking Python packages..." -ForegroundColor Gray
