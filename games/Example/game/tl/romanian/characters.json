@@ -1,26 +1,32 @@
-{
-  "narrator": {
-    "name": "Narrator",
-    "gender": "neutral",
-    "type": "narrator",
-    "description": "Story narrator"
-  },
-  "mc": {
-    "name": "MainCharacter",
-    "gender": "neutral",
-    "type": "protagonist",
-    "description": "Player character"
-  },
-  "sarah": {
-    "name": "Sarah",
-    "gender": "female",
-    "type": "main",
-    "description": "Helpful student who shows the academy"
-  },
-  "alex": {
-    "name": "Alex",
-    "gender": "neutral",
-    "type": "supporting",
-    "description": "Sarah's best friend"
-  }
+﻿{
+    "mc":  {
+               "type":  "protagonist",
+               "description":  "Cell character (appears in 1 files)",
+               "name":  "MainCharacter",
+               "gender":  "neutral"
+           },
+    "narrator":  {
+                     "type":  "narrator",
+                     "description":  "Cell character (appears in 1 files)",
+                     "name":  "Narrator",
+                     "gender":  "neutral"
+                 },
+    "alex":  {
+                 "type":  "main",
+                 "description":  "Cell character (appears in 1 files)",
+                 "name":  "Alex",
+                 "gender":  "neutral"
+             },
+    "sarah":  {
+                  "type":  "main",
+                  "description":  "Cell character (appears in 1 files)",
+                  "name":  "Sarah",
+                  "gender":  "neutral"
+              },
+    "":  {
+             "type":  "narrator",
+             "description":  "narration without character",
+             "name":  "narrator",
+             "gender":  "neutral"
+         }
 }

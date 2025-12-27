@@ -15,7 +15,7 @@ function Get-PythonCommand {
         }
     }
 
-    Write-Host "❌ Python not found! Please install Python 3.8+" -ForegroundColor Red
+    Write-Host " Python not found! Please install Python 3.8+" -ForegroundColor Red
     exit 1
 }
 
@@ -25,7 +25,7 @@ function Get-GameConfig {
     $configPath = Join-Path $PSScriptRoot "..\models\local_config.json"
 
     if (-not (Test-Path $configPath)) {
-        Write-Host "❌ Configuration file not found!" -ForegroundColor Red
+        Write-Host " Configuration file not found!" -ForegroundColor Red
         Write-Host "   Please run characters.ps1 first to configure your game" -ForegroundColor Yellow
         exit 1
     }
@@ -36,7 +36,7 @@ function Get-GameConfig {
         if ($config.games.PSObject.Properties.Name -contains $GameName) {
             return $config.games.$GameName
         } else {
-            Write-Host "❌ Game '$GameName' not found in configuration!" -ForegroundColor Red
+            Write-Host " Game '$GameName' not found in configuration!" -ForegroundColor Red
             exit 1
         }
     }
@@ -47,7 +47,7 @@ function Get-GameConfig {
         return $config.games.$currentGame
     }
 
-    Write-Host "❌ No game configured!" -ForegroundColor Red
+    Write-Host " No game configured!" -ForegroundColor Red
     Write-Host "   Please run characters.ps1 first" -ForegroundColor Yellow
     exit 1
 }
@@ -56,7 +56,7 @@ function Select-ConfiguredGame {
     $configPath = Join-Path $PSScriptRoot "..\models\local_config.json"
 
     if (-not (Test-Path $configPath)) {
-        Write-Host "❌ No games configured!" -ForegroundColor Red
+        Write-Host " No games configured!" -ForegroundColor Red
         Write-Host "   Please run characters.ps1 first" -ForegroundColor Yellow
         exit 1
     }
@@ -65,7 +65,7 @@ function Select-ConfiguredGame {
     $gameNames = $config.games.PSObject.Properties.Name
 
     if ($gameNames.Count -eq 0) {
-        Write-Host "❌ No games configured!" -ForegroundColor Red
+        Write-Host " No games configured!" -ForegroundColor Red
         exit 1
     }
 
@@ -75,7 +75,7 @@ function Select-ConfiguredGame {
     }
 
     # Multiple games, let user choose
-    Write-Host "🎮 Configured Games:" -ForegroundColor Yellow
+    Write-Host " Configured Games:" -ForegroundColor Yellow
     Write-Host ""
 
     for ($i = 0; $i -lt $gameNames.Count; $i++) {
@@ -113,8 +113,8 @@ function Update-CurrentGame {
 function Show-GameInfo {
     param($GameConfig)
 
-    Write-Host "📁 Game: $($GameConfig.name)" -ForegroundColor Cyan
-    Write-Host "🌍 Language: $($GameConfig.target_language)" -ForegroundColor Cyan
-    Write-Host "🤖 Model: $($GameConfig.model)" -ForegroundColor Cyan
+    Write-Host " Game: $($GameConfig.name)" -ForegroundColor Cyan
+    Write-Host " Language: $($GameConfig.target_language)" -ForegroundColor Cyan
+    Write-Host " Model: $($GameConfig.model)" -ForegroundColor Cyan
     Write-Host ""
 }

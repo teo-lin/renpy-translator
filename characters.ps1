@@ -12,31 +12,31 @@ param(
 
 function Show-Banner {
     Write-Host ""
-    Write-Host "╔═══════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║         Character Discovery & Game Configuration          ║" -ForegroundColor Cyan
-    Write-Host "╚═══════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+    Write-Host "" -ForegroundColor Cyan
+    Write-Host "         Character Discovery & Game Configuration          " -ForegroundColor Cyan
+    Write-Host "" -ForegroundColor Cyan
     Write-Host ""
 }
 
 function Select-Game {
-    Write-Host "🎮 Available Games:" -ForegroundColor Yellow
+    Write-Host "[Game] Available Games:" -ForegroundColor Yellow
     Write-Host ""
 
     $gamesDir = Join-Path $PSScriptRoot "games"
     if (-not (Test-Path $gamesDir)) {
-        New-Item -ItemType Directory -Path $gamesDir -Force | Out-Null
+        new-Item -ItemType Directory -Path $gamesDir -Force | Out-null
     }
 
     $games = Get-ChildItem -Path $gamesDir -Directory
 
     if ($games.Count -eq 0) {
-        Write-Host "   No games found in 'games' directory!" -ForegroundColor Red
+        Write-Host "   no games found in 'games' directory!" -ForegroundColor Red
         Write-Host "   Please add your game folders to: $gamesDir" -ForegroundColor Yellow
         exit 1
     }
 
     for ($i = 0; $i -lt $games.Count; $i++) {
-        Write-Host "   [$($i + 1)] $($games[$i].Name)" -ForegroundColor Cyan
+        Write-Host "   [$($i + 1)] $($games[$i].name)" -ForegroundColor Cyan
     }
 
     Write-Host ""
@@ -58,24 +58,24 @@ function Select-Game {
 function Select-Language {
     param([string]$GamePath)
 
-    Write-Host "🌍 Available Languages:" -ForegroundColor Yellow
+    Write-Host "[Language] Available Languages:" -ForegroundColor Yellow
     Write-Host ""
 
     $tlDir = Join-Path $GamePath "game\tl"
     if (-not (Test-Path $tlDir)) {
-        Write-Host "   No translation folders found in game!" -ForegroundColor Red
+        Write-Host "   no translation folders found in game!" -ForegroundColor Red
         exit 1
     }
 
     $languages = Get-ChildItem -Path $tlDir -Directory
 
     if ($languages.Count -eq 0) {
-        Write-Host "   No language folders found!" -ForegroundColor Red
+        Write-Host "   no language folders found!" -ForegroundColor Red
         exit 1
     }
 
     for ($i = 0; $i -lt $languages.Count; $i++) {
-        Write-Host "   [$($i + 1)] $($languages[$i].Name)" -ForegroundColor Cyan
+        Write-Host "   [$($i + 1)] $($languages[$i].name)" -ForegroundColor Cyan
     }
 
     Write-Host ""
@@ -87,7 +87,7 @@ function Select-Language {
             Write-Host "Invalid selection!" -ForegroundColor Red
             exit 1
         }
-        return $languages[$index].Name
+        return $languages[$index].name
     } catch {
         Write-Host "Invalid input!" -ForegroundColor Red
         exit 1
@@ -95,7 +95,7 @@ function Select-Language {
 }
 
 function Select-Model {
-    Write-Host "🤖 Available Models:" -ForegroundColor Yellow
+    Write-Host "[Model] Available Models:" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "   [1] Aya-23-8B (Higher quality, 4.8GB)" -ForegroundColor Cyan
     Write-Host "   [2] MADLAD-400-3B (400+ languages, 6GB)" -ForegroundColor Cyan
@@ -119,13 +119,15 @@ function Discover-Characters {
     )
 
     Write-Host ""
-    Write-Host "🔍 Discovering characters from .rpy files..." -ForegroundColor Yellow
+    Write-Host "[Search] Discovering characters from .rpy files..." -ForegroundColor Yellow
 
     $characterVars = @{}
+    $characterFiles = @{}  # Track which files each character appears in
     $rpyFiles = Get-ChildItem -Path $TlPath -Filter "*.rpy" -Recurse
 
     foreach ($file in $rpyFiles) {
         $content = Get-Content -Path $file.FullName -Raw -Encoding UTF8
+        $fileName = $file.BaseName
 
         # Find dialogue patterns: character_var "text"
         $matches = [regex]::Matches($content, '^\s*(\w+)\s+"[^"\\]*(?:\\.[^"\\]*)*"', [Text.RegularExpressions.RegexOptions]::Multiline)
@@ -133,7 +135,7 @@ function Discover-Characters {
         foreach ($match in $matches) {
             $charVar = $match.Groups[1].Value
 
-            # Skip if it's a keyword or already exists
+            # Skip if it's a keyword
             if ($charVar -match '^(translate|old|new)$') {
                 continue
             }
@@ -145,23 +147,93 @@ function Discover-Characters {
                     type = "supporting"
                     description = ""
                 }
+                $characterFiles[$charVar] = @()
             }
+
+            # Track this file for the character
+            if ($characterFiles[$charVar] -notcontains $fileName) {
+                $characterFiles[$charVar] += $fileName
+            }
+        }
+    }
+
+    # Extract character names from script.rpy define statements
+    Write-Host "   [Search] Extracting character names from script.rpy..." -ForegroundColor Yellow
+
+    $gamePath = Split-Path (Split-Path $TlPath -Parent) -Parent
+    $scriptFiles = Get-ChildItem -Path $gamePath -Filter "script*.rpy" -Recurse | Where-Object { $_.FullName -notmatch "\\tl\\" }
+
+    foreach ($scriptFile in $scriptFiles) {
+        $content = Get-Content -Path $scriptFile.FullName -Raw -Encoding UTF8
+
+        # Match: define var = Character('Name', ...) or Character(None)
+        $defineMatches = [regex]::Matches($content, 'define\s+(\w+)\s*=\s*Character\((?:[''"](.+?)[''"]|None)\s*[,)]')
+
+        foreach ($match in $defineMatches) {
+            $charVar = $match.Groups[1].Value
+            $charName = $match.Groups[2].Value
+
+            if (-not $characterVars.ContainsKey($charVar)) {
+                continue
+            }
+
+            # Handle special cases
+            if ($charVar -eq "narrator" -or $charName -eq "") {
+                $characterVars[$charVar].name = "Narrator"
+                $characterVars[$charVar].type = "narrator"
+            }
+            # Detect protagonist (common patterns: mc, u, player)
+            elseif ($charVar -match '^(mc|u|player)$' -or $charName -match '^\[.*name.*\]$') {
+                # Use proper name if not a placeholder
+                if ($charName -notmatch '^\[.*\]$' -and $charName -ne "") {
+                    $characterVars[$charVar].name = $charName
+                } else {
+                    $characterVars[$charVar].name = "MainCharacter"
+                }
+                $characterVars[$charVar].type = "protagonist"
+            }
+            # Regular characters
+            elseif ($charName -notmatch '^\?+$|^\[.*\]$' -and $charName -ne "") {
+                $characterVars[$charVar].name = $charName
+                # Determine type based on context (can be refined)
+                $characterVars[$charVar].type = "main"
+            }
+        }
+    }
+
+    # Generate descriptions based on file appearances
+    foreach ($charVar in $characterVars.Keys) {
+        if ($characterFiles.ContainsKey($charVar)) {
+            $files = $characterFiles[$charVar]
+            $fileTypes = @()
+
+            # Categorize file types
+            $cellFiles = @($files | Where-Object { $_ -match '^Cell' })
+            $roomFiles = @($files | Where-Object { $_ -match '^Room' })
+            $expedFiles = @($files | Where-Object { $_ -match '^Exped' })
+            $charaFiles = @($files | Where-Object { $_ -match '^Chara' })
+
+            if ($cellFiles.Count -gt 0) { $fileTypes += "Cell character" }
+            if ($roomFiles.Count -gt 0) { $fileTypes += "Room character" }
+            if ($expedFiles.Count -gt 0) { $fileTypes += "Expedition character" }
+            if ($charaFiles.Count -gt 0) { $fileTypes += "Character definition" }
+
+            $description = if ($fileTypes.Count -gt 0) {
+                ($fileTypes -join ", ") + " (appears in $($files.Count) files)"
+            } else {
+                "Appears in: " + (($files | Select-Object -First 3) -join ", ")
+            }
+
+            $characterVars[$charVar].description = $description
         }
     }
 
     # Add special characters
     $characterVars[""] = @{
-        name = "Narrator"
+        name = "narrator"
         gender = "neutral"
         type = "narrator"
-        description = "Narration without character"
-    }
-
-    $characterVars["d"] = @{
-        name = "System"
-        gender = "neutral"
-        type = "system"
-        description = "System/Drone messages"
+        description = "narration without character"
     }
 
     Write-Host "   Found $($characterVars.Count) unique character variables" -ForegroundColor Green
@@ -171,7 +243,7 @@ function Discover-Characters {
 
 function Save-Configuration {
     param(
-        [string]$GameName,
+        [string]$Gamename,
         [string]$GamePath,
         [string]$Language,
         [string]$Model,
@@ -179,14 +251,14 @@ function Save-Configuration {
     )
 
     Write-Host ""
-    Write-Host "💾 Saving configuration..." -ForegroundColor Yellow
+    Write-Host "[Save] Saving configuration..." -ForegroundColor Yellow
 
     # Save to local_config.json
     $configPath = Join-Path $PSScriptRoot "models\local_config.json"
     $configDir = Split-Path $configPath -Parent
 
     if (-not (Test-Path $configDir)) {
-        New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+        new-Item -ItemType Directory -Path $configDir -Force | Out-null
     }
 
     # Load existing config or create new
@@ -201,7 +273,7 @@ function Save-Configuration {
 
     # Add/update game config
     $gameConfig = @{
-        name = $GameName
+        name = $Gamename
         path = $GamePath
         target_language = $Language.ToLower()
         source_language = "english"
@@ -213,27 +285,27 @@ function Save-Configuration {
     if ($config.games -is [PSCustomObject]) {
         $config.games = @{}
     }
-    $config.games[$GameName] = $gameConfig
-    $config.current_game = $GameName
+    $config.games[$Gamename] = $gameConfig
+    $config.current_game = $Gamename
 
     # Save config
     $config | ConvertTo-Json -Depth 10 | Set-Content $configPath -Encoding UTF8
-    Write-Host "   ✅ Saved game config to: $configPath" -ForegroundColor Green
+    Write-Host "   [OK] Saved game config to: $configPath" -ForegroundColor Green
 
     # Save characters.json
     $charactersPath = Join-Path $GamePath "game\tl\$Language\characters.json"
     $charactersDir = Split-Path $charactersPath -Parent
 
     if (-not (Test-Path $charactersDir)) {
-        New-Item -ItemType Directory -Path $charactersDir -Force | Out-Null
+        new-Item -ItemType Directory -Path $charactersDir -Force | Out-null
     }
 
     $Characters | ConvertTo-Json -Depth 10 | Set-Content $charactersPath -Encoding UTF8
-    Write-Host "   ✅ Saved characters to: $charactersPath" -ForegroundColor Green
+    Write-Host "   [OK] Saved characters to: $charactersPath" -ForegroundColor Green
 }
 
 # ============================================================================
-# MAIN EXECUTION
+# MAIn EXECUTIOn
 # ============================================================================
 
 Show-Banner
@@ -241,13 +313,13 @@ Show-Banner
 # Step 1: Select Game
 if ($GamePath -eq "") {
     $selectedGame = Select-Game
-    $GamePath = $selectedGame.FullName
-    $GameName = $selectedGame.Name
+    $GamePath = $selectedGame.Fullname
+    $Gamename = $selectedGame.name
 } else {
-    $GameName = Split-Path $GamePath -Leaf
+    $Gamename = Split-Path $GamePath -Leaf
 }
 
-Write-Host "📁 Selected game: $GameName" -ForegroundColor Green
+Write-Host "Selected game: $Gamename" -ForegroundColor Green
 Write-Host "   Path: $GamePath" -ForegroundColor Gray
 Write-Host ""
 
@@ -256,7 +328,7 @@ if ($Language -eq "") {
     $Language = Select-Language -GamePath $GamePath
 }
 
-Write-Host "🌍 Selected language: $Language" -ForegroundColor Green
+Write-Host "[Language] Selected language: $Language" -ForegroundColor Green
 Write-Host ""
 
 # Step 3: Select Model
@@ -264,7 +336,7 @@ if ($Model -eq "") {
     $Model = Select-Model
 }
 
-Write-Host "🤖 Selected model: $Model" -ForegroundColor Green
+Write-Host "[Model] Selected model: $Model" -ForegroundColor Green
 
 # Step 4: Discover Characters
 $tlPath = Join-Path $GamePath "game\tl\$Language"
@@ -272,19 +344,19 @@ $characters = Discover-Characters -TlPath $tlPath
 
 # Step 5: Save Configuration
 Save-Configuration `
-    -GameName $GameName `
+    -Gamename $Gamename `
     -GamePath $GamePath `
     -Language $Language `
     -Model $Model `
     -Characters $characters
 
 Write-Host ""
-Write-Host "✨ Configuration complete!" -ForegroundColor Green
+Write-Host "[Done] Configuration complete!" -ForegroundColor Green
 Write-Host ""
-Write-Host "📝 You can now manually edit the characters.json file to:" -ForegroundColor Yellow
+Write-Host "[Note] You can now manually edit the characters.json file to:" -ForegroundColor Yellow
 Write-Host "   - Add proper character names" -ForegroundColor Gray
 Write-Host "   - Set correct gender (male/female/neutral)" -ForegroundColor Gray
 Write-Host "   - Update character types (main/protagonist/supporting)" -ForegroundColor Gray
 Write-Host ""
-Write-Host "📍 Characters file: $(Join-Path $GamePath "game\tl\$Language\characters.json")" -ForegroundColor Cyan
+Write-Host "[Location] Characters file: $(Join-Path $GamePath "game\tl\$Language\characters.json")" -ForegroundColor Cyan
 Write-Host ""

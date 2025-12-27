@@ -12,9 +12,9 @@ param(
 
 function Show-Banner {
     Write-Host ""
-    Write-Host "╔═══════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║               Translation File Extraction                 ║" -ForegroundColor Cyan
-    Write-Host "╚═══════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+    Write-Host "" -ForegroundColor Cyan
+    Write-Host "               Translation File Extraction                 " -ForegroundColor Cyan
+    Write-Host "" -ForegroundColor Cyan
     Write-Host ""
 }
 
@@ -27,7 +27,7 @@ function Extract-File {
     )
 
     $fileName = Split-Path $FilePath -Leaf
-    Write-Host "📄 Extracting: $fileName" -ForegroundColor Yellow
+    Write-Host " Extracting: $fileName" -ForegroundColor Yellow
 
     # Prepare output paths
     $baseName = [System.IO.Path]::GetFileNameWithoutExtension($FilePath)
@@ -66,7 +66,7 @@ parsed_blocks, tags_file = extractor.extract_file(
 extractor.save_parsed_yaml(parsed_blocks, Path(r'$yamlPath'))
 extractor.save_tags_json(tags_file, Path(r'$jsonPath'))
 
-print(f'\n✅ Extraction complete!')
+print(f'\n Extraction complete!')
 print(f'   YAML: $yamlPath')
 print(f'   JSON: $jsonPath')
 "@
@@ -110,13 +110,13 @@ $tlPath = Join-Path $gameConfig.path "game\tl\$($gameConfig.target_language)"
 
 if ($All) {
     # Extract all .rpy files
-    Write-Host "🔍 Finding all .rpy files..." -ForegroundColor Yellow
+    Write-Host " Finding all .rpy files..." -ForegroundColor Yellow
     $rpyFiles = Get-ChildItem -Path $tlPath -Filter "*.rpy" -Recurse | Where-Object {
         $_.Name -notlike "*.parsed.*" -and $_.Name -notlike "*.tags.*"
     }
 
     if ($rpyFiles.Count -eq 0) {
-        Write-Host "❌ No .rpy files found!" -ForegroundColor Red
+        Write-Host " No .rpy files found!" -ForegroundColor Red
         exit 1
     }
 
@@ -135,14 +135,14 @@ if ($All) {
 } else {
     # Extract single file
     if ($Source -eq "") {
-        Write-Host "❌ Please specify -Source <filename> or use -All" -ForegroundColor Red
+        Write-Host " Please specify -Source <filename> or use -All" -ForegroundColor Red
         exit 1
     }
 
     # Find file
     $fullPath = Join-Path $tlPath $Source
     if (-not (Test-Path $fullPath)) {
-        Write-Host "❌ File not found: $fullPath" -ForegroundColor Red
+        Write-Host " File not found: $fullPath" -ForegroundColor Red
         exit 1
     }
 
@@ -154,9 +154,9 @@ if ($All) {
 }
 
 Write-Host ""
-Write-Host "✨ Extraction complete!" -ForegroundColor Green
+Write-Host " Extraction complete!" -ForegroundColor Green
 Write-Host ""
-Write-Host "📝 Next steps:" -ForegroundColor Yellow
+Write-Host " Next steps:" -ForegroundColor Yellow
 Write-Host "   1. Review the .parsed.yaml files for any issues" -ForegroundColor Gray
 Write-Host "   2. Run 'translate.ps1' to translate untranslated blocks" -ForegroundColor Gray
 Write-Host ""

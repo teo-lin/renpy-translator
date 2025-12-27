@@ -1,0 +1,42 @@
+# Line ending normalization
+* text=auto
+
+# Windows-specific files (require CRLF)
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Unix/Linux shell scripts (require LF)
+*.sh text eol=lf
+
+# Python files (LF is standard, but works with both)
+*.py text eol=lf
+
+# Text files
+*.txt text
+*.md text
+*.json text
+*.yaml text
+*.yml text
+
+# Ren'Py files
+*.rpy text eol=lf
+*.rpyc binary
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.eot binary
+*.pyc binary
+*.pyo binary
+*.so binary
+*.dll binary
+*.exe binary
+*.gguf binary

@@ -13,9 +13,9 @@ param(
 
 function Show-Banner {
     Write-Host ""
-    Write-Host "╔═══════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║               Translation File Merge                      ║" -ForegroundColor Cyan
-    Write-Host "╚═══════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+    Write-Host "" -ForegroundColor Cyan
+    Write-Host "               Translation File Merge                      " -ForegroundColor Cyan
+    Write-Host "" -ForegroundColor Cyan
     Write-Host ""
 }
 
@@ -27,7 +27,7 @@ function Merge-File {
     )
 
     $fileName = Split-Path $YamlPath -Leaf
-    Write-Host "📄 Merging: $fileName" -ForegroundColor Yellow
+    Write-Host " Merging: $fileName" -ForegroundColor Yellow
 
     # Prepare paths
     $baseName = $fileName -replace '\.parsed\.yaml$', ''
@@ -37,7 +37,7 @@ function Merge-File {
 
     # Check if tags file exists
     if (-not (Test-Path $jsonPath)) {
-        Write-Host "❌ Tags file not found: $jsonPath" -ForegroundColor Red
+        Write-Host " Tags file not found: $jsonPath" -ForegroundColor Red
         return
     }
 
@@ -63,10 +63,10 @@ success = merger.merge_file(
 )
 
 if not success:
-    print('\n⚠️  Validation found issues. Please review the output file.')
+    print('\n  Validation found issues. Please review the output file.')
     print(merger.get_validation_report())
 
-print(f'\n✅ Merge complete!')
+print(f'\n Merge complete!')
 print(f'   Output: $outputPath')
 "@
 
@@ -110,11 +110,11 @@ $validate = -not $SkipValidation
 
 if ($All) {
     # Merge all .parsed.yaml files
-    Write-Host "🔍 Finding all .parsed.yaml files..." -ForegroundColor Yellow
+    Write-Host " Finding all .parsed.yaml files..." -ForegroundColor Yellow
     $yamlFiles = Get-ChildItem -Path $tlPath -Filter "*.parsed.yaml" -Recurse
 
     if ($yamlFiles.Count -eq 0) {
-        Write-Host "❌ No .parsed.yaml files found!" -ForegroundColor Red
+        Write-Host " No .parsed.yaml files found!" -ForegroundColor Red
         Write-Host "   Run extract.ps1 first" -ForegroundColor Yellow
         exit 1
     }
@@ -133,7 +133,7 @@ if ($All) {
 } else {
     # Merge single file
     if ($Source -eq "") {
-        Write-Host "❌ Please specify -Source <filename> or use -All" -ForegroundColor Red
+        Write-Host " Please specify -Source <filename> or use -All" -ForegroundColor Red
         Write-Host "   Example: .\merge.ps1 -Source Cell01_JM" -ForegroundColor Yellow
         exit 1
     }
@@ -141,7 +141,7 @@ if ($All) {
     # Find YAML file
     $yamlPath = Join-Path $tlPath "$Source.parsed.yaml"
     if (-not (Test-Path $yamlPath)) {
-        Write-Host "❌ YAML file not found: $yamlPath" -ForegroundColor Red
+        Write-Host " YAML file not found: $yamlPath" -ForegroundColor Red
         exit 1
     }
 
@@ -152,9 +152,9 @@ if ($All) {
 }
 
 Write-Host ""
-Write-Host "✨ Merge complete!" -ForegroundColor Green
+Write-Host " Merge complete!" -ForegroundColor Green
 Write-Host ""
-Write-Host "📝 Next steps:" -ForegroundColor Yellow
+Write-Host " Next steps:" -ForegroundColor Yellow
 Write-Host "   1. Review the .translated.rpy files" -ForegroundColor Gray
 Write-Host "   2. Test the translations in the game" -ForegroundColor Gray
 Write-Host "   3. Replace the original .rpy files if satisfied" -ForegroundColor Gray

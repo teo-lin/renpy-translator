@@ -8,12 +8,12 @@
                                       "file":  "aya-23-8B-Q4_K_M.gguf",
                                       "size":  "4.8GB",
                                       "destination":  "models/aya-23-8B-GGUF/aya-23-8B-Q4_K_M.gguf",
-                                      "script":  "src/translators/aya23_translator.py",
+                                      "script":  "scripts/translate_with_aya23.py",
                                       "description":  "Higher quality for 23 European and major Asian languages",
                                       "languages":  "ro es fr de it pt ru tr cs pl uk bg zh ja ko vi th id ar he hi nl fi"
                                   },
                        "Description":  "Higher quality for 23 European and major Asian languages",
-                       "SupportedCount":  2,
+                       "SupportedCount":  1,
                        "Key":  "aya-23-8b",
                        "Languages":  [
                                          "ro",
@@ -41,66 +41,12 @@
                                          "fi"
                                      ],
                        "Size":  "4.8GB"
-                   },
-                   {
-                       "Name":  "MADLAD-400-3B",
-                       "Config":  {
-                                      "name":  "MADLAD-400-3B",
-                                      "repo":  "google/madlad400-3b-mt",
-                                      "file":  null,
-                                      "size":  "~6GB",
-                                      "destination":  "models/madlad400-3b-mt",
-                                      "script":  "src/translators/madlad400_translator.py",
-                                      "description":  "Supports 400+ languages (30 pre-configured with language codes)",
-                                      "languages":  "ro es fr de it pt ru tr cs pl uk bg zh ja ko vi th id ar he fa hi bn nl sv no da fi el hu",
-                                      "huggingface_download":  true
-                                  },
-                       "Description":  "Supports 400+ languages (30 pre-configured with language codes)",
-                       "SupportedCount":  2,
-                       "Key":  "madlad-400-3b",
-                       "Languages":  [
-                                         "ro",
-                                         "es",
-                                         "fr",
-                                         "de",
-                                         "it",
-                                         "pt",
-                                         "ru",
-                                         "tr",
-                                         "cs",
-                                         "pl",
-                                         "uk",
-                                         "bg",
-                                         "zh",
-                                         "ja",
-                                         "ko",
-                                         "vi",
-                                         "th",
-                                         "id",
-                                         "ar",
-                                         "he",
-                                         "fa",
-                                         "hi",
-                                         "bn",
-                                         "nl",
-                                         "sv",
-                                         "no",
-                                         "da",
-                                         "fi",
-                                         "el",
-                                         "hu"
-                                     ],
-                       "Size":  "~6GB"
                    }
                ],
     "languages":  [
                       {
                           "Code":  "ro",
                           "Name":  "Romanian"
-                      },
-                      {
-                          "Code":  "fr",
-                          "Name":  "French"
                       }
                   ]
 }

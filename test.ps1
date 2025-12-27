@@ -1,18 +1,5 @@
-#!/usr/bin/env pwsh
-<#
-.SYNOPSIS
-    Run all standalone tests in the tests directory
-
-.DESCRIPTION
-    This script automatically finds and runs all test_*.py files in the tests directory.
-    It reports individual test results and provides an overall summary.
-
-.EXAMPLE
-    .\test.ps1
-
-.EXAMPLE
-    .\test.ps1 -Model 1
-#>
+# Ren'Py Translation System - Automated Testing Script
+# Run as: .\test.ps1
 
 param(
     [int]$Model = 0  # Model number to test (1-based), 0 = prompt user
