@@ -1,0 +1,443 @@
+{
+  "metadata": {
+    "source_file": "C:\\_oxo_\\games\\Example\\game\\tl\\romanian\\Cell01_Academy.rpy",
+    "target_language": "romanian",
+    "source_language": "english",
+    "extracted_at": "2025-12-28T01:16:24.324440",
+    "file_structure_type": "dialogue_and_strings",
+    "has_separator_lines": false,
+    "total_blocks": 26,
+    "untranslated_blocks": 22
+  },
+  "structure": {
+    "block_order": [
+      "1-Narrator",
+      "2-MainCharacter",
+      "3-Narrator",
+      "4-Sarah",
+      "5-MainCharacter",
+      "6-Sarah",
+      "7-MainCharacter",
+      "8-Sarah",
+      "9-MainCharacter",
+      "10-Sarah",
+      "11-Narrator",
+      "12-Sarah",
+      "13-MainCharacter",
+      "14-Sarah",
+      "15-Alex",
+      "16-Sarah",
+      "17-Alex",
+      "18-MainCharacter",
+      "19-Narrator",
+      "20-Narrator",
+      "21-Narrator",
+      "22-Narrator",
+      "23-Narrator",
+      "24-Narrator",
+      "25-Narrator",
+      "26-Narrator"
+    ],
+    "string_section_start": 20,
+    "string_section_header": "translate romanian strings:"
+  },
+  "blocks": {
+    "1-Narrator": {
+      "type": "dialogue",
+      "label": "start_intro",
+      "location": "game/script.rpy:5",
+      "char_var": "narrator",
+      "char_name": "Narrator",
+      "tags": [],
+      "template": "# {location}\ntranslate {language} {label}:\n\n    # {char_var} \"{original}\"\n    {char_var} \"{translation}\"",
+      "separator_content": null
+    },
+    "2-MainCharacter": {
+      "type": "dialogue",
+      "label": "start_greeting",
+      "location": "game/script.rpy:7",
+      "char_var": "mc",
+      "char_name": "MainCharacter",
+      "tags": [
+        {
+          "pos": 15,
+          "tag": "[player_name]",
+          "type": "variable"
+        }
+      ],
+      "template": "# {location}\ntranslate {language} {label}:\n\n    # {char_var} \"{original}\"\n    {char_var} \"{translation}\"",
+      "separator_content": null
+    },
+    "3-Narrator": {
+      "type": "dialogue",
+      "label": "start_location",
+      "location": "game/script.rpy:9",
+      "char_var": "narrator",
+      "char_name": "Narrator",
+      "tags": [
+        {
+          "pos": 0,
+          "tag": "{size=18}",
+          "type": "size"
+        },
+        {
+          "pos": 9,
+          "tag": "{color=#808080}",
+          "type": "color"
+        },
+        {
+          "pos": 43,
+          "tag": "{/color}",
+          "type": "close"
+        },
+        {
+          "pos": 51,
+          "tag": "{/size}",
+          "type": "close"
+        }
+      ],
+      "template": "# {location}\ntranslate {language} {label}:\n\n    # {char_var} \"{original}\"\n    {char_var} \"{translation}\"",
+      "separator_content": null
+    },
+    "4-Sarah": {
+      "type": "dialogue",
+      "label": "meet_sarah_1",
+      "location": "game/script.rpy:12",
+      "char_var": "sarah",
+      "char_name": "Sarah",
+      "tags": [],
+      "template": "# {location}\ntranslate {language} {label}:\n\n    # {char_var} \"{original}\"\n    {char_var} \"{translation}\"",
+      "separator_content": null
+    },
+    "5-MainCharacter": {
+      "type": "dialogue",
+      "label": "meet_sarah_2",
+      "location": "game/script.rpy:14",
+      "char_var": "mc",
+      "char_name": "MainCharacter",
+      "tags": [],
+      "template": "# {location}\ntranslate {language} {label}:\n\n    # {char_var} \"{original}\"\n    {char_var} \"{translation}\"",
+      "separator_content": null
+    },
+    "6-Sarah": {
+      "type": "dialogue",
+      "label": "meet_sarah_3",
+      "location": "game/script.rpy:16",
+      "char_var": "sarah",
+      "char_name": "Sarah",
+      "tags": [],
+      "template": "# {location}\ntranslate {language} {label}:\n\n    # {char_var} \"{original}\"\n    {char_var} \"{translation}\"",
+      "separator_content": null
+    },
+    "7-MainCharacter": {
+      "type": "dialogue",
+      "label": "meet_sarah_4",
+      "location": "game/script.rpy:18",
+      "char_var": "mc",
+      "char_name": "MainCharacter",
+      "tags": [
+        {
+          "pos": 14,
+          "tag": "{b}",
+          "type": "other"
+        },
+        {
+          "pos": 26,
+          "tag": "{/b}",
+          "type": "close"
+        }
+      ],
+      "template": "# {location}\ntranslate {language} {label}:\n\n    # {char_var} \"{original}\"\n    {char_var} \"{translation}\"",
+      "separator_content": null
+    },
+    "8-Sarah": {
+      "type": "dialogue",
+      "label": "tour_library",
+      "location": "game/script.rpy:21",
+      "char_var": "sarah",
+      "char_name": "Sarah",
+      "tags": [],
+      "template": "# {location}\ntranslate {language} {label}:\n\n    # {char_var} \"{original}\"\n    {char_var} \"{translation}\"",
+      "separator_content": null
+    },
+    "9-MainCharacter": {
+      "type": "dialogue",
+      "label": "tour_question",
+      "location": "game/script.rpy:23",
+      "char_var": "mc",
+      "char_name": "MainCharacter",
+      "tags": [],
+      "template": "# {location}\ntranslate {language} {label}:\n\n    # {char_var} \"{original}\"\n    {char_var} \"{translation}\"",
+      "separator_content": null
+    },
+    "10-Sarah": {
+      "type": "dialogue",
+      "label": "tour_response",
+      "location": "game/script.rpy:25",
+      "char_var": "sarah",
+      "char_name": "Sarah",
+      "tags": [
+        {
+          "pos": 38,
+          "tag": "{color=#ff69b4}",
+          "type": "color"
+        },
+        {
+          "pos": 61,
+          "tag": "{/color}",
+          "type": "close"
+        }
+      ],
+      "template": "# {location}\ntranslate {language} {label}:\n\n    # {char_var} \"{original}\"\n    {char_var} \"{translation}\"",
+      "separator_content": null
+    },
+    "11-Narrator": {
+      "type": "dialogue",
+      "label": "cafeteria_scene",
+      "location": "game/script.rpy:28",
+      "char_var": "narrator",
+      "char_name": "Narrator",
+      "tags": [
+        {
+          "pos": 0,
+          "tag": "{size=18}",
+          "type": "size"
+        },
+        {
+          "pos": 9,
+          "tag": "{color=#808080}",
+          "type": "color"
+        },
+        {
+          "pos": 46,
+          "tag": "{/color}",
+          "type": "close"
+        },
+        {
+          "pos": 54,
+          "tag": "{/size}",
+          "type": "close"
+        }
+      ],
+      "template": "# {location}\ntranslate {language} {label}:\n\n    # {char_var} \"{original}\"\n    {char_var} \"{translation}\"",
+      "separator_content": null
+    },
+    "12-Sarah": {
+      "type": "dialogue",
+      "label": "cafeteria_intro",
+      "location": "game/script.rpy:30",
+      "char_var": "sarah",
+      "char_name": "Sarah",
+      "tags": [],
+      "template": "# {location}\ntranslate {language} {label}:\n\n    # {char_var} \"{original}\"\n    {char_var} \"{translation}\"",
+      "separator_content": null
+    },
+    "13-MainCharacter": {
+      "type": "dialogue",
+      "label": "cafeteria_food",
+      "location": "game/script.rpy:32",
+      "char_var": "mc",
+      "char_name": "MainCharacter",
+      "tags": [],
+      "template": "# {location}\ntranslate {language} {label}:\n\n    # {char_var} \"{original}\"\n    {char_var} \"{translation}\"",
+      "separator_content": null
+    },
+    "14-Sarah": {
+      "type": "dialogue",
+      "label": "cafeteria_recommendation",
+      "location": "game/script.rpy:34",
+      "char_var": "sarah",
+      "char_name": "Sarah",
+      "tags": [],
+      "template": "# {location}\ntranslate {language} {label}:\n\n    # {char_var} \"{original}\"\n    {char_var} \"{translation}\"",
+      "separator_content": null
+    },
+    "15-Alex": {
+      "type": "dialogue",
+      "label": "friend_arrives",
+      "location": "game/script.rpy:37",
+      "char_var": "alex",
+      "char_name": "Alex",
+      "tags": [],
+      "template": "# {location}\ntranslate {language} {label}:\n\n    # {char_var} \"{original}\"\n    {char_var} \"{translation}\"",
+      "separator_content": null
+    },
+    "16-Sarah": {
+      "type": "dialogue",
+      "label": "friend_introduction",
+      "location": "game/script.rpy:39",
+      "char_var": "sarah",
+      "char_name": "Sarah",
+      "tags": [
+        {
+          "pos": 5,
+          "tag": "[player_name]",
+          "type": "variable"
+        }
+      ],
+      "template": "# {location}\ntranslate {language} {label}:\n\n    # {char_var} \"{original}\"\n    {char_var} \"{translation}\"",
+      "separator_content": null
+    },
+    "17-Alex": {
+      "type": "dialogue",
+      "label": "alex_greeting",
+      "location": "game/script.rpy:41",
+      "char_var": "alex",
+      "char_name": "Alex",
+      "tags": [],
+      "template": "# {location}\ntranslate {language} {label}:\n\n    # {char_var} \"{original}\"\n    {char_var} \"{translation}\"",
+      "separator_content": null
+    },
+    "18-MainCharacter": {
+      "type": "dialogue",
+      "label": "mc_thanks",
+      "location": "game/script.rpy:43",
+      "char_var": "mc",
+      "char_name": "MainCharacter",
+      "tags": [
+        {
+          "pos": 29,
+          "tag": "{b}",
+          "type": "other"
+        },
+        {
+          "pos": 36,
+          "tag": "{/b}",
+          "type": "close"
+        }
+      ],
+      "template": "# {location}\ntranslate {language} {label}:\n\n    # {char_var} \"{original}\"\n    {char_var} \"{translation}\"",
+      "separator_content": null
+    },
+    "19-Narrator": {
+      "type": "dialogue",
+      "label": "day_end",
+      "location": "game/script.rpy:46",
+      "char_var": "narrator",
+      "char_name": "Narrator",
+      "tags": [],
+      "template": "# {location}\ntranslate {language} {label}:\n\n    # {char_var} \"{original}\"\n    {char_var} \"{translation}\"",
+      "separator_content": null
+    },
+    "20-Narrator": {
+      "type": "dialogue",
+      "label": "chapter_complete",
+      "location": "game/script.rpy:48",
+      "char_var": "narrator",
+      "char_name": "Narrator",
+      "tags": [
+        {
+          "pos": 0,
+          "tag": "{size=24}",
+          "type": "size"
+        },
+        {
+          "pos": 9,
+          "tag": "{color=#4169e1}",
+          "type": "color"
+        },
+        {
+          "pos": 42,
+          "tag": "{/color}",
+          "type": "close"
+        },
+        {
+          "pos": 50,
+          "tag": "{/size}",
+          "type": "close"
+        }
+      ],
+      "template": "# {location}\ntranslate {language} {label}:\n\n    # {char_var} \"{original}\"\n    {char_var} \"{translation}\"",
+      "separator_content": null
+    },
+    "21-Narrator": {
+      "type": "string",
+      "label": "strings",
+      "location": "game/script.rpy:10",
+      "char_var": null,
+      "char_name": "Narrator",
+      "tags": [],
+      "template": "    # {location}\n    old \"{original}\"\n    new \"{translation}\"",
+      "separator_content": null
+    },
+    "22-Narrator": {
+      "type": "string",
+      "label": "strings",
+      "location": "game/script.rpy:10",
+      "char_var": null,
+      "char_name": "Narrator",
+      "tags": [
+        {
+          "pos": 0,
+          "tag": "{color=#4169e1}",
+          "type": "color"
+        },
+        {
+          "pos": 34,
+          "tag": "{/color}",
+          "type": "close"
+        }
+      ],
+      "template": "    # {location}\n    old \"{original}\"\n    new \"{translation}\"",
+      "separator_content": null
+    },
+    "23-Narrator": {
+      "type": "string",
+      "label": "strings",
+      "location": "game/script.rpy:10",
+      "char_var": null,
+      "char_name": "Narrator",
+      "tags": [
+        {
+          "pos": 0,
+          "tag": "{color=#ff69b4}",
+          "type": "color"
+        },
+        {
+          "pos": 28,
+          "tag": "{/color}",
+          "type": "close"
+        }
+      ],
+      "template": "    # {location}\n    old \"{original}\"\n    new \"{translation}\"",
+      "separator_content": null
+    },
+    "24-Narrator": {
+      "type": "string",
+      "label": "strings",
+      "location": "game/script.rpy:10",
+      "char_var": null,
+      "char_name": "Narrator",
+      "tags": [],
+      "template": "    # {location}\n    old \"{original}\"\n    new \"{translation}\"",
+      "separator_content": null
+    },
+    "25-Narrator": {
+      "type": "string",
+      "label": "strings",
+      "location": "game/script.rpy:33",
+      "char_var": null,
+      "char_name": "Narrator",
+      "tags": [],
+      "template": "    # {location}\n    old \"{original}\"\n    new \"{translation}\"",
+      "separator_content": null
+    },
+    "26-Narrator": {
+      "type": "string",
+      "label": "strings",
+      "location": "game/script.rpy:33",
+      "char_var": null,
+      "char_name": "Narrator",
+      "tags": [],
+      "template": "    # {location}\n    old \"{original}\"\n    new \"{translation}\"",
+      "separator_content": null
+    }
+  },
+  "character_map": {
+    "mc": "MainCharacter",
+    "narrator": "Narrator",
+    "alex": "Alex",
+    "sarah": "Sarah",
+    "": "narrator"
+  }
+}

@@ -128,7 +128,7 @@ class RenpyExtractor:
             - parsed_blocks: Dict[block_id, ParsedBlock] for YAML output
             - tags_file_content: Complete tags.json structure
         """
-        print(f"📖 Reading file: {rpy_file_path}")
+        print(f"Reading file: {rpy_file_path}")
 
         # Read file content
         with open(rpy_file_path, 'r', encoding='utf-8') as f:
@@ -136,11 +136,11 @@ class RenpyExtractor:
 
         # Detect file structure
         file_structure_type = self._detect_file_structure(content)
-        print(f"📋 File structure: {file_structure_type.value}")
+        print(f"File structure: {file_structure_type.value}")
 
         # Parse blocks
         blocks = self._parse_blocks(content, target_language)
-        print(f"📦 Found {len(blocks)} blocks")
+        print(f"Found {len(blocks)} blocks")
 
         # Detect separator lines
         has_separators = bool(self.SEPARATOR_PATTERN.search(content))
@@ -392,7 +392,7 @@ class RenpyExtractor:
 
     def save_parsed_yaml(self, parsed_blocks: Dict[str, ParsedBlock], output_path: Path):
         """Save parsed blocks to YAML file."""
-        print(f"💾 Saving parsed YAML to: {output_path}")
+        print(f"Saving parsed YAML to: {output_path}")
 
         # Add header comment
         header = (
@@ -407,7 +407,7 @@ class RenpyExtractor:
 
     def save_tags_json(self, tags_file: TagsFileContent, output_path: Path):
         """Save tags file to JSON."""
-        print(f"💾 Saving tags JSON to: {output_path}")
+        print(f"Saving tags JSON to: {output_path}")
 
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(tags_file, f, indent=2, ensure_ascii=False)

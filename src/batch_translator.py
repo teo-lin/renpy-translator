@@ -74,7 +74,7 @@ class BatchTranslator:
         if output_yaml_path is None:
             output_yaml_path = parsed_yaml_path
 
-        print(f"📖 Loading files for translation...")
+        print(f"Loading files for translation...")
 
         # Load files
         with open(parsed_yaml_path, 'r', encoding='utf-8') as f:
@@ -92,12 +92,12 @@ class BatchTranslator:
         untranslated_ids = self._identify_untranslated(parsed_blocks)
         total_blocks = len([bid for bid in parsed_blocks if not is_separator_block(bid, parsed_blocks[bid])])
 
-        print(f"📦 Total blocks: {total_blocks}")
-        print(f"📝 Untranslated blocks: {len(untranslated_ids)}")
-        print(f"✅ Already translated: {total_blocks - len(untranslated_ids)}")
+        print(f"Total blocks: {total_blocks}")
+        print(f"Untranslated blocks: {len(untranslated_ids)}")
+        print(f"Already translated: {total_blocks - len(untranslated_ids)}")
 
         if not untranslated_ids:
-            print("✨ All blocks are already translated!")
+            print("All blocks are already translated!")
             return {
                 'total': total_blocks,
                 'translated': 0,
@@ -140,14 +140,14 @@ class BatchTranslator:
                 parsed_blocks[context.block_id]['ro'] = translation
                 translated_count += 1
 
-                print(f"  ✅ Translated: {translation[:60]}...")
+                print(f"  Translated: {translation[:60]}...")
 
             except Exception as e:
-                print(f"  ❌ Translation failed: {e}")
+                print(f"  Translation failed: {e}")
                 failed_count += 1
 
         # Save updated YAML
-        print(f"\n💾 Saving translated file to: {output_yaml_path}")
+        print(f"\nSaving translated file to: {output_yaml_path}")
         self._save_yaml(parsed_blocks, output_yaml_path, metadata)
 
         # Return statistics

@@ -62,7 +62,7 @@ function Select-ConfiguredGame {
     }
 
     $config = Get-Content $configPath -Raw | ConvertFrom-Json
-    $gameNames = $config.games.PSObject.Properties.Name
+    $gameNames = @($config.games.PSObject.Properties.Name)
 
     if ($gameNames.Count -eq 0) {
         Write-Host " No games configured!" -ForegroundColor Red

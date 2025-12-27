@@ -68,7 +68,7 @@ class RenpyMerger:
         Returns:
             True if successful, False if validation errors found
         """
-        print(f"📖 Loading files for merge...")
+        print(f"Loading files for merge...")
 
         # Load files
         with open(parsed_yaml_path, 'r', encoding='utf-8') as f:
@@ -81,8 +81,8 @@ class RenpyMerger:
         structure = tags_file['structure']
         tagged_blocks = tags_file['blocks']
 
-        print(f"📦 Loaded {len(parsed_blocks)} blocks")
-        print(f"🔧 File structure: {metadata['file_structure_type']}")
+        print(f"Loaded {len(parsed_blocks)} blocks")
+        print(f"File structure: {metadata['file_structure_type']}")
 
         # Build output content
         output_lines: List[str] = []
@@ -117,7 +117,7 @@ class RenpyMerger:
             tagged_block = tagged_blocks.get(block_id)
 
             if not parsed_block or not tagged_block:
-                print(f"⚠️  Warning: Missing data for block {block_id}")
+                print(f"Warning: Missing data for block {block_id}")
                 continue
 
             # Handle separator blocks
@@ -159,19 +159,19 @@ class RenpyMerger:
 
         # Validate if requested
         if validate:
-            print("🔍 Running integrity validation...")
+            print("Running integrity validation...")
             self.validation_errors = self.validate_content(output_content, block_order, parsed_blocks, tagged_blocks)
 
             if self.validation_errors:
-                print(f"❌ Found {len(self.validation_errors)} validation errors:")
+                print(f"Found {len(self.validation_errors)} validation errors:")
                 for error in self.validation_errors[:10]:  # Show first 10
                     print(f"   - {error.block_id}: {error.message}")
-                print(f"\n⚠️  File will be saved, but please review errors!")
+                print(f"\nFile will be saved, but please review errors!")
             else:
-                print("✅ Validation passed!")
+                print("Validation passed!")
 
         # Write output file
-        print(f"💾 Writing to: {output_rpy_path}")
+        print(f"Writing to: {output_rpy_path}")
         with open(output_rpy_path, 'w', encoding='utf-8') as f:
             f.write(output_content)
 
@@ -303,7 +303,7 @@ class RenpyMerger:
     def get_validation_report(self) -> str:
         """Get a formatted validation error report."""
         if not self.validation_errors:
-            return "✅ No validation errors found!"
+            return "No validation errors found!"
 
         report = [f"Found {len(self.validation_errors)} validation errors:\n"]
 

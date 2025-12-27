@@ -282,10 +282,18 @@ function Save-Configuration {
         context_after = 1
     }
 
-    if ($config.games -is [PSCustomObject]) {
-        $config.games = @{}
+    # Ensure games property exists - convert PSCustomObject to hashtable for proper indexing
+    if (-not $config.games) {
+        $config | Add-Member -MemberType NoteProperty -Name "games" -Value ([PSCustomObject]@{}) -Force
     }
-    $config.games[$Gamename] = $gameConfig
+
+    # Ensure current_game property exists
+    if (-not $config.PSObject.Properties['current_game']) {
+        $config | Add-Member -MemberType NoteProperty -Name "current_game" -Value $null -Force
+    }
+
+    # Add game config as a property (not hashtable index)
+    $config.games | Add-Member -MemberType NoteProperty -Name $Gamename -Value ([PSCustomObject]$gameConfig) -Force
     $config.current_game = $Gamename
 
     # Save config
