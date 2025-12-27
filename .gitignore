@@ -14,6 +14,7 @@ models/*
 *.bin
 *.safetensors
 !models/MODELS.md
+!models/local_config.json
 
 # Data - ignore directory but track specific files
 data/**/*uncensored*
@@ -47,10 +48,13 @@ games/*
 !games/Example/
 !games/Example/**
 
-# Ren'Py - ignore all except specific files
+# Ren'Py - ignore all except specific files, unRen, and rpaExtract.exe
 renpy/
 !renpy/
 renpy/*
 !renpy/RENPY.md
 !renpy/tools_config.json
+!renpy/rpaExtract.exe
+!renpy/unRen/
+!renpy/unRen/**
 /src/PROMO.md

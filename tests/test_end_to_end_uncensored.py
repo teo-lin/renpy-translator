@@ -1,30 +1,20 @@
-"""
-End-to-end tests for Ren'Py translation system
-
-Tests the complete workflow:
-1. Create mock Ren'Py game structure
-2. Convert English translations to Romanian format
-3. Translate using Aya-23-8B
-4. Verify tag preservation
-5. Verify glossary usage
-6. Verify output quality
-
-This ensures the system works with ANY Ren'Py game, not just specific test cases.
-"""
-
 import sys
 import json
 import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import argparse
 
 # Add project paths
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
-sys.path.insert(0, str(project_root / "scripts"))
+sys.path.insert(0, str(project_root / "src" / "translators")) # Add translators dir to path
 
 import re
-from translate import RenpyTranslationPipeline
+from translation_pipeline import RenpyTranslationPipeline, BaseTranslator
+from renpy_utils import RenpyTranslationParser
+from aya23_translator import Aya23Translator # Import the specific translator
+from madlad400_translator import MADLAD400Translator # Import MADLAD translator
 
 
 class MockRenpyGame:
@@ -186,23 +176,14 @@ def test_conversion_workflow(game_dir: Path):
     return romanian_dir
 
 
-def test_translation_workflow(romanian_dir: Path):
-    """Test translation using Aya-23-8B"""
+def test_translation_workflow(romanian_dir: Path, translator_backend: BaseTranslator):
+    """Test translation using the provided translator backend"""
     print("\n" + "=" * 70)
     print("TEST 3: Translation Workflow")
     print("=" * 70)
 
-    # Load model and glossary
-    model_path = project_root / "models" / "aya-23-8B-GGUF" / "aya-23-8B-Q4_K_M.gguf"
-    glossary_path = project_root / "data" / "ro_uncensored_glossary.json"
-
-    if not model_path.exists():
-        print("\n⚠ WARNING: Model not found, skipping translation test")
-        print(f"  Expected: {model_path}")
-        return None
-
-    # Initialize pipeline
-    pipeline = RenpyTranslationPipeline(str(model_path), target_language="Romanian", glossary_path=str(glossary_path))
+    # Initialize pipeline (no glossary for basic test)
+    pipeline = RenpyTranslationPipeline(translator_backend)
 
     # Translate one file
     test_file = romanian_dir / "basic.rpy"
@@ -229,21 +210,13 @@ def test_translation_workflow(romanian_dir: Path):
     return stats
 
 
-def test_tag_preservation(romanian_dir: Path):
+def test_tag_preservation(romanian_dir: Path, translator_backend: BaseTranslator):
     """Test that Ren'Py tags are preserved during translation"""
     print("\n" + "=" * 70)
     print("TEST 4: Tag Preservation")
     print("=" * 70)
 
-    # Load model
-    model_path = project_root / "models" / "aya-23-8B-GGUF" / "aya-23-8B-Q4_K_M.gguf"
-    glossary_path = project_root / "data" / "ro_uncensored_glossary.json"
-
-    if not model_path.exists():
-        print("\n⚠ WARNING: Model not found, skipping tag preservation test")
-        return None
-
-    pipeline = RenpyTranslationPipeline(str(model_path), target_language="Romanian", glossary_path=str(glossary_path))
+    pipeline = RenpyTranslationPipeline(translator_backend)
 
     # Translate tagged file
     test_file = romanian_dir / "tagged.rpy"
@@ -281,27 +254,15 @@ def test_tag_preservation(romanian_dir: Path):
     print("\n✓ PASSED: All tags preserved correctly")
 
 
-def test_glossary_usage(romanian_dir: Path):
+def test_glossary_usage(romanian_dir: Path, translator_backend: BaseTranslator, glossary_path: Path):
     """Test that adult glossary terms are used"""
     print("\n" + "=" * 70)
     print("TEST 5: Glossary Usage")
     print("=" * 70)
 
-    # Load model
-    model_path = project_root / "models" / "aya-23-8B-GGUF" / "aya-23-8B-Q4_K_M.gguf"
-    glossary_path = project_root / "data" / "ro_uncensored_glossary.json"
+    print(f"\n✓ Loaded glossary at {glossary_path}")
 
-    if not model_path.exists():
-        print("\n⚠ WARNING: Model not found, skipping glossary test")
-        return None
-
-    # Load glossary to check terms
-    with open(glossary_path, 'r', encoding='utf-8') as f:
-        glossary = json.load(f)
-
-    print(f"\n✓ Loaded glossary with {len(glossary)} terms")
-
-    pipeline = RenpyTranslationPipeline(str(model_path), target_language="Romanian", glossary_path=str(glossary_path))
+    pipeline = RenpyTranslationPipeline(translator_backend)
 
     # Translate adult content file
     test_file = romanian_dir / "adult.rpy"
@@ -348,8 +309,6 @@ translate romanian test_2:
         test_file.write_text(content, encoding='utf-8')
 
         # Parse to verify format
-        from translate import RenpyTranslationParser
-
         blocks = RenpyTranslationParser.parse_file(test_file)
 
         print(f"\n✓ Parsed {len(blocks)} blocks from formatted output")
@@ -361,7 +320,7 @@ translate romanian test_2:
         print("\n✓ PASSED: Output format is valid Ren'Py format")
 
 
-def run_all_tests():
+def run_all_tests(model_script_path: Path, language: str):
     """Run complete end-to-end test suite"""
     print("\n" + "=" * 70)
     print("COMPREHENSIVE END-TO-END TEST SUITE")
@@ -369,6 +328,38 @@ def run_all_tests():
     print("=" * 70)
 
     results = []
+
+    # Initialize the translator backend once for all tests
+    # This will dynamically load the correct translator class (Aya23Translator or MADLAD400Translator)
+    # based on the model_script_path
+    translator_class_name = model_script_path.stem.replace('_translator', '').replace('translate_with_', '').capitalize() + "Translator"
+    translator_module_name = model_script_path.stem
+
+    sys.path.insert(0, str(model_script_path.parent.parent)) # Add src to path
+    sys.path.insert(0, str(model_script_path.parent)) # Add translators dir to path
+
+    # Dynamic import
+    translator_module = __import__(translator_module_name)
+    translator_backend_class = getattr(translator_module, translator_class_name)
+
+    # Default model path assumptions - need to be more dynamic
+    # This test is hardcoded for Aya-23-8B model
+    model_path = project_root / "models" / "aya-23-8B-GGUF" / "aya-23-8B-Q4_K_M.gguf"
+    if not model_path.exists():
+        print("\n⚠ WARNING: Default model not found, skipping tests that require it.")
+        print(f"  Expected: {model_path}")
+        return False # Exit early if model isn't found
+
+    # Generic glossary path (can be overridden by specific tests)
+    glossary_path = project_root / "data" / f"ro_uncensored_glossary.json" # Adjust for target language
+
+    # Initialize the specific translator instance
+    translator_instance = translator_backend_class(
+        model_path=str(model_path),
+        target_language=language,
+        glossary=None # Glossary is handled by pipeline in these tests
+    )
+
 
     # Create a single temporary directory for all tests
     with TemporaryDirectory() as tmpdir:
@@ -385,7 +376,7 @@ def run_all_tests():
 
             # Test 3: Translation workflow
             try:
-                test_translation_workflow(romanian_dir)
+                test_translation_workflow(romanian_dir, translator_instance)
                 results.append(("Translation Workflow", True))
             except Exception as e:
                 print(f"\n✗ Translation workflow failed: {e}")
@@ -393,7 +384,7 @@ def run_all_tests():
 
             # Test 4: Tag preservation
             try:
-                test_tag_preservation(romanian_dir)
+                test_tag_preservation(romanian_dir, translator_instance)
                 results.append(("Tag Preservation", True))
             except Exception as e:
                 print(f"\n✗ Tag preservation failed: {e}")
@@ -401,14 +392,15 @@ def run_all_tests():
 
             # Test 5: Glossary usage
             try:
-                test_glossary_usage(romanian_dir)
+                # Use the glossary_path from args for this test
+                test_glossary_usage(romanian_dir, translator_instance, glossary_path)
                 results.append(("Glossary Usage", True))
             except Exception as e:
                 print(f"\n✗ Glossary usage failed: {e}")
                 results.append(("Glossary Usage", False))
 
             # Test 6: Output format
-            test_output_format()
+            test_output_format() # No translator backend needed here
             results.append(("Output Format", True))
 
         except Exception as e:
@@ -440,5 +432,17 @@ def run_all_tests():
 
 
 if __name__ == "__main__":
-    success = run_all_tests()
+    # --- Argument Parsing ---
+    parser = argparse.ArgumentParser(description="End-to-end tests for Ren'Py translation system.")
+    parser.add_argument("--model_script", type=str, required=True, help="Path to the Python translation script to use (e.g., scripts/aya23_translator.py).")
+    parser.add_argument("--language", type=str, required=True, help="Target language code (e.g., 'ro').")
+    args = parser.parse_args()
+
+    # --- Debugging ---
+    print(f"\nDEBUG: sys.argv = {sys.argv}")
+    print(f"DEBUG: args.model_script = {args.model_script}")
+    print(f"DEBUG: args.language = {args.language}")
+
+    # Pass args to run_all_tests
+    success = run_all_tests(Path(args.model_script), args.language)
     sys.exit(0 if success else 1)

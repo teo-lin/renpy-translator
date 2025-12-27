@@ -1,30 +1,38 @@
-"""
-Test the example game translation workflow
-
-This test:
-1. Backs up the original example game file (3 strings translated)
-2. Runs translation on the remaining empty strings
-3. Verifies new translations were added
-4. Restores the original file for next test run
-"""
-
 import sys
 import shutil
 import subprocess
 from pathlib import Path
+import argparse # Import argparse
 
 # Project paths
 project_root = Path(__file__).parent.parent
 example_file = project_root / "games" / "Example" / "game" / "tl" / "romanian" / "script.rpy"
 backup_file = example_file.with_suffix(".rpy.backup")
 python_exe = project_root / "venv" / "Scripts" / "python.exe"
-translate_script = project_root / "scripts" / "translate.py"
 
+# --- Argument Parsing ---
+parser = argparse.ArgumentParser(description="Test example game translation workflow.")
+parser.add_argument("--model_script", type=str, required=True, help="Path to the Python translation script to use.")
+parser.add_argument("--language", type=str, required=True, help="Target language code (e.g., 'ro').")
+args = parser.parse_args()
+
+# Use the model script from arguments
+translate_script = Path(args.model_script)
+target_language = args.language
+
+# --- DEBUGGING PRINTS ---
+print(f"\nDEBUG: sys.argv = {sys.argv}")
+print(f"DEBUG: args.model_script = {args.model_script}")
+print(f"DEBUG: translate_script (resolved Path) = {translate_script}")
+print(f"DEBUG: translate_script.exists() = {translate_script.exists()}")
+print(f"DEBUG: python_exe = {python_exe}")
+# --- END DEBUGGING PRINTS ---
 
 def count_translations(file_path):
     """Count how many non-empty translations exist in the file"""
     content = file_path.read_text(encoding='utf-8')
     lines = content.split('\n')
+
 
     count = 0
     for i, line in enumerate(lines):
@@ -63,11 +71,11 @@ def test_example_game_translation():
 
     # Step 3: Run translation
     print("\n[3/5] Running translation...")
-    print(f"Command: {python_exe} {translate_script} {example_file}")
+    print(f"Command: {python_exe} {translate_script} {example_file} --language {target_language}")
 
     try:
         result = subprocess.run(
-            [str(python_exe), str(translate_script), str(example_file)],
+            [str(python_exe), str(translate_script), str(example_file), "--language", target_language],
             capture_output=True,
             text=True,
             timeout=180  # 3 minutes timeout

@@ -44,11 +44,11 @@ A new student arrives at an academy and meets Sarah, who gives them a tour. They
 You can translate the file manually:
 
 ```powershell
-# Using PowerShell wrapper
-.\translate.ps1 games\Example\game\tl\romanian
+# Using interactive launcher (recommended)
+.\translate.ps1
 
 # Or directly with Python
-venv\Scripts\python.exe scripts\translate.py games\Example\game\tl\romanian
+venv\Scripts\python.exe scripts\translate_with_aya23.py games\Example\game\tl\romanian
 ```
 
 ### Automated Test

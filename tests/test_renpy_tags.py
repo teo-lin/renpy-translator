@@ -6,8 +6,9 @@ import sys
 from pathlib import Path
 
 # Import the tag extractor from scripts
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-from translate import RenpyTagExtractor
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+from renpy_utils import RenpyTagExtractor
+from renpy_utils import RenpyTranslationParser
 
 
 def test_tag_extraction():
@@ -148,7 +149,7 @@ def test_tag_restoration():
 
 def test_renpy_parser():
     """Test Ren'Py file parsing"""
-    from translate import RenpyTranslationParser
+    from renpy_utils import RenpyTranslationParser
 
     # Sample Ren'Py translation content
     sample_content = """# TODO: Translation updated at 2024-02-29 18:59

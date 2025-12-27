@@ -4,10 +4,23 @@
 
   "models": {
     "aya-23-8b": {
+      "name": "Aya-23-8B",
       "repo": "bartowski/aya-23-8B-GGUF",
       "file": "aya-23-8B-Q4_K_M.gguf",
       "size": "4.8GB",
-      "destination": "models/aya-23-8B-GGUF/aya-23-8B-Q4_K_M.gguf"
+      "destination": "models/aya-23-8B-GGUF/aya-23-8B-Q4_K_M.gguf",
+      "description": "Higher quality for 23 European and major Asian languages",
+      "languages": ["ro", "es", "fr", "de", "it", "pt", "ru", "tr", "cs", "pl", "uk", "bg", "zh", "ja", "ko", "vi", "th", "id", "ar", "he", "hi", "nl", "fi"]
+    },
+    "madlad-400-3b": {
+      "name": "MADLAD-400-3B",
+      "repo": "google/madlad400-3b-mt",
+      "file": null,
+      "size": "~6GB",
+      "destination": "models/madlad400-3b-mt",
+      "description": "Supports 400+ languages (30 pre-configured with language codes)",
+      "languages": ["ro", "es", "fr", "de", "it", "pt", "ru", "tr", "cs", "pl", "uk", "bg", "zh", "ja", "ko", "vi", "th", "id", "ar", "he", "fa", "hi", "bn", "nl", "sv", "no", "da", "fi", "el", "hu"],
+      "huggingface_download": true
     }
   },
 
@@ -19,14 +32,8 @@
       "description": "Ren'Py SDK for generate-translations command"
     },
     "rpaextract": {
-      "url": "https://github.com/Lattyware/rpaextract/releases/latest/download/rpaExtract.exe",
-      "destination": "tools/rpaExtract.exe",
-      "description": "Extract RPA archives from Ren'Py games"
-    },
-    "unren": {
-      "url": "https://github.com/sam-m888/unren-forpy3/archive/refs/heads/main.zip",
-      "destination": "tools/unren/",
-      "description": "UnRen.bat for extracting and decompiling Ren'Py games"
+      "destination": "renpy/rpaExtract.exe",
+      "description": "Extract RPA archives from Ren'Py games (included in repository)"
     }
   }
 }
