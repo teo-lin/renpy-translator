@@ -127,6 +127,23 @@ class PatternBasedCorrector:
                         'new': replacement
                     })
 
+        # Apply pronoun correction patterns
+        for pattern_def in self.corrections.get('pronoun_corrections', []):
+            pattern = pattern_def['pattern']
+            replacement = pattern_def['replacement']
+
+            regex = re.compile(pattern)
+            matches = list(regex.finditer(corrected))
+
+            for match in reversed(matches):
+                old_text = match.group(0)
+                corrected = corrected[:match.start()] + replacement + corrected[match.end():]
+                changes.append({
+                    'type': 'pronoun_correction',
+                    'old': old_text,
+                    'new': replacement
+                })
+
         # Apply gender agreement patterns
         for pattern_def in self.corrections.get('gender_agreement', []):
             pattern = pattern_def['pattern']
@@ -209,9 +226,56 @@ class LLMBasedCorrector:
                 new_pos = 0
 
             new_pos = max(0, min(new_pos, len(result)))
-            result = result[:new_pos] + tag + result[new_pos:]
+
+            # CRITICAL FIX: Ensure we don't insert inside another tag
+            safe_pos = self._find_safe_insertion_point(result, new_pos)
+
+            result = result[:safe_pos] + tag + result[safe_pos:]
 
         return result
+
+    @staticmethod
+    def _find_safe_insertion_point(text: str, target_pos: int) -> int:
+        """
+        Find a safe position to insert a tag, ensuring we don't break existing tags
+
+        Args:
+            text: The text to insert into
+            target_pos: The desired insertion position
+
+        Returns:
+            A safe position that won't break existing tags
+        """
+        # Clamp to text bounds
+        target_pos = max(0, min(target_pos, len(text)))
+
+        # Check if we're inside a tag at target_pos
+        # Count unclosed braces/brackets before this position
+        before_text = text[:target_pos]
+
+        # Count { and } before target
+        open_braces = before_text.count('{')
+        close_braces = before_text.count('}')
+
+        # Count [ and ] before target
+        open_brackets = before_text.count('[')
+        close_brackets = before_text.count(']')
+
+        # If we're inside a tag, find the end of it
+        if open_braces > close_braces:
+            # We're inside {}, find the next }
+            next_close = text.find('}', target_pos)
+            if next_close != -1:
+                return next_close + 1
+
+        if open_brackets > close_brackets:
+            # We're inside [], find the next ]
+            next_close = text.find(']', target_pos)
+            if next_close != -1:
+                return next_close + 1
+
+        # Position is safe
+        return target_pos
 
     def create_correction_prompt(self, romanian_text: str) -> str:
         """Create prompt for correcting Romanian text"""
@@ -364,20 +428,54 @@ class CombinedCorrector:
         self.patterns = patterns_corrector
         self.llm = llm_corrector
 
+    @staticmethod
+    def sanitize_quotes(text: str) -> Tuple[str, bool]:
+        """
+        Sanitize quotes in text to prevent Ren'Py syntax errors.
+
+        CRITICAL: Ren'Py uses Python syntax, so strings delimited by " cannot contain unescaped "
+        This function converts nested quotes to '' (two single quotes) format.
+
+        Args:
+            text: Translation text that may contain quote issues
+
+        Returns:
+            (sanitized_text, was_changed)
+        """
+        original_text = text
+
+        # Replace any nested double quotes with two single quotes
+        # This is safe because we're already inside a double-quoted string
+        sanitized = text.replace('"', "''")
+
+        # Also fix escaped quotes (\" or \") that slipped through
+        sanitized = sanitized.replace('\\"', "''").replace('\\"', "''")
+
+        # Fix single escaped single quotes
+        sanitized = sanitized.replace("\\'", "'")
+
+        was_changed = (sanitized != original_text)
+        return sanitized, was_changed
+
     def correct_text(self, text: str) -> Tuple[str, Dict]:
         """
-        Apply corrections in order: patterns first, then LLM
+        Apply corrections in order: quote sanitization, patterns, then LLM
 
         Returns:
             (corrected_text, changes_dict)
         """
         corrected = text
         changes = {
+            'quote_sanitized': False,
             'pattern_changes': [],
             'llm_changed': False,
             'pattern_corrected': text,
             'llm_corrected': text
         }
+
+        # Step 0: Quote sanitization (CRITICAL - prevents syntax errors)
+        corrected, quote_changed = self.sanitize_quotes(corrected)
+        changes['quote_sanitized'] = quote_changed
 
         # Step 1: Pattern-based corrections (fast)
         if self.patterns:
@@ -397,18 +495,20 @@ class CombinedCorrector:
 class RenpyFileCorrector:
     """Parse and correct Ren'Py translation files"""
 
+    # Updated patterns to handle strings with unescaped quotes
+    # Match everything up to the end of line instead of stopping at quotes
     TRANSLATE_BLOCK_PATTERN = re.compile(
         r'(# game/[^\n]+\n'
         r'translate \w+ \w+:\s*\n'
         r'\s*# [^\n]+\n'
-        r'\s*\w+ ")([^"]*?)(")',
+        r'\s*\w+ ")(.+?)("(?:\s*#.*)?)\s*$',
         re.MULTILINE
     )
 
     STRING_BLOCK_PATTERN = re.compile(
         r'(# game/[^\n]+\n'
         r'\s*old "[^\n]*?"\s*\n'
-        r'\s*new ")([^"]*?)(")',
+        r'\s*new ")(.+?)("(?:\s*#.*)?)\s*$',
         re.MULTILINE
     )
 
@@ -442,6 +542,21 @@ class RenpyFileCorrector:
             if not old_translation.strip():
                 return match.group(0)
 
+            # Extract English source text from comment
+            english_source = ""
+            if block_type == 'dialogue':
+                # For dialogue blocks: extract from "# character "English text""
+                # Handle nested quotes by capturing everything between the first " and last "
+                comment_match = re.search(r'#\s+\w+\s+"(.+)"', prefix)
+                if comment_match:
+                    english_source = comment_match.group(1)
+            elif block_type == 'string':
+                # For string blocks: extract from 'old "English text"'
+                # Handle nested quotes by capturing everything between the first " and last "
+                old_match = re.search(r'old\s+"(.+?)"', prefix)
+                if old_match:
+                    english_source = old_match.group(1)
+
             # Show progress
             show_progress(blocks_processed, total_count, start_time, prefix="  ")
 
@@ -451,8 +566,10 @@ class RenpyFileCorrector:
                 change_record = {
                     'block_type': block_type,
                     'block_number': blocks_processed,
+                    'english_source': english_source,
                     'old': old_translation,
                     'new': new_translation,
+                    'quote_sanitized': change_info.get('quote_sanitized', False),
                     'pattern_changes': change_info.get('pattern_changes', []),
                     'llm_changed': change_info.get('llm_changed', False)
                 }
@@ -470,15 +587,21 @@ class RenpyFileCorrector:
 
         # Show corrections summary
         if all_changes:
+            quote_count = sum(1 for c in all_changes if c['quote_sanitized'])
             pattern_count = sum(1 for c in all_changes if c['pattern_changes'])
             llm_count = sum(1 for c in all_changes if c['llm_changed'])
 
             print(f"\n  Corrections made:")
+            print(f"    Quote sanitization: {quote_count}")
             print(f"    Pattern-based: {pattern_count}")
             print(f"    LLM-based: {llm_count}")
 
             for i, change in enumerate(all_changes[:5], 1):
-                print(f"\n    {i}. [{change['block_type']}]")
+                english = change.get('english_source', '')
+                display_text = english[:60] if english else f"[{change['block_type']}]"
+                print(f"\n    {i}. {display_text}")
+                if change['quote_sanitized']:
+                    print(f"       [QUOTE] Fixed unescaped quotes")
                 if change['pattern_changes']:
                     for pc in change['pattern_changes']:
                         print(f"       [PATTERN:{pc['type']}] {pc['old']} → {pc['new']}")
@@ -495,12 +618,20 @@ class RenpyFileCorrector:
             with open(corrections_file, 'w', encoding='utf-8') as f:
                 f.write(f"Corrections for: {file_path.name}\n")
                 f.write(f"Total corrections: {len(all_changes)}\n")
+                f.write(f"  Quote sanitization: {quote_count}\n")
                 f.write(f"  Pattern-based: {pattern_count}\n")
                 f.write(f"  LLM-based: {llm_count}\n")
                 f.write("=" * 80 + "\n\n")
 
                 for i, change in enumerate(all_changes, 1):
-                    f.write(f"{i}. {change['block_type'].upper()}\n")
+                    english_source = change.get('english_source', '')
+                    if english_source:
+                        f.write(f"{i}. ENGLISH: {english_source}\n")
+                    else:
+                        f.write(f"{i}. [{change['block_type'].upper()}]\n")
+
+                    if change['quote_sanitized']:
+                        f.write(f"   [QUOTE] Fixed unescaped quotes\n")
                     if change['pattern_changes']:
                         for pc in change['pattern_changes']:
                             f.write(f"   [PATTERN:{pc['type']}] {pc['old']} → {pc['new']}\n")
@@ -576,6 +707,36 @@ class RenpyFileCorrector:
         return total_stats
 
 
+def detect_language_from_path(path: Path) -> str:
+    """
+    Auto-detect target language from path (e.g., "game/tl/romanian" → "Romanian")
+
+    Returns capitalized language name (e.g., "Romanian", "Spanish", "French")
+    """
+    path_str = str(path).lower().replace('\\', '/')
+
+    # Language mappings (path name → proper name)
+    lang_map = {
+        'romanian': 'Romanian',
+        'spanish': 'Spanish',
+        'french': 'French',
+        'german': 'German',
+        'italian': 'Italian',
+        'portuguese': 'Portuguese',
+        'russian': 'Russian',
+        'turkish': 'Turkish',
+        'czech': 'Czech',
+        'polish': 'Polish',
+        'ukrainian': 'Ukrainian'
+    }
+
+    for path_name, proper_name in lang_map.items():
+        if path_name in path_str:
+            return proper_name
+
+    return "Romanian"  # Default fallback
+
+
 def main():
     """CLI entry point"""
     if len(sys.argv) < 2:
@@ -596,20 +757,51 @@ def main():
         print("Error: Cannot use both --patterns-only and --llm-only")
         sys.exit(1)
 
+    # Detect language from path
+    target_language = detect_language_from_path(input_path)
+
+    # Map language names to ISO codes
+    lang_code_map = {
+        'Romanian': 'ro',
+        'Spanish': 'es',
+        'French': 'fr',
+        'German': 'de',
+        'Italian': 'it',
+        'Portuguese': 'pt',
+        'Russian': 'ru',
+        'Turkish': 'tr',
+        'Czech': 'cs',
+        'Polish': 'pl',
+        'Ukrainian': 'uk'
+    }
+    lang_code = lang_code_map.get(target_language, target_language.lower()[:2])
+
     # Setup paths
     project_root = Path(__file__).parent.parent
-    corrections_file = project_root / "data" / "romanian_corrections.json"
     model_path = project_root / "models" / "aya-23-8B-GGUF" / "aya-23-8B-Q4_K_M.gguf"
+
+    # Generic corrections fallback: uncensored → censored → none
+    corrections_file = None
+    for corrections_variant in [f"{lang_code}_uncensored_corrections.json", f"{lang_code}_corrections.json"]:
+        candidate = project_root / "data" / corrections_variant
+        if candidate.exists():
+            corrections_file = candidate
+            print(f"[OK] Using corrections: {corrections_variant}")
+            break
 
     # Initialize correctors based on flags
     patterns_corrector = None
     llm_corrector = None
 
     if not llm_only:
-        if not corrections_file.exists():
-            print(f"Error: Corrections file not found at {corrections_file}")
-            sys.exit(1)
-        patterns_corrector = PatternBasedCorrector(str(corrections_file))
+        if not corrections_file:
+            print(f"[WARNING] No corrections file found for {target_language} ({lang_code})")
+            if patterns_only:
+                print("Error: --patterns-only requires a corrections file")
+                sys.exit(1)
+            print("[INFO] Skipping pattern-based corrections")
+        else:
+            patterns_corrector = PatternBasedCorrector(str(corrections_file))
 
     if not patterns_only:
         if not model_path.exists():

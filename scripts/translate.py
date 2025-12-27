@@ -158,6 +158,7 @@ class RenpyTagExtractor:
         Strategy:
         - If text length is similar, use proportional positions
         - Place tags at word boundaries when possible
+        - Never insert tags inside other tags
         """
         if not tags:
             return translated_text
@@ -180,10 +181,57 @@ class RenpyTagExtractor:
             # Clamp position to text bounds
             new_pos = max(0, min(new_pos, len(result)))
 
+            # CRITICAL FIX: Ensure we don't insert inside another tag
+            # Check if we're inside a tag (between { and } or [ and ])
+            safe_pos = cls._find_safe_insertion_point(result, new_pos)
+
             # Insert tag
-            result = result[:new_pos] + tag + result[new_pos:]
+            result = result[:safe_pos] + tag + result[safe_pos:]
 
         return result
+
+    @staticmethod
+    def _find_safe_insertion_point(text: str, target_pos: int) -> int:
+        """
+        Find a safe position to insert a tag, ensuring we don't break existing tags
+
+        Args:
+            text: The text to insert into
+            target_pos: The desired insertion position
+
+        Returns:
+            A safe position that won't break existing tags
+        """
+        # Clamp to text bounds
+        target_pos = max(0, min(target_pos, len(text)))
+
+        # Check if we're inside a tag at target_pos
+        # Count unclosed braces/brackets before this position
+        before_text = text[:target_pos]
+
+        # Count { and } before target
+        open_braces = before_text.count('{')
+        close_braces = before_text.count('}')
+
+        # Count [ and ] before target
+        open_brackets = before_text.count('[')
+        close_brackets = before_text.count(']')
+
+        # If we're inside a tag, find the end of it
+        if open_braces > close_braces:
+            # We're inside {}, find the next }
+            next_close = text.find('}', target_pos)
+            if next_close != -1:
+                return next_close + 1
+
+        if open_brackets > close_brackets:
+            # We're inside [], find the next ]
+            next_close = text.find(']', target_pos)
+            if next_close != -1:
+                return next_close + 1
+
+        # Position is safe
+        return target_pos
 
 
 class RenpyTranslationParser:
@@ -339,6 +387,65 @@ class RenpyTranslationPipeline:
                 self.glossary = json.load(f)
             print(f"[OK] Loaded glossary with {len(self.glossary)} terms")
 
+    @staticmethod
+    def _get_dialogue_context(current_block: Dict, all_blocks: List[Dict], max_context: int = 3) -> List[str]:
+        """
+        Get surrounding dialogue context for a dialogue block
+
+        For dialogue blocks, we want context from nearby dialogue in the same file,
+        NOT from menu options or unrelated dialogue.
+
+        Args:
+            current_block: The block we're translating
+            all_blocks: All blocks from the file
+            max_context: Maximum number of context lines (before + after)
+
+        Returns:
+            List of context strings in format ["speaker: text", ...]
+        """
+        if current_block['type'] != 'dialogue':
+            return None
+
+        context = []
+        current_pos = current_block['start_pos']
+
+        # Find dialogue blocks near this one (within a reasonable distance)
+        # A reasonable distance is ~5000 characters (roughly same scene)
+        nearby_dialogue = []
+        for block in all_blocks:
+            if block['type'] == 'dialogue' and block['start_pos'] != current_pos:
+                distance = abs(block['start_pos'] - current_pos)
+                if distance < 5000:  # Same scene threshold
+                    nearby_dialogue.append((distance, block['start_pos'], block))
+
+        # Sort by position in file
+        nearby_dialogue.sort(key=lambda x: x[1])
+
+        # Get context: up to max_context/2 before and after
+        context_before = []
+        context_after = []
+
+        for _, pos, block in nearby_dialogue:
+            if pos < current_pos:
+                context_before.append(block)
+            elif pos > current_pos:
+                context_after.append(block)
+
+        # Take the closest ones
+        context_before = context_before[-(max_context // 2):]
+        context_after = context_after[:(max_context // 2 + max_context % 2)]
+
+        # Build context strings
+        for block in context_before + context_after:
+            speaker = block.get('character_var', 'unknown')
+            text = RenpyTranslationParser.extract_dialogue(block['original'])
+            # Remove tags for cleaner context
+            clean_text, _ = RenpyTagExtractor.extract_tags(text)
+            if clean_text.strip():
+                context.append(f"{speaker}: {clean_text}")
+
+        return context if context else None
+
     def translate_file(self, input_path: Path, output_path: Path = None,
                        skip_empty: bool = True) -> Dict:
         """
@@ -380,7 +487,6 @@ class RenpyTranslationPipeline:
 
         # Translate each block and store results
         translations = {}
-        dialogue_context = []  # Track previous dialogue for context
         start_time = time.time()
 
         for i, block in enumerate(to_translate):
@@ -406,11 +512,17 @@ class RenpyTranslationPipeline:
             # Show progress
             show_progress(i + 1, len(to_translate), start_time, prefix="  ")
 
-            # Translate clean text with context (only provide context for dialogue)
+            # Get context based on block type
+            context = None
+            if block['type'] == 'dialogue':
+                # For dialogue: get surrounding dialogue from the same file location
+                context = self._get_dialogue_context(block, blocks, max_context=3)
+
+            # Translate clean text with context
             translation = self.translator.translate(
                 clean_text,
                 glossary=self.glossary,
-                context=dialogue_context if block['type'] == 'dialogue' else None,
+                context=context,
                 speaker=speaker
             )
 
@@ -425,14 +537,15 @@ class RenpyTranslationPipeline:
             # Remove unwanted letters after variables: "[name]u" → "[name]"
             final_translation = re.sub(r'(\[[\w\s]+\])([a-zA-Z]+)', lambda m: m.group(1) + (' ' + m.group(2) if m.group(2) not in ['u', 'a', 'i'] else ''), final_translation)
 
+            # CRITICAL: Sanitize quotes to prevent Ren'Py syntax errors
+            # Replace any nested double quotes with two single quotes
+            final_translation = final_translation.replace('"', "''")
+            # Fix escaped quotes that might have slipped through
+            final_translation = final_translation.replace('\\"', "''").replace('\\"', "''")
+            final_translation = final_translation.replace("\\'", "'")
+
             # Store translation for this block
             translations[block['label']] = final_translation
-
-            # Update context with this dialogue (keep last 5 lines) - only for dialogue blocks
-            if block['type'] == 'dialogue':
-                dialogue_context.append(f"{speaker}: {clean_text}")
-                if len(dialogue_context) > 5:
-                    dialogue_context.pop(0)
 
         # Clear progress line and show completion
         print()  # Newline after progress bar
@@ -560,13 +673,31 @@ def main():
     project_root = Path(__file__).parent.parent
     model_path = project_root / "models" / "aya-23-8B-GGUF" / "aya-23-8B-Q4_K_M.gguf"
 
-    # Try to find language-specific glossary
-    glossary_path = project_root / "data" / f"{target_language.lower()}_glossary.json"
-    if not glossary_path.exists():
-        glossary_path = None  # No glossary available
+    # Map language names to ISO codes
+    lang_code_map = {
+        'Romanian': 'ro',
+        'Spanish': 'es',
+        'French': 'fr',
+        'German': 'de',
+        'Italian': 'it',
+        'Portuguese': 'pt'
+    }
+    lang_code = lang_code_map.get(target_language, target_language.lower()[:2])
+
+    # Generic glossary fallback: uncensored → censored → none
+    glossary_path = None
+    for glossary_variant in [f"{lang_code}_uncensored_glossary.json", f"{lang_code}_glossary.json"]:
+        candidate = project_root / "data" / glossary_variant
+        if candidate.exists():
+            glossary_path = candidate
+            print(f"[OK] Using glossary: {glossary_variant}")
+            break
+
+    if not glossary_path:
+        print(f"[WARNING] No glossary found for {target_language} ({lang_code})")
 
     # Initialize pipeline
-    pipeline = RenpyTranslationPipeline(str(model_path), target_language, str(glossary_path) if glossary_path and glossary_path.exists() else None)
+    pipeline = RenpyTranslationPipeline(str(model_path), target_language, str(glossary_path) if glossary_path else None)
 
     # Translate
     if input_path.is_file():
