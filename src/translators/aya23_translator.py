@@ -148,14 +148,14 @@ class Aya23Translator:
             temperature=temperature,
             top_p=0.9,
             repeat_penalty=1.1,
-            stop=["English:", "\n\n", "\nTranslation:", "Translation:"],
+            stop=["English:", "\nEnglish:", "\nTranslation:", "Translation:", "\n\n\n"],
             echo=False
         )
 
-        translation = output['choices'][0]['text'].strip()
+        raw_translation = output['choices'][0]['text'].strip()
 
         # Post-process: Clean up any remaining artifacts
-        translation = self._clean_translation(translation)
+        translation = self._clean_translation(raw_translation)
 
         return translation
 

@@ -1,24 +1,50 @@
-# Interactive PowerShell launcher for Ren'Py translation
-# Guided workflow: Model -> Language -> Game selection
+# Modular Translation Pipeline Launcher
+# Translates .parsed.yaml files using batch translation with context awareness
+# Uses configuration from models\local_config.json
 
 param(
-    [int]$Model = 0,      # Model number (1-based), 0 = prompt user
-    [int]$Language = 0,   # Language number (1-based), 0 = prompt user
-    [int]$Game = 0,       # Game number (1-based), 0 = prompt user
-    [switch]$Yes,         # Skip confirmation prompt
-    [Parameter(ValueFromRemainingArguments=$true)]
-    [string[]]$Arguments  # Additional arguments to pass to Python script
+    [string]$Game = "",        # Optional game name (uses current_game if not specified)
+    [switch]$Help              # Show help
 )
 
 $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-# Source the shared user selection module
-. (Join-Path $scriptDir "scripts\user_selection.ps1")
+if ($Help) {
+    Write-Host ""
+    Write-Host "=================================================================" -ForegroundColor Green
+    Write-Host "       Modular Translation Pipeline - Help                      " -ForegroundColor Green
+    Write-Host "=================================================================" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Translates .parsed.yaml files using batch translation."
+    Write-Host ""
+    Write-Host "USAGE:" -ForegroundColor Yellow
+    Write-Host "  .\5-translate.ps1                  # Use current_game from config"
+    Write-Host "  .\5-translate.ps1 -Game 'MyGame'   # Translate specific game"
+    Write-Host ""
+    Write-Host "REQUIREMENTS:" -ForegroundColor Yellow
+    Write-Host "  1. Run .\3-config.ps1 first to set up game configuration"
+    Write-Host "  2. Run .\4-extract.ps1 to create .parsed.yaml files"
+    Write-Host "  3. Then run this script to translate"
+    Write-Host ""
+    Write-Host "WHAT IT DOES:" -ForegroundColor Yellow
+    Write-Host "  - Loads game config from models\local_config.json"
+    Write-Host "  - Finds all .parsed.yaml files in game\tl\<language>\"
+    Write-Host "  - Translates only untranslated blocks (empty target language field)"
+    Write-Host "  - Uses context-aware translation:"
+    Write-Host "    * DIALOGUE: 3 lines before + 1 line after"
+    Write-Host "    * CHOICE: No context (only character info)"
+    Write-Host "  - Saves translations back to .parsed.yaml files"
+    Write-Host ""
+    Write-Host "NEXT STEPS:" -ForegroundColor Yellow
+    Write-Host "  After translation, run .\7-merge.ps1 to reconstruct .rpy files"
+    Write-Host ""
+    exit 0
+}
 
 $pythonExe = Join-Path $scriptDir "venv\Scripts\python.exe"
-$gamesFolder = Join-Path $scriptDir "games"
 $configFile = Join-Path $scriptDir "models\local_config.json"
+$pythonScript = Join-Path $scriptDir "scripts\translate_modular.py"
 
 # Add PyTorch lib directory to PATH for CUDA DLLs (needed by llama-cpp-python)
 $torchLibPath = Join-Path $scriptDir "venv\Lib\site-packages\torch\lib"
@@ -32,211 +58,43 @@ $env:PYTHONIOENCODING = "utf-8"
 # Check Python exists
 if (-not (Test-Path $pythonExe)) {
     Write-Host "ERROR: Python executable not found at $pythonExe" -ForegroundColor Red
-    Write-Host "Please run setup.ps1 to install the virtual environment." -ForegroundColor Yellow
+    Write-Host "Please run 0-setup.ps1 to install the virtual environment." -ForegroundColor Yellow
     exit 1
 }
 
-# Load configuration
+# Check Python script exists
+if (-not (Test-Path $pythonScript)) {
+    Write-Host "ERROR: Python script not found at $pythonScript" -ForegroundColor Red
+    exit 1
+}
+
+# Check configuration exists
 if (-not (Test-Path $configFile)) {
-    Write-Host "ERROR: Configuration not found at models\local_config.json" -ForegroundColor Red
-    Write-Host "Please run setup.ps1 first." -ForegroundColor Yellow
+    Write-Host "ERROR: Configuration not found at $configFile" -ForegroundColor Red
+    Write-Host "Please run 3-config.ps1 first to set up your game." -ForegroundColor Yellow
     exit 1
-}
-
-$config = Get-Content $configFile | ConvertFrom-Json
-
-# Get models as an array
-if ($config.models -is [array]) {
-    $allModels = $config.models
-} else {
-    $allModels = @($config.models)
-}
-
-# Filter to only include downloaded models
-$installedModels = @()
-foreach ($modelItem in $allModels) {
-    $modelPath = Join-Path $scriptDir $modelItem.Config.destination
-    if (Test-Path $modelPath) {
-        $installedModels += $modelItem
-    }
-}
-
-# Get languages as an array
-if ($config.languages -is [array]) {
-    $languages = $config.languages
-} else {
-    $languages = @($config.languages)
 }
 
 # Banner
 Write-Host ""
 Write-Host "=================================================================" -ForegroundColor Green
-Write-Host "       Ren'Py Translation - Interactive Setup                   " -ForegroundColor Green
+Write-Host "       Modular Translation Pipeline                             " -ForegroundColor Green
 Write-Host "=================================================================" -ForegroundColor Green
 
-# Step 1: Select Model
-if ($Model -gt 0) {
-    if ($Model -le $installedModels.Count) {
-        $selectedModel = $installedModels[$Model - 1]
-        Write-Host ""
-        Write-Host "Auto-selecting model $Model`: $($selectedModel.Name)" -ForegroundColor Cyan
-    } else {
-        Write-Host "ERROR: Invalid model number: $Model. Available models: 1-$($installedModels.Count)" -ForegroundColor Red
-        exit 1
-    }
-} else {
-    try {
-        $selectedModel = Select-Item `
-            -Title "Step 1: Select Translation Model" `
-            -ItemTypeName "model" `
-            -Items $installedModels `
-            -DisplayItem {
-                param($model, $num)
-                Write-Host "  [$num] " -NoNewline -ForegroundColor Yellow
-                Write-Host $model.Name -NoNewline -ForegroundColor Green
-                Write-Host " - $($model.Description)" -ForegroundColor White
-                Write-Host "      Size: $($model.Size)" -ForegroundColor DarkGray
-                Write-Host ""
-            }
-    } catch {
-        Write-Host "Selection cancelled." -ForegroundColor Yellow
-        exit 0
-    }
-}
-
-# Step 2: Select Language
-if ($Language -gt 0) {
-    if ($Language -le $languages.Count) {
-        $selectedLanguage = $languages[$Language - 1]
-        Write-Host ""
-        Write-Host "Auto-selecting language $Language`: $($selectedLanguage.Name) ($($selectedLanguage.Code))" -ForegroundColor Cyan
-    } else {
-        Write-Host "ERROR: Invalid language number: $Language. Available languages: 1-$($languages.Count)" -ForegroundColor Red
-        exit 1
-    }
-} else {
-    try {
-        $selectedLanguage = Select-Item `
-            -Title "Step 2: Select Target Language" `
-            -ItemTypeName "language" `
-            -Items $languages `
-            -DisplayItem {
-                param($lang, $num)
-                Write-Host "  [$num] " -NoNewline -ForegroundColor Yellow
-                Write-Host "$($lang.Name) " -NoNewline -ForegroundColor Green
-                Write-Host "($($lang.Code))" -ForegroundColor DarkGray
-            }
-    } catch {
-        Write-Host "Selection cancelled." -ForegroundColor Yellow
-        exit 0
-    }
-}
-
-# Step 3: Scan games and select game
-Write-Host ""
-Write-Host "Scanning games folder for $($selectedLanguage.Name) translations..." -ForegroundColor Cyan
-
-# Scan games folder
-$games = @()
-if (Test-Path $gamesFolder) {
-    $gameFolders = Get-ChildItem -Path $gamesFolder -Directory
-    foreach ($gameFolder in $gameFolders) {
-        $tlPath = Join-Path $gameFolder.FullName "game\tl\$($selectedLanguage.Name.ToLower())"
-        if (Test-Path $tlPath) {
-            $renpyFiles = Get-ChildItem -Path $tlPath -Filter "*.rpy" -Recurse
-            if ($renpyFiles.Count -gt 0) {
-                $games += @{
-                    Name = $gameFolder.Name
-                    Path = $tlPath
-                }
-            }
-        }
-    }
-}
-
-if ($games.Count -eq 0) {
-    Write-Host ""
-    Write-Host "ERROR: No games found with $($selectedLanguage.Name) translations!" -ForegroundColor Red
-    Write-Host ""
-    Write-Host "Please generate translation files first using Ren'Py:" -ForegroundColor Yellow
-    Write-Host "  renpy.exe `"path\to\game`" generate-translations $($selectedLanguage.Name.ToLower())" -ForegroundColor Yellow
-    Write-Host ""
-    exit 1
-}
-
-if ($Game -gt 0) {
-    if ($Game -le $games.Count) {
-        $selectedGame = $games[$Game - 1]
-        Write-Host ""
-        Write-Host "Auto-selecting game $Game`: $($selectedGame.Name)" -ForegroundColor Cyan
-    } else {
-        Write-Host "ERROR: Invalid game number: $Game. Available games: 1-$($games.Count)" -ForegroundColor Red
-        exit 1
-    }
-} else {
-    try {
-        $selectedGame = Select-Item `
-            -Title "Step 3: Select Game to Translate" `
-            -ItemTypeName "game" `
-            -Items $games `
-            -DisplayItem {
-                param($game, $num)
-                Write-Host "  [$num] " -NoNewline -ForegroundColor Yellow
-                Write-Host $game.Name -ForegroundColor Green
-                Write-Host "      Path: $($game.Path)" -ForegroundColor DarkGray
-            }
-    } catch {
-        Write-Host "Selection cancelled." -ForegroundColor Yellow
-        exit 0
-    }
-}
-
-# Summary
-Write-Host ""
-Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host "       Translation Summary                                       " -ForegroundColor Cyan
-Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host "  Model:    " -NoNewline -ForegroundColor White
-Write-Host $selectedModel.Name -ForegroundColor Green
-Write-Host "  Language: " -NoNewline -ForegroundColor White
-Write-Host "$($selectedLanguage.Name) ($($selectedLanguage.Code))" -ForegroundColor Green
-Write-Host "  Game:     " -NoNewline -ForegroundColor White
-Write-Host $selectedGame.Name -ForegroundColor Green
-Write-Host "  Path:     " -NoNewline -ForegroundColor White
-Write-Host $selectedGame.Path -ForegroundColor Green
-Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host ""
-
-if (-not $Yes) {
-    $confirm = Read-Host "Proceed with translation? (Y/N)"
-    if ($confirm -ne "Y" -and $confirm -ne "y") {
-        Write-Host "Cancelled by user." -ForegroundColor Yellow
-        exit 0
-    }
-}
-
-# Get the model script path
-$modelScript = Join-Path $scriptDir $selectedModel.Config.script
-
-# Check if script exists
-if (-not (Test-Path $modelScript)) {
-    Write-Host ""
-    Write-Host "ERROR: Translation script not found at $modelScript" -ForegroundColor Red
-    exit 1
-}
-
 # Build arguments
-$scriptArgs = @($selectedGame.Path, "--language", $selectedLanguage.Code)
-if ($Arguments.Count -gt 0) {
-    $scriptArgs += $Arguments
+$scriptArgs = @()
+if ($Game) {
+    Write-Host ""
+    Write-Host "Using game: $Game" -ForegroundColor Cyan
+    $scriptArgs += "--game"
+    $scriptArgs += $Game
+} else {
+    Write-Host ""
+    Write-Host "Using current_game from configuration" -ForegroundColor Cyan
 }
 
-# Run the selected translation script
-Write-Host ""
-Write-Host "Starting translation with $($selectedModel.Name)..." -ForegroundColor Cyan
-Write-Host ""
-
-& $pythonExe $modelScript $scriptArgs
+# Run the Python script
+& $pythonExe $pythonScript $scriptArgs
 
 # Check exit code
 if ($LASTEXITCODE -ne 0) {
@@ -247,6 +105,10 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "=================================================================" -ForegroundColor Green
-Write-Host "       Translation Completed Successfully!                      " -ForegroundColor Green
+Write-Host "       Translation Complete!                                    " -ForegroundColor Green
 Write-Host "=================================================================" -ForegroundColor Green
+Write-Host ""
+Write-Host "NEXT STEPS:" -ForegroundColor Yellow
+Write-Host "  1. Review the .parsed.yaml files for translation quality"
+Write-Host "  2. Run .\7-merge.ps1 to reconstruct .rpy files"
 Write-Host ""

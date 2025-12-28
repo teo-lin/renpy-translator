@@ -37,10 +37,10 @@ Simple, automated translation in a single step. Best for quick translations.
 Three-phase pipeline with human review checkpoints. Better for quality and collaboration.
 
 ```powershell
-.\3-stage.ps1  # Phase 0: Setup (one-time)
-.\4-4-extract.ps1     # Phase 1: Extract clean text
+.\3-config.ps1  # Phase 0: Setup (one-time)
+.\4-extract.ps1     # Phase 1: Extract clean text
 # → Edit .parsed.yaml files manually or translate
-.\7-7-merge.ps1       # Phase 2: Merge back to .rpy
+.\7-merge.ps1       # Phase 2: Merge back to .rpy
 ```
 
 **Benefits of Modular Workflow:**
@@ -255,7 +255,7 @@ Translates Ren'Py files from English to any of 400+ languages using Google's MAD
 - Preserves Ren'Py tags and variables
 - Uses language-agnostic glossary system
 - Auto-detects language from path
-- Uses uncensored prompts with fallback
+- Customizable translation prompts
 - GPU acceleration via transformers
 
 **Usage:**
@@ -322,14 +322,14 @@ Create `data/<language>_benchmark.json` with reference translations:
 .\1-benchmark.ps1 data\ro_benchmark.json
 
 # Run with explicit glossary
-.\1-benchmark.ps1 data\ro_uncensored_benchmark.json --glossary data\ro_uncensored_glossary.json
+.\1-benchmark.ps1 data\ro_benchmark.json --glossary data\ro_glossary.json
 
 # Run for other languages
 .\1-benchmark.ps1 data\de_benchmark.json
 ```
 
 **Template Files:**
-- `data/ro_glossary.json` - Example SFW glossary template
+- `data/ro_glossary.json` - Example glossary template
 - `data/ro_benchmark.json` - Example benchmark data template
 
 ## Configuration
@@ -337,15 +337,12 @@ Create `data/<language>_benchmark.json` with reference translations:
 ### Custom Prompts
 
 The translation and correction prompts can be customized by editing the template files in `data/prompts/`:
-- `data/prompts/translate.txt` - SFW translation prompt template
-- `data/prompts/correct.txt` - SFW grammar correction prompt template
-- `data/prompts/translate_uncensored.txt` - Uncensored translation prompt (default if exists)
-- `data/prompts/correct_uncensored.txt` - Uncensored correction prompt (default if exists)
+- `data/prompts/translate.txt` - Translation prompt template
+- `data/prompts/correct.txt` - Grammar correction prompt template
 
 **Fallback hierarchy:**
-1. Try `*_uncensored.txt` (for adult/explicit content)
-2. Fall back to `*.txt` (SFW version)
-3. Fall back to embedded template in code
+1. Try custom templates in `data/prompts/`
+2. Fall back to embedded template in code
 
 These files use Python's `{variable}` syntax for placeholders. Edit them to adjust the translation style, add language-specific rules, or modify the behavior.
 
@@ -366,9 +363,8 @@ Place in `data\<language_code>_glossary.json` (e.g., `data\ro_glossary.json`, `d
 **Template:** See `data/ro_glossary.json` for an example with UI elements, character stats, and common game terms.
 
 **Fallback Hierarchy:**
-1. `data\<code>_uncensored_glossary.json` (for adult content)
-2. `data\<code>_glossary.json` (SFW version)
-3. No glossary (translation without term enforcement)
+1. `data\<code>_glossary.json` (language-specific glossary)
+2. No glossary (translation without term enforcement)
 
 Both Aya-23-8B and MADLAD-400-3B support glossaries.
 
@@ -548,10 +544,10 @@ Mixed line endings (LF vs CRLF) or UTF-8 encoding issues. This can happen when:
 ```powershell
 # View git's line ending configuration
 git config core.autocrlf
-git ls-files --eol 3-stage.ps1
+git ls-files --eol 3-config.ps1
 
 # Check actual file encoding
-file 3-stage.ps1
+file 3-config.ps1
 ```
 
 2. **Fix line endings for all PowerShell scripts:**
@@ -706,13 +702,10 @@ translator = Aya23Translator(model_path, n_gpu_layers=30)  # Instead of -1
 ├── data/                  # Prompts, glossaries, benchmarks, and correction rules
 │   ├── prompts/
 │   │   ├── translate.txt              # Translation prompt template (customizable)
-│   │   ├── translate_uncensored.txt   # Uncensored translation prompt (gitignored)
-│   │   ├── correct.txt                # Correction prompt template (customizable)
-│   │   └── correct_uncensored.txt     # Uncensored correction prompt (gitignored)
-│   ├── ro_glossary.json          # Example SFW glossary template
-│   ├── ro_uncensored_glossary.json   # Example uncensored glossary (gitignored)
+│   │   └── correct.txt                # Correction prompt template (customizable)
+│   ├── ro_glossary.json          # Example glossary template
 │   ├── ro_benchmark.json         # Example benchmark data template
-│   └── ro_uncensored_corrections.json # Example correction rules (gitignored)
+│   └── ro_corrections.json       # Example correction rules
 ├── models/                # Downloaded models and configuration
 │   └── local_config.json  # Per-game configuration (NEW)
 ├── tools/                 # External tools (gitignored)
@@ -730,7 +723,7 @@ translator = Aya23Translator(model_path, n_gpu_layers=30)  # Instead of -1
 ├── 0-setup.ps1            # Automated setup script
 ├── 1-benchmark.ps1        # PowerShell launcher for benchmark.py
 ├── 2-test.ps1             # Test runner
-├── 3-stage.ps1            # Character discovery & game setup (NEW)
+├── 3-config.ps1           # Character discovery & game setup (NEW)
 ├── 4-extract.ps1          # Extract .rpy → YAML/JSON (NEW)
 ├── 5-translate.ps1        # Interactive launcher (selects model, language, game)
 ├── 6-correct.ps1          # Interactive launcher for grammar correction
@@ -788,7 +781,7 @@ This separation provides:
 
 ```powershell
 # 1. Discover characters and configure game
-.\3-stage.ps1
+.\3-config.ps1
 
 # This will:
 # - Let you select a game from games/ folder
@@ -911,7 +904,7 @@ game/tl/romanian/
 
 ```powershell
 # Step 1: Configure game
-.\3-stage.ps1
+.\3-config.ps1
 # Select game, language, model
 # Edit game/tl/romanian/characters.json manually
 
@@ -966,9 +959,9 @@ Stores game-specific configuration:
 ```json
 {
   "games": {
-    "Once.a.Porn.a.Time.2": {
-      "name": "Once.a.Porn.a.Time.2",
-      "path": "C:\\_oxo_\\games\\Once.a.Porn.a.Time.2",
+    "MyVisualNovel": {
+      "name": "MyVisualNovel",
+      "path": "C:\\_oxo_\\games\\MyVisualNovel",
       "target_language": "romanian",
       "source_language": "english",
       "model": "Aya-23-8B",
@@ -976,7 +969,7 @@ Stores game-specific configuration:
       "context_after": 1
     }
   },
-  "current_game": "Once.a.Porn.a.Time.2"
+  "current_game": "MyVisualNovel"
 }
 ```
 
@@ -1019,7 +1012,7 @@ This is configured in `models/local_config.json` per game.
 ## Troubleshooting
 
 ### "Configuration file not found"
-**Solution:** Run `.\3-stage.ps1` first to set up the game.
+**Solution:** Run `.\3-config.ps1` first to set up the game.
 
 ### "No .parsed.yaml files found"
 **Solution:** Run `.\4-4-extract.ps1 -All` first.
@@ -1063,13 +1056,13 @@ Process multiple games:
 
 ```powershell
 # Game 1
-.\3-stage.ps1  # Select Game 1
+.\3-config.ps1  # Select Game 1
 .\4-4-extract.ps1 -All
 .\5-5-translate.ps1
 .\7-7-merge.ps1 -All
 
 # Game 2
-.\3-stage.ps1  # Select Game 2
+.\3-config.ps1  # Select Game 2
 .\4-4-extract.ps1 -All
 .\5-5-translate.ps1
 .\7-7-merge.ps1 -All

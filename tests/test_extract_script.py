@@ -76,7 +76,7 @@ def configure_example_game():
 
     config_path = project_root / "models" / "local_config.json"
     characters_file = example_tl / "characters.json"
-    stage_script = project_root / "3-stage.ps1"
+    stage_script = project_root / "3-config.ps1"
 
     try:
         with open(config_path, 'r', encoding='utf-8-sig') as f:

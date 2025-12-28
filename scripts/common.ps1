@@ -26,7 +26,7 @@ function Get-GameConfig {
 
     if (-not (Test-Path $configPath)) {
         Write-Host " Configuration file not found!" -ForegroundColor Red
-        Write-Host "   Please run 3-stage.ps1 first to configure your game" -ForegroundColor Yellow
+        Write-Host "   Please run 3-config.ps1 first to configure your game" -ForegroundColor Yellow
         exit 1
     }
 
@@ -48,7 +48,7 @@ function Get-GameConfig {
     }
 
     Write-Host " No game configured!" -ForegroundColor Red
-    Write-Host "   Please run 3-stage.ps1 first" -ForegroundColor Yellow
+    Write-Host "   Please run 3-config.ps1 first" -ForegroundColor Yellow
     exit 1
 }
 
@@ -57,7 +57,7 @@ function Select-ConfiguredGame {
 
     if (-not (Test-Path $configPath)) {
         Write-Host " No games configured!" -ForegroundColor Red
-        Write-Host "   Please run 3-stage.ps1 first" -ForegroundColor Yellow
+        Write-Host "   Please run 3-config.ps1 first" -ForegroundColor Yellow
         exit 1
     }
 
@@ -69,20 +69,24 @@ function Select-ConfiguredGame {
         exit 1
     }
 
+    # If current_game is set, use it automatically
+    if ($config.current_game -and ($gameNames -contains $config.current_game)) {
+        Write-Host " Using configured game: $($config.current_game)" -ForegroundColor Cyan
+        return $config.current_game
+    }
+
     if ($gameNames.Count -eq 1) {
         # Only one game, select it automatically
         return $gameNames[0]
     }
 
-    # Multiple games, let user choose
+    # Multiple games and no current_game set, let user choose
     Write-Host " Configured Games:" -ForegroundColor Yellow
     Write-Host ""
 
     for ($i = 0; $i -lt $gameNames.Count; $i++) {
         $gameName = $gameNames[$i]
-        $isCurrent = ($gameName -eq $config.current_game)
-        $marker = if ($isCurrent) { " (current)" } else { "" }
-        Write-Host "   [$($i + 1)] $gameName$marker" -ForegroundColor Cyan
+        Write-Host "   [$($i + 1)] $gameName" -ForegroundColor Cyan
     }
 
     Write-Host ""

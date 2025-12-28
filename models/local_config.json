@@ -104,15 +104,6 @@
                       }
                   ],
     "games":  {
-                  "Example":  {
-                                  "target_language":  "romanian",
-                                  "name":  "Example",
-                                  "context_after":  1,
-                                  "path":  "C:\\_oxo_\\games\\Example",
-                                  "source_language":  "english",
-                                  "model":  "Aya-23-8B",
-                                  "context_before":  3
-                              },
                   "Once a Porn a Time 2":  {
                                                "target_language":  "romanian",
                                                "name":  "Once a Porn a Time 2",
@@ -121,7 +112,16 @@
                                                "source_language":  "english",
                                                "model":  "Aya-23-8B",
                                                "context_before":  3
-                                           }
+                                           },
+                  "Example":  {
+                                  "target_language":  "romanian",
+                                  "name":  "Example",
+                                  "context_after":  1,
+                                  "path":  "C:\\_oxo_\\games\\Example",
+                                  "source_language":  "english",
+                                  "model":  "Aya-23-8B",
+                                  "context_before":  3
+                              }
               },
-    "current_game":  "Once a Porn a Time 2"
+    "current_game":  "Example"
 }

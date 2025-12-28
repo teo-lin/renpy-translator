@@ -318,11 +318,31 @@ function Save-Configuration {
 
 Show-Banner
 
+# Load existing config to get current game
+$configPath = Join-Path $PSScriptRoot "models\local_config.json"
+$existingConfig = $null
+$currentGameConfig = $null
+
+if (Test-Path $configPath) {
+    $existingConfig = Get-Content $configPath -Raw | ConvertFrom-Json
+
+    if ($existingConfig.current_game -and $existingConfig.games.PSObject.Properties[$existingConfig.current_game]) {
+        $currentGameConfig = $existingConfig.games.PSObject.Properties[$existingConfig.current_game].Value
+    }
+}
+
 # Step 1: Select Game
 if ($GamePath -eq "") {
-    $selectedGame = Select-Game
-    $GamePath = $selectedGame.Fullname
-    $Gamename = $selectedGame.name
+    # Use configured game if available
+    if ($currentGameConfig) {
+        $Gamename = $currentGameConfig.name
+        $GamePath = $currentGameConfig.path
+        Write-Host "[Config] Using configured game: $Gamename" -ForegroundColor Cyan
+    } else {
+        $selectedGame = Select-Game
+        $GamePath = $selectedGame.Fullname
+        $Gamename = $selectedGame.name
+    }
 } else {
     $Gamename = Split-Path $GamePath -Leaf
 }
@@ -333,7 +353,13 @@ Write-Host ""
 
 # Step 2: Select Language
 if ($Language -eq "") {
-    $Language = Select-Language -GamePath $GamePath
+    # Use configured language if available
+    if ($currentGameConfig -and $currentGameConfig.target_language) {
+        $Language = $currentGameConfig.target_language
+        Write-Host "[Config] Using configured language: $Language" -ForegroundColor Cyan
+    } else {
+        $Language = Select-Language -GamePath $GamePath
+    }
 }
 
 Write-Host "[Language] Selected language: $Language" -ForegroundColor Green
@@ -341,7 +367,13 @@ Write-Host ""
 
 # Step 3: Select Model
 if ($Model -eq "") {
-    $Model = Select-Model
+    # Use configured model if available
+    if ($currentGameConfig -and $currentGameConfig.model) {
+        $Model = $currentGameConfig.model
+        Write-Host "[Config] Using configured model: $Model" -ForegroundColor Cyan
+    } else {
+        $Model = Select-Model
+    }
 }
 
 Write-Host "[Model] Selected model: $Model" -ForegroundColor Green
