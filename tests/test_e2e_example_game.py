@@ -55,7 +55,7 @@ def count_translations(file_path):
     return count
 
 
-def test_example_game_translation():
+def test_e2e_example_game_translation():
     """Test translating the example game"""
     print("\n" + "=" * 70)
     print("TEST: Example Game Translation Workflow")
@@ -155,7 +155,7 @@ def test_example_game_translation():
 
 if __name__ == "__main__":
     try:
-        success = test_example_game_translation()
+        success = test_e2e_example_game_translation()
         sys.exit(0 if success else 1)
     except Exception as e:
         print(f"\n[FAIL] FATAL ERROR: {e}")

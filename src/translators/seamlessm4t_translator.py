@@ -1,70 +1,70 @@
 """
-MADLAD-400-3B Translator Implementation
+SeamlessM4T-v2 Translator Implementation
 
-Uses Hugging Face transformers for translation with 400+ language support.
-Optimized for broad language coverage including rare and low-resource languages.
+Uses Hugging Face transformers for translation with Meta's latest multimodal model.
+Optimized for high-quality text translation with nearly 100 languages supported.
 """
 
 import torch
-from transformers import T5ForConditionalGeneration, T5Tokenizer
+from transformers import AutoProcessor, SeamlessM4Tv2Model
 from pathlib import Path
 
 
-class MADLAD400Translator:
+class SeamlessM4Tv2Translator:
     """
-    MADLAD-400-3B translator using Hugging Face transformers
+    SeamlessM4T-v2 translator using Hugging Face transformers
 
-    Supports 400+ languages with good quality translations.
-    Uses language tags like <2ro>, <2es>, <2ja> for target language specification.
+    Supports nearly 100 languages with state-of-art translation quality.
+    Uses Meta's 2024 multimodal model (text + speech, though we only use text).
     """
 
-    # Mapping of common language codes to MADLAD language tags
-    # Format: <2xx> where xx is the ISO 639-1 code
+    # Mapping of common language codes to SeamlessM4T language codes
+    # SeamlessM4T uses 3-letter ISO codes (e.g., "ron" for Romanian)
     LANGUAGE_CODE_MAP = {
-        'ro': 'ro',  # Romanian
-        'es': 'es',  # Spanish
-        'fr': 'fr',  # French
-        'de': 'de',  # German
-        'it': 'it',  # Italian
-        'pt': 'pt',  # Portuguese
-        'ru': 'ru',  # Russian
-        'tr': 'tr',  # Turkish
-        'cs': 'cs',  # Czech
-        'pl': 'pl',  # Polish
-        'uk': 'uk',  # Ukrainian
-        'bg': 'bg',  # Bulgarian
-        'zh': 'zh',  # Chinese
-        'ja': 'ja',  # Japanese
-        'ko': 'ko',  # Korean
-        'vi': 'vi',  # Vietnamese
-        'th': 'th',  # Thai
-        'id': 'id',  # Indonesian
-        'ar': 'ar',  # Arabic
-        'he': 'he',  # Hebrew
-        'fa': 'fa',  # Persian/Farsi
-        'hi': 'hi',  # Hindi
-        'bn': 'bn',  # Bengali
-        'nl': 'nl',  # Dutch
-        'sv': 'sv',  # Swedish
-        'no': 'no',  # Norwegian
-        'da': 'da',  # Danish
-        'fi': 'fi',  # Finnish
-        'el': 'el',  # Greek
-        'hu': 'hu',  # Hungarian
+        'ro': 'ron',  # Romanian
+        'es': 'spa',  # Spanish
+        'fr': 'fra',  # French
+        'de': 'deu',  # German
+        'it': 'ita',  # Italian
+        'pt': 'por',  # Portuguese
+        'ru': 'rus',  # Russian
+        'tr': 'tur',  # Turkish
+        'cs': 'ces',  # Czech
+        'pl': 'pol',  # Polish
+        'uk': 'ukr',  # Ukrainian
+        'bg': 'bul',  # Bulgarian
+        'zh': 'cmn',  # Chinese (Mandarin)
+        'ja': 'jpn',  # Japanese
+        'ko': 'kor',  # Korean
+        'vi': 'vie',  # Vietnamese
+        'th': 'tha',  # Thai
+        'id': 'ind',  # Indonesian
+        'ar': 'arb',  # Arabic (Modern Standard)
+        'he': 'heb',  # Hebrew
+        'fa': 'pes',  # Persian/Farsi
+        'hi': 'hin',  # Hindi
+        'bn': 'ben',  # Bengali
+        'nl': 'nld',  # Dutch
+        'sv': 'swe',  # Swedish
+        'no': 'nor',  # Norwegian
+        'da': 'dan',  # Danish
+        'fi': 'fin',  # Finnish
+        'el': 'ell',  # Greek
+        'hu': 'hun',  # Hungarian
+        'en': 'eng',  # English (source)
     }
 
     def __init__(self, target_language: str = "Romanian", lang_code: str = None,
-                 device: str = None, glossary: dict = None, unsloth: bool = False, trust_remote_code: bool = False):
+                 device: str = None, glossary: dict = None, model_name: str = None):
         """
-        Initialize MADLAD-400-3B translator
+        Initialize SeamlessM4T-v2 translator
 
         Args:
             target_language: Target language name (e.g., "Romanian", "Spanish", "Japanese")
-            lang_code: ISO 639-1 language code (e.g., "ro", "es", "ja"). If None, auto-detected.
+            lang_code: 2-letter language code (e.g., "ro", "es", "ja"). Auto-converted to 3-letter.
             device: Device to use ('cuda' or 'cpu'). If None, auto-detected.
             glossary: Optional dict of EN→target language term mappings
-            unsloth: Whether to use unsloth for faster inference
-            trust_remote_code: Whether to trust remote code for the model
+            model_name: Model variant to use. Default: "facebook/seamless-m4t-v2-large"
         """
         self._target_language = target_language
         self.glossary = glossary or {}
@@ -73,14 +73,24 @@ class MADLAD400Translator:
         if lang_code is None:
             # Try to guess from language name
             lang_name_lower = target_language.lower()
-            for code, name_key in self.LANGUAGE_CODE_MAP.items():
-                if lang_name_lower.startswith(code) or lang_name_lower.startswith(name_key):
-                    lang_code = code
-                    break
-            if lang_code is None:
-                # Default to first 2 letters of language name
-                lang_code = target_language[:2].lower()
+            # Try exact matches first
+            name_to_code = {
+                'romanian': 'ro', 'spanish': 'es', 'french': 'fr',
+                'german': 'de', 'italian': 'it', 'portuguese': 'pt',
+                'russian': 'ru', 'turkish': 'tr', 'czech': 'cs',
+                'polish': 'pl', 'ukrainian': 'uk', 'bulgarian': 'bg',
+                'chinese': 'zh', 'japanese': 'ja', 'korean': 'ko',
+                'vietnamese': 'vi', 'thai': 'th', 'indonesian': 'id',
+                'arabic': 'ar', 'hebrew': 'he', 'persian': 'fa',
+                'farsi': 'fa', 'hindi': 'hi', 'bengali': 'bn',
+                'dutch': 'nl', 'swedish': 'sv', 'norwegian': 'no',
+                'danish': 'da', 'finnish': 'fi', 'greek': 'el',
+                'hungarian': 'hu'
+            }
+            lang_code = name_to_code.get(lang_name_lower, target_language[:2].lower())
 
+        # Convert 2-letter code to 3-letter code for SeamlessM4T
+        self.lang_code_3letter = self.LANGUAGE_CODE_MAP.get(lang_code, lang_code)
         self.lang_code = lang_code
 
         # Auto-detect device
@@ -88,26 +98,25 @@ class MADLAD400Translator:
             device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = device
 
-        print(f"Initializing MADLAD-400-3B Translation (EN→{target_language})...")
-        print(f"  Language code: {lang_code}")
-        print(f"  Device: {device}")
-        print(f"  Loading model... This may take 30-60 seconds...")
+        # Default model
+        if model_name is None:
+            model_name = "facebook/seamless-m4t-v2-large"
+        self.model_name = model_name
 
-        # Load model and tokenizer
-        model_name = "google/madlad400-3b-mt"
-        if unsloth:
-            from unsloth import FastLanguageModel
-            self.model, self.tokenizer = FastLanguageModel.from_pretrained(
-                model_name = model_name,
-                trust_remote_code=trust_remote_code
-            )
-        else:
-            self.tokenizer = T5Tokenizer.from_pretrained(model_name)
-            self.model = T5ForConditionalGeneration.from_pretrained(model_name, trust_remote_code=trust_remote_code)
+        print(f"Initializing SeamlessM4T-v2 Translation (EN→{target_language})...")
+        print(f"  Language code: {lang_code} ({self.lang_code_3letter})")
+        print(f"  Device: {device}")
+        print(f"  Model: {model_name}")
+        print(f"  Loading model... This may take 60-90 seconds...")
+
+        # Load processor and model
+        self.processor = AutoProcessor.from_pretrained(model_name)
+        self.model = SeamlessM4Tv2Model.from_pretrained(model_name)
         self.model.to(self.device)
         self.model.eval()
 
         print("Model loaded successfully!")
+        print("  Note: SeamlessM4T-v2 is a large model (2.3GB+)")
 
     @property
     def target_language(self) -> str:
@@ -142,46 +151,44 @@ class MADLAD400Translator:
 
         return translation
 
-    def translate(self, text: str, max_length: int = 512, num_beams: int = 4,
-                  temperature: float = 1.0, context: list = None,
-                  speaker: str = None) -> str:
+    def translate(self, text: str, max_length: int = 512, num_beams: int = 5,
+                  context: list = None, speaker: str = None) -> str:
         """
-        Translate text using MADLAD-400-3B
+        Translate text using SeamlessM4T-v2
 
         Args:
             text: English text to translate
             max_length: Maximum length of translation
-            num_beams: Number of beams for beam search
-            temperature: Sampling temperature (1.0 = default)
+            num_beams: Number of beams for beam search (default 5 for quality)
             context: Optional list of previous dialogue lines (for consistency)
             speaker: Optional character name/identifier
 
         Returns:
             Translated text
         """
-        # MADLAD uses language tags like <2ro> for Romanian, <2es> for Spanish
-        lang_tag = f"<2{self.lang_code}>"
+        # SeamlessM4T uses processor to prepare inputs
+        # tgt_lang specifies target language using 3-letter codes
+        text_inputs = self.processor(
+            text=text,
+            src_lang="eng",  # Source is always English
+            return_tensors="pt"
+        )
 
-        # Prepare input with language tag
-        input_text = f"{lang_tag} {text}"
-
-        # Tokenize
-        inputs = self.tokenizer(input_text, return_tensors="pt", padding=True)
-        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        # Move inputs to device
+        text_inputs = {k: v.to(self.device) for k, v in text_inputs.items()}
 
         # Generate translation
         with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs,
+            output_tokens = self.model.generate(
+                **text_inputs,
+                tgt_lang=self.lang_code_3letter,
                 max_length=max_length,
                 num_beams=num_beams,
-                temperature=temperature,
                 early_stopping=True,
-                do_sample=False,  # Use beam search, not sampling
             )
 
         # Decode translation
-        translation = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        translation = self.processor.decode(output_tokens[0].tolist()[0], skip_special_tokens=True)
 
         # Apply glossary if available
         translation = self._apply_glossary(text, translation)
@@ -197,10 +204,10 @@ if __name__ == "__main__":
     CLI entry point for standalone translation script usage.
 
     Usage:
-        python madlad400_translator.py <input_file> --language <language_code>
+        python seamlessm4t_translator.py <input_file> --language <language_code>
 
     Example:
-        python madlad400_translator.py script.rpy --language ro
+        python seamlessm4t_translator.py script.rpy --language ro
     """
     import sys
     import json
@@ -212,8 +219,8 @@ if __name__ == "__main__":
     from translation_pipeline import RenpyTranslationPipeline
 
     if len(sys.argv) < 3:
-        print("Usage: python madlad400_translator.py <input_file> --language <lang_code>")
-        print("Example: python madlad400_translator.py script.rpy --language ro")
+        print("Usage: python seamlessm4t_translator.py <input_file> --language <lang_code>")
+        print("Example: python seamlessm4t_translator.py script.rpy --language ro")
         sys.exit(1)
 
     # Parse arguments
@@ -261,7 +268,7 @@ if __name__ == "__main__":
             break
 
     # Initialize translator
-    translator = MADLAD400Translator(
+    translator = SeamlessM4Tv2Translator(
         target_language=target_language,
         lang_code=lang_code,
         glossary=glossary

@@ -163,7 +163,7 @@ class GameConfig(TypedDict, total=False):
 
 
 class LocalConfig(TypedDict):
-    """Content of models/local_config.json."""
+    """Content of models/current_config.json."""
     games: Dict[str, GameConfig]    # Game name -> GameConfig
     current_game: Optional[str]     # Currently selected game name
 

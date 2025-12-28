@@ -23,6 +23,18 @@
       "description": "Supports 400+ languages (30 pre-configured with language codes)",
       "languages": ["ro", "es", "fr", "de", "it", "pt", "ru", "tr", "cs", "pl", "uk", "bg", "zh", "ja", "ko", "vi", "th", "id", "ar", "he", "fa", "hi", "bn", "nl", "sv", "no", "da", "fi", "el", "hu"],
       "huggingface_download": true
+    },
+    "seamlessm4t-v2": {
+      "name": "SeamlessM4T-v2",
+      "repo": "facebook/seamless-m4t-v2-large",
+      "file": null,
+      "size": "~5GB",
+      "destination": "models/seamless-m4t-v2-large",
+      "script": "scripts/translate_with_seamlessm4t.py",
+      "description": "Meta's latest multimodal translation model (nearly 100 languages)",
+      "languages": ["ro", "es", "fr", "de", "it", "pt", "ru", "tr", "cs", "pl", "uk", "bg", "zh", "ja", "ko", "vi", "th", "id", "ar", "he", "fa", "hi", "bn", "nl", "sv", "no", "da", "fi", "el", "hu"],
+      "huggingface_download": true,
+      "requires_tiktoken": true
     }
   },
 

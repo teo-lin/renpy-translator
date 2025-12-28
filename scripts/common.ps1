@@ -22,7 +22,7 @@ function Get-PythonCommand {
 function Get-GameConfig {
     param([string]$GameName)
 
-    $configPath = Join-Path $PSScriptRoot "..\models\local_config.json"
+    $configPath = Join-Path $PSScriptRoot "..\models\current_config.json"
 
     if (-not (Test-Path $configPath)) {
         Write-Host " Configuration file not found!" -ForegroundColor Red
@@ -53,7 +53,7 @@ function Get-GameConfig {
 }
 
 function Select-ConfiguredGame {
-    $configPath = Join-Path $PSScriptRoot "..\models\local_config.json"
+    $configPath = Join-Path $PSScriptRoot "..\models\current_config.json"
 
     if (-not (Test-Path $configPath)) {
         Write-Host " No games configured!" -ForegroundColor Red
@@ -108,7 +108,7 @@ function Select-ConfiguredGame {
 function Update-CurrentGame {
     param([string]$GameName)
 
-    $configPath = Join-Path $PSScriptRoot "..\models\local_config.json"
+    $configPath = Join-Path $PSScriptRoot "..\models\current_config.json"
     $config = Get-Content $configPath -Raw | ConvertFrom-Json
     $config.current_game = $GameName
     $config | ConvertTo-Json -Depth 10 | Set-Content $configPath -Encoding UTF8

@@ -2,7 +2,7 @@
 Modular Translation Pipeline Script
 
 Translates .parsed.yaml files using batch translation with context awareness.
-Uses configuration from local_config.json and character.json files.
+Uses configuration from current_config.json and character.json files.
 Supports glossary and custom prompts with fallback hierarchy.
 
 Usage:
@@ -341,8 +341,8 @@ class ModularBatchTranslator:
 
 
 def load_config(project_root: Path, game_name: Optional[str] = None) -> Dict:
-    """Load game configuration from local_config.json."""
-    config_file = project_root / "models" / "local_config.json"
+    """Load game configuration from current_config.json."""
+    config_file = project_root / "models" / "current_config.json"
 
     if not config_file.exists():
         print(f"ERROR: Configuration not found at {config_file}")

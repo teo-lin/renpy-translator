@@ -95,21 +95,72 @@ function Select-Language {
 }
 
 function Select-Model {
-    Write-Host "[Model] Available Models:" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "   [1] Aya-23-8B (Higher quality, 4.8GB)" -ForegroundColor Cyan
-    Write-Host "   [2] MADLAD-400-3B (400+ languages, 6GB)" -ForegroundColor Cyan
+    # Load models configuration
+    $modelsConfigPath = Join-Path $PSScriptRoot "models\models_config.json"
+
+    if (-not (Test-Path $modelsConfigPath)) {
+        Write-Host "[ERROR] Models configuration not found at $modelsConfigPath" -ForegroundColor Red
+        Write-Host "Please run 0-setup.ps1 first to configure models." -ForegroundColor Yellow
+        exit 1
+    }
+
+    $modelsConfig = Get-Content $modelsConfigPath -Raw | ConvertFrom-Json
+
+    # Get installed models
+    if (-not $modelsConfig.installed_models -or $modelsConfig.installed_models.Count -eq 0) {
+        Write-Host "[ERROR] No models are installed!" -ForegroundColor Red
+        Write-Host "Please run 0-setup.ps1 first to install models." -ForegroundColor Yellow
+        exit 1
+    }
+
+    Write-Host "[Model] Installed Models:" -ForegroundColor Yellow
     Write-Host ""
 
-    $selection = Read-Host "Select model (1-2)"
+    # Build list of installed models
+    $installedModels = @()
+    foreach ($modelKey in $modelsConfig.installed_models) {
+        $modelConfig = $modelsConfig.available_models.$modelKey
+        if ($modelConfig) {
+            $installedModels += @{
+                Key = $modelKey
+                Name = $modelConfig.name
+                Size = $modelConfig.size
+                Description = $modelConfig.description
+            }
+        }
+    }
 
-    switch ($selection) {
-        "1" { return "Aya-23-8B" }
-        "2" { return "MADLAD-400-3B" }
-        default {
+    # Display models
+    for ($i = 0; $i -lt $installedModels.Count; $i++) {
+        $num = $i + 1
+        $model = $installedModels[$i]
+        Write-Host "   [$num] $($model.Name) ($($model.Size))" -ForegroundColor Cyan
+    }
+    Write-Host ""
+
+    # Auto-select if only one model
+    if ($installedModels.Count -eq 1) {
+        $selectedModel = $installedModels[0]
+        Write-Host "Auto-selecting the only installed model: $($selectedModel.Name)" -ForegroundColor Green
+        return $selectedModel.Name
+    }
+
+    # Get user selection
+    $selection = Read-Host "Select model (1-$($installedModels.Count))"
+
+    try {
+        $index = [int]$selection - 1
+        if ($index -ge 0 -and $index -lt $installedModels.Count) {
+            return $installedModels[$index].Name
+        }
+        else {
             Write-Host "Invalid selection!" -ForegroundColor Red
             exit 1
         }
+    }
+    catch {
+        Write-Host "Invalid input!" -ForegroundColor Red
+        exit 1
     }
 }
 
@@ -253,8 +304,8 @@ function Save-Configuration {
     Write-Host ""
     Write-Host "[Save] Saving configuration..." -ForegroundColor Yellow
 
-    # Save to local_config.json
-    $configPath = Join-Path $PSScriptRoot "models\local_config.json"
+    # Save to current_config.json
+    $configPath = Join-Path $PSScriptRoot "models\current_config.json"
     $configDir = Split-Path $configPath -Parent
 
     if (-not (Test-Path $configDir)) {
@@ -319,7 +370,7 @@ function Save-Configuration {
 Show-Banner
 
 # Load existing config to get current game
-$configPath = Join-Path $PSScriptRoot "models\local_config.json"
+$configPath = Join-Path $PSScriptRoot "models\current_config.json"
 $existingConfig = $null
 $currentGameConfig = $null
 

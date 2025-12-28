@@ -85,7 +85,7 @@ Run the automated test that translates and verifies:
 
 ```powershell
 # Run test (automatically restores original after)
-venv\Scripts\python.exe tests\test_example_game.py
+venv\Scripts\python.exe tests\test_e2e_example_game.py
 
 # Or use the test runner
 .\2-test.ps1

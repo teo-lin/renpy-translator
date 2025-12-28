@@ -412,18 +412,12 @@ Place in `data\<language>_corrections.json`
 ## Performance
 
 ### Aya-23-8B
-- **Speed:** ~2-3 seconds/sentence (full GPU acceleration)
-- **GPU Config:** ALL layers offloaded (-1), uses ~5.8GB VRAM
-- **Quality:** SOTA multilingual model (January 2025)
-- **Privacy:** 100% local processing, no data sent to cloud services
-- **Status:** Production-ready
+👍 **Pros:** Uncensored/No Guardrails, GGUF Format, 4-bit Quantization, 23 Languages
+👎 **Cons:** Slower than MADLAD-400, Larger VRAM requirement
 
 ### MADLAD-400-3B
-- **Speed:** ~1-2 seconds/sentence (GPU with transformers)
-- **GPU Config:** Auto-detects CUDA, uses ~4GB VRAM
-- **Quality:** Excellent for 400+ languages, Google Research model
-- **Privacy:** 100% local processing, no data sent to cloud services
-- **Status:** Production-ready
+👍 **Pros:** Uncensored/No Guardrails, safetensors Format, 4-bit Quantization, 400+ Languages
+👎 **Cons:** Requires `trust_remote_code=True`, slightly lower quality for some languages
 
 ## Quality Assurance
 
@@ -434,10 +428,10 @@ Place in `data\<language>_corrections.json`
 python tests\test_end_to_end.py
 
 # Unit tests for tag preservation (fast, no model required)
-python tests\test_renpy_tags.py
+python tests\test_u_renpy_tags.py
 
 # Modular pipeline tests (extraction/merge)
-python tests\test_extraction_merge.py
+python tests\test_u_extract_merge.py
 ```
 
 The tests verify:
@@ -505,7 +499,7 @@ Verify the system works correctly:
 ```powershell
 # Run all tests
 python tests\test_end_to_end.py
-python tests\test_renpy_tags.py
+python tests\test_u_renpy_tags.py
 ```
 
 ## Troubleshooting
@@ -682,7 +676,7 @@ translator = Aya23Translator(model_path, n_gpu_layers=30)  # Instead of -1
 ```
 ├── src/                    # Core translation modules
 │   ├── models.py          # Type-safe data structures for modular pipeline
-│   ├── extraction.py      # Extract .rpy → clean YAML + tags JSON
+│   ├── extract.py      # Extract .rpy → clean YAML + tags JSON
 │   ├── merger.py          # Merge YAML + JSON → .rpy with validation
 │   ├── batch_translator.py # Context-aware batch translation
 │   ├── renpy_utils.py     # Ren'Py parsing and tag handling utilities
@@ -697,8 +691,8 @@ translator = Aya23Translator(model_path, n_gpu_layers=30)  # Instead of -1
 │   └── user_selection.ps1 # Interactive game/language selection
 ├── tests/                 # Automated tests
 │   ├── test_end_to_end.py           # End-to-end translation tests
-│   ├── test_renpy_tags.py           # Tag preservation tests
-│   └── test_extraction_merge.py     # Modular pipeline tests (NEW)
+│   ├── test_u_renpy_tags.py           # Tag preservation tests
+│   └── test_u_extract_merge.py     # Modular pipeline tests (NEW)
 ├── data/                  # Prompts, glossaries, benchmarks, and correction rules
 │   ├── prompts/
 │   │   ├── translate.txt              # Translation prompt template (customizable)
@@ -707,7 +701,7 @@ translator = Aya23Translator(model_path, n_gpu_layers=30)  # Instead of -1
 │   ├── ro_benchmark.json         # Example benchmark data template
 │   └── ro_corrections.json       # Example correction rules
 ├── models/                # Downloaded models and configuration
-│   └── local_config.json  # Per-game configuration (NEW)
+│   └── current_config.json  # Per-game configuration (NEW)
 ├── tools/                 # External tools (gitignored)
 ├── renpy/                 # Ren'Py SDK (gitignored)
 │   └── tools_config.json  # External tools configuration
@@ -749,10 +743,12 @@ MIT License - Use for any purpose, including commercial projects.
 - **Models:**
   - [Aya-23-8B](https://huggingface.co/CohereForAI/aya-23-8B) by Cohere For AI
   - [MADLAD-400-3B](https://huggingface.co/google/madlad400-3b-mt) by Google Research
-- **Quantization:** [bartowski's GGUF conversion](https://huggingface.co/bartowski/aya-23-8B-GGUF)
+- **Quantization:** 
+  - [bartowski's GGUF conversion](https://huggingface.co/bartowski/aya-23-8B-GGUF)
+  - [unsloth's 4-bit conversion](https://huggingface.co/unsloth/madlad400-3b-mt-4bit)
 - **Frameworks:**
   - [llama-cpp-python](https://github.com/abetlen/llama-cpp-python) (Aya-23-8B)
-  - [transformers](https://github.com/huggingface/transformers) (MADLAD-400-3B)
+  - [unsloth](https://github.com/unslothai/unsloth) (MADLAD-400-3B)
 
 
 
@@ -788,7 +784,7 @@ This separation provides:
 # - Select target language
 # - Select translation model
 # - Auto-discover character variables
-# - Save configuration to models/local_config.json
+# - Save configuration to models/current_config.json
 # - Save characters.json to game/tl/<language>/
 ```
 
@@ -952,7 +948,7 @@ game/tl/romanian/
 
 ## Configuration
 
-### models/local_config.json
+### models/current_config.json
 
 Stores game-specific configuration:
 
@@ -1005,7 +1001,7 @@ The translation engine uses asymmetric context (from `MODULARISATION_PLAN.md`):
 - **Expedition files** (gameplay): 1 line before only
 - **Common.rpy** (system): No context
 
-This is configured in `models/local_config.json` per game.
+This is configured in `models/current_config.json` per game.
 
 ---
 

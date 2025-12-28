@@ -19,7 +19,7 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pythonExe = Join-Path $scriptDir "venv\Scripts\python.exe"
 $correctScript = Join-Path $scriptDir "scripts\correct_with_aya23.py"
 $gamesFolder = Join-Path $scriptDir "games"
-$configFile = Join-Path $scriptDir "models\local_config.json"
+$configFile = Join-Path $scriptDir "models\current_config.json"
 
 # Add PyTorch lib directory to PATH for CUDA DLLs (needed by llama-cpp-python)
 $torchLibPath = Join-Path $scriptDir "venv\Lib\site-packages\torch\lib"
@@ -76,7 +76,7 @@ if (Test-Path $configFile) {
         $languages = @($config.languages)
     }
 } else {
-    Write-Host "WARNING: Configuration not found at models\local_config.json" -ForegroundColor Yellow
+    Write-Host "WARNING: Configuration not found at models\current_config.json" -ForegroundColor Yellow
     Write-Host "Please run setup.ps1 first." -ForegroundColor Yellow
     exit 1
 }

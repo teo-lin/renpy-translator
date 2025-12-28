@@ -33,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from renpy_utils import detect_language_from_path
 from translation_pipeline import RenpyTranslationPipeline
-from translators import MADLAD400Translator
+from translators.madlad400_translator import MADLAD400Translator
 
 
 def main():
@@ -99,7 +99,9 @@ def main():
     translator = MADLAD400Translator(
         target_language=target_language,
         lang_code=lang_code,
-        glossary=glossary
+        glossary=glossary,
+        unsloth=True,
+        trust_remote_code=True
     )
 
     # Initialize pipeline with translator

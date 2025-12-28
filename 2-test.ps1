@@ -38,7 +38,7 @@ function Write-Header {
 # Main script
 $testDir = Join-Path $PSScriptRoot "tests"
 $pythonExe = Join-Path $PSScriptRoot "venv\Scripts\python.exe"
-$configFile = Join-Path $PSScriptRoot "models\local_config.json"
+$configFile = Join-Path $PSScriptRoot "models\current_config.json"
 $results = @()
 
 # Add PyTorch lib directory to PATH for CUDA DLLs (needed by llama-cpp-python)

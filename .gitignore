@@ -14,7 +14,7 @@ models/*
 *.bin
 *.safetensors
 !models/MODELS.md
-!models/local_config.json
+!models/models_config.json
 
 # Data - ignore directory but track specific files
 data/**/*uncensored*

@@ -1,6 +1,6 @@
 # Modular Translation Pipeline Launcher
 # Translates .parsed.yaml files using batch translation with context awareness
-# Uses configuration from models\local_config.json
+# Uses configuration from models\current_config.json
 
 param(
     [string]$Game = "",        # Optional game name (uses current_game if not specified)
@@ -28,7 +28,7 @@ if ($Help) {
     Write-Host "  3. Then run this script to translate"
     Write-Host ""
     Write-Host "WHAT IT DOES:" -ForegroundColor Yellow
-    Write-Host "  - Loads game config from models\local_config.json"
+    Write-Host "  - Loads game config from models\current_config.json"
     Write-Host "  - Finds all .parsed.yaml files in game\tl\<language>\"
     Write-Host "  - Translates only untranslated blocks (empty target language field)"
     Write-Host "  - Uses context-aware translation:"
@@ -43,7 +43,7 @@ if ($Help) {
 }
 
 $pythonExe = Join-Path $scriptDir "venv\Scripts\python.exe"
-$configFile = Join-Path $scriptDir "models\local_config.json"
+$configFile = Join-Path $scriptDir "models\current_config.json"
 $pythonScript = Join-Path $scriptDir "scripts\translate_modular.py"
 
 # Add PyTorch lib directory to PATH for CUDA DLLs (needed by llama-cpp-python)

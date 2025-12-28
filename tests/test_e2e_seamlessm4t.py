@@ -1,16 +1,16 @@
 """
-End-to-End Test: Full Modular Pipeline with Aya-23-8B Model
+End-to-End Test: Full Modular Pipeline with SeamlessM4T-v2 Model
 
-This test runs the complete modular translation pipeline with the actual Aya-23 model:
+This test runs the complete modular translation pipeline with the actual SeamlessM4T-v2 model:
 - Step 1: Config (discover characters from .rpy files → characters.json)
 - Step 2: Extract (.rpy → .parsed.yaml + .tags.json)
-- Step 3: Translate (ModularBatchTranslator + Aya23Translator)
+- Step 3: Translate (ModularBatchTranslator + SeamlessM4Tv2Translator)
 - Step 4: Merge (.parsed.yaml + .tags.json → .translated.rpy)
 - Step 5: Validate and cleanup
 
 Usage:
-    python tests/test_e2e_aya23.py
-    python tests/test_e2e_aya23.py --file 1    # Process specific file by number
+    python tests/test_e2e_seamlessm4t.py
+    python tests/test_e2e_seamlessm4t.py --file 1    # Process specific file by number
 """
 
 import sys
@@ -34,7 +34,7 @@ sys.path.insert(0, str(project_root / "tests"))
 
 from extract import RenpyExtractor
 from merger import RenpyMerger
-from aya23_translator import Aya23Translator
+from seamlessm4t_translator import SeamlessM4Tv2Translator
 from translate_modular import ModularBatchTranslator
 from tests.utils import (
     discover_characters, count_translations, backup_file,
@@ -43,12 +43,13 @@ from tests.utils import (
 
 # Test configuration
 example_dir = project_root / "games" / "Example" / "game" / "tl" / "romanian"
-model_path = project_root / "models" / "aya-23-8B-GGUF" / "aya-23-8B-Q4_K_M.gguf"
+# SeamlessM4T uses Hugging Face models (auto-downloaded, no local path needed)
+model_name = "facebook/seamless-m4t-v2-large"
 
 
 def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dict]:
     """
-    Test the full e2e pipeline on a single .rpy file with Aya-23 model.
+    Test the full e2e pipeline on a single .rpy file with SeamlessM4T-v2 model.
 
     Args:
         rpy_file: Path to .rpy file to test
@@ -112,20 +113,15 @@ def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dic
         print(f"[OK] Created: {parsed_yaml.name}")
         print(f"[OK] Created: {tags_json.name}")
 
-        # Step 3: Translate with Aya-23 model
-        print("\n[3/5] Translating with Aya-23 model...")
-        print(f"[INFO] Loading model from: {model_path.name}")
+        # Step 3: Translate with SeamlessM4T-v2 model
+        print("\n[3/5] Translating with SeamlessM4T-v2 model...")
+        print(f"[INFO] Using model: {model_name}")
 
-        # Check if model exists
-        if not model_path.exists():
-            print(f"[FAIL] Model not found: {model_path}")
-            print("[INFO] Please download the Aya-23-8B model first")
-            return False, stats
-
-        # Initialize Aya-23 translator
-        translator = Aya23Translator(
-            model_path=str(model_path),
-            target_language='Romanian'
+        # Initialize SeamlessM4T-v2 translator
+        translator = SeamlessM4Tv2Translator(
+            target_language='Romanian',
+            lang_code='ro',
+            model_name=model_name
         )
 
         # Create batch translator
@@ -212,7 +208,7 @@ def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dic
         print(f"  - Initial translations: {initial_count}")
         print(f"  - Translations added: {stats['translations_added']}")
         print(f"  - Final translations: {final_count}")
-        print(f"  - Pipeline: Config → Extract → Translate (Aya-23) → Merge ✓")
+        print(f"  - Pipeline: Config → Extract → Translate (SeamlessM4T-v2) → Merge ✓")
         print("=" * 70)
 
         stats['success'] = True
@@ -236,21 +232,16 @@ def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dic
 
 def test_e2e_pipeline() -> bool:
     """
-    Test the full e2e pipeline with Aya-23 model.
+    Test the full e2e pipeline with SeamlessM4T-v2 model.
 
     Returns:
         True if test passed, False otherwise
     """
     print("\n" + "=" * 70)
-    print("  E2E TEST: Aya-23-8B Modular Pipeline")
+    print("  E2E TEST: SeamlessM4T-v2 Modular Pipeline")
     print("=" * 70)
-
-    # Check if model exists
-    if not model_path.exists():
-        print(f"\n[SKIP] Model not found: {model_path}")
-        print("[INFO] Please download the Aya-23-8B model to run this test")
-        print("[INFO] Expected location: models/aya-23-8B-GGUF/aya-23-8B-Q4_K_M.gguf")
-        return False
+    print(f"[INFO] Using Hugging Face model: {model_name}")
+    print("[INFO] Model will be auto-downloaded if not cached")
 
     # Get .rpy files to test
     rpy_files = get_rpy_files(example_dir)
@@ -260,7 +251,7 @@ def test_e2e_pipeline() -> bool:
         return False
 
     # Parse arguments for file selection
-    parser = argparse.ArgumentParser(description="E2E test with Aya-23 model")
+    parser = argparse.ArgumentParser(description="E2E test with SeamlessM4T-v2 model")
     parser.add_argument("--file", type=int, help="Process specific file by number (1-based index)")
     args = parser.parse_args()
 

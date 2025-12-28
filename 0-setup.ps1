@@ -45,8 +45,9 @@ function Invoke-WebRequestWithRetry {
     }
 }
 
-# Load configuration
-$config = Get-Content "renpy\tools_config.json" | ConvertFrom-Json
+# Load configurations
+$modelsConfig = Get-Content "models\models_config.json" | ConvertFrom-Json
+$toolsConfig = Get-Content "renpy\tools_config.json" | ConvertFrom-Json
 
 # Helper function to check if a Python package is installed
 function Test-PythonPackage {
@@ -303,9 +304,9 @@ if (-not $SkipModel) {
     Write-Host "Example: 1,2 (selects both models)" -ForegroundColor Gray
     Write-Host ""
 
-    # Convert models object to array and filter by language support
+    # Convert available models object to array and filter by language support
     $allModels = @()
-    $config.models.PSObject.Properties | ForEach-Object {
+    $modelsConfig.available_models.PSObject.Properties | ForEach-Object {
         $allModels += @{
             Key = $_.Name
             Name = $_.Value.name
@@ -456,44 +457,71 @@ if (-not $SkipModel) {
         }
     }
 
-    # Save combined configuration (languages + models) to single file
+    # Update models_config.json with installed models (just the keys)
     $modelsDir = Join-Path $scriptDir "models"
     New-Item -ItemType Directory -Force -Path $modelsDir | Out-Null
-    $configFile = Join-Path $modelsDir "local_config.json"
+    $configFile = Join-Path $modelsDir "models_config.json"
 
-    # Build a clean array of selected models for the config file
-    # By saving the $selectedModels array as is, all its properties are preserved.
-    $combinedConfig = @{
-        languages = $selectedLanguages
-        models = $selectedModels # Save the full selectedModels objects
-    }
+    # Update installed_models section with the keys of selected models
+    $installedModelKeys = $selectedModels | ForEach-Object { $_.Key }
+    $modelsConfig.installed_models = $installedModelKeys
 
-    $combinedConfig | ConvertTo-Json -Depth 3 | Set-Content -Path $configFile -Encoding UTF8
+    # Save updated models_config.json
+    $modelsConfig | ConvertTo-Json -Depth 4 | Set-Content -Path $configFile -Encoding UTF8
 
     Write-Host ""
-    Write-Host "  Configuration saved to: models\local_config.json" -ForegroundColor Green
-    Write-Host "    - Languages: $($selectedLanguages.Count)" -ForegroundColor Gray
-    Write-Host "    - Models: $($selectedModels.Count)" -ForegroundColor Gray
+    Write-Host "  Configuration saved to: models\models_config.json" -ForegroundColor Green
+    Write-Host "    - Available models: $($modelsConfig.available_models.PSObject.Properties.Count)" -ForegroundColor Gray
+    Write-Host "    - Installed models: $($installedModelKeys.Count)" -ForegroundColor Gray
     Write-Host ""
 }
 else {
     Write-Host "[0/6] Skipping model selection (--SkipModel)" -ForegroundColor Yellow
     Write-Host ""
 
-    # Load previously selected configuration
-    $configFile = Join-Path $scriptDir "models\local_config.json"
+    # Load installed models from models_config.json
+    $configFile = Join-Path $scriptDir "models\models_config.json"
     if (Test-Path $configFile) {
-        $savedConfig = Get-Content $configFile | ConvertFrom-Json
+        $modelsConfig = Get-Content $configFile | ConvertFrom-Json
 
-        # Load languages
-        $selectedLanguages = $savedConfig.languages
+        # Rebuild selectedModels from installed_models keys
+        $selectedModels = @()
+        foreach ($modelKey in $modelsConfig.installed_models) {
+            $modelConfig = $modelsConfig.available_models.$modelKey
+            if ($modelConfig) {
+                $selectedModels += @{
+                    Key = $modelKey
+                    Name = $modelConfig.name
+                    Description = $modelConfig.description
+                    Size = $modelConfig.size
+                    Languages = $modelConfig.languages
+                    Config = $modelConfig
+                }
+            }
+        }
 
-        # Load models directly from savedConfig.models
-        $selectedModels = $savedConfig.models
+        # Use all 30 languages as default when skipping model selection
+        $selectedLanguages = @()
+        $selectedLanguages += @{ Name = "Romanian"; Code = "ro" }
+        $languageMap = @{
+            "ro" = "Romanian"; "es" = "Spanish"; "fr" = "French"; "de" = "German"
+            "it" = "Italian"; "pt" = "Portuguese"; "ru" = "Russian"; "tr" = "Turkish"
+            "cs" = "Czech"; "pl" = "Polish"; "uk" = "Ukrainian"; "bg" = "Bulgarian"
+            "zh" = "Chinese"; "ja" = "Japanese"; "ko" = "Korean"; "vi" = "Vietnamese"
+            "th" = "Thai"; "id" = "Indonesian"; "ar" = "Arabic"; "he" = "Hebrew"
+            "fa" = "Persian"; "hi" = "Hindi"; "bn" = "Bengali"; "nl" = "Dutch"
+            "sv" = "Swedish"; "no" = "Norwegian"; "da" = "Danish"; "fi" = "Finnish"
+            "el" = "Greek"; "hu" = "Hungarian"
+        }
+        foreach ($code in ($languageMap.Keys | Sort-Object)) {
+            if ($code -ne "ro") {
+                $selectedLanguages += @{ Name = $languageMap[$code]; Code = $code }
+            }
+        }
 
-        Write-Host "  Loaded configuration from: models\local_config.json" -ForegroundColor Gray
-        Write-Host "    - Languages: $($selectedLanguages.Count)" -ForegroundColor Gray
-        Write-Host "    - Models: $($selectedModels.Count)" -ForegroundColor Gray
+        Write-Host "  Loaded configuration from: models\models_config.json" -ForegroundColor Gray
+        Write-Host "    - Languages: Using all 30 supported languages" -ForegroundColor Gray
+        Write-Host "    - Models: $($selectedModels.Count) installed" -ForegroundColor Gray
     }
 }
 
@@ -549,11 +577,11 @@ if (-not $SkipPython) {
         & $venvPython -m pip install torch --index-url https://download.pytorch.org/whl/cu124
     }
 
-    # Check and install llama-cpp-python (only if Aya-23-8B is selected)
+    # Check and install llama-cpp-python (only if Aya-23-8B or Orion-14B is selected)
     $needsLlamaCpp = $false
     if ($selectedModels) {
         foreach ($model in $selectedModels) {
-            if ($model.Key -eq "aya-23-8b") {
+            if ($model.Key -eq "aya-23-8b" -or $model.Key -eq "orion-14b") {
                 $needsLlamaCpp = $true
                 break
             }
@@ -648,13 +676,16 @@ if (-not $SkipPython) {
         Write-Host "  Skipping llama-cpp-python (not needed for selected models)" -ForegroundColor Gray
     }
 
-    # Check and install transformers (only if MADLAD is selected)
+    # Check and install transformers (only if MADLAD or SeamlessM4T is selected)
     $needsTransformers = $false
+    $needsTiktoken = $false
     if ($selectedModels) {
         foreach ($model in $selectedModels) {
-            if ($model.Key -eq "madlad-400-3b") {
+            if ($model.Key -eq "madlad-400-3b" -or $model.Key -eq "seamlessm4t-v2") {
                 $needsTransformers = $true
-                break
+            }
+            if ($model.Config.requires_tiktoken) {
+                $needsTiktoken = $true
             }
         }
     }
@@ -663,8 +694,22 @@ if (-not $SkipPython) {
         if (Test-PythonPackage -PackageName "transformers" -PythonExe $venvPython) {
             Write-Host "  transformers already installed" -ForegroundColor Gray
         } else {
-            Write-Host "  Installing transformers for MADLAD model..." -ForegroundColor Gray
+            Write-Host "  Installing transformers..." -ForegroundColor Gray
             & $venvPython -m pip install transformers
+        }
+
+        # Install tiktoken if needed (for SeamlessM4T)
+        if ($needsTiktoken) {
+            if (Test-PythonPackage -PackageName "tiktoken" -PythonExe $venvPython) {
+                Write-Host "  tiktoken already installed" -ForegroundColor Gray
+            } else {
+                Write-Host "  Installing tiktoken for SeamlessM4T..." -ForegroundColor Gray
+                & $venvPython -m pip install tiktoken
+            }
+
+            # Install protobuf (required by SeamlessM4T tokenizer)
+            Write-Host "  Installing protobuf for SeamlessM4T..." -ForegroundColor Gray
+            & $venvPython -m pip install protobuf
         }
     } else {
         Write-Host "  Skipping transformers (not needed for selected models)" -ForegroundColor Gray
@@ -758,7 +803,7 @@ if (-not $SkipTools) {
     Write-Host "[4/6] Downloading external tools..." -ForegroundColor Green
 
     # Download Ren'Py SDK
-    $renpyConfig = $config.tools.renpy
+    $renpyConfig = $toolsConfig.tools.renpy
     $renpyPath = Join-Path $scriptDir $renpyConfig.destination
 
     if (Test-Path $renpyPath) {
@@ -835,7 +880,7 @@ if (Test-PythonPackage -PackageName "torch" -PythonExe $venvPython) {
 # Check model-specific packages
 if ($selectedModels) {
     foreach ($model in $selectedModels) {
-        if ($model.Key -eq "aya-23-8b") {
+        if ($model.Key -eq "aya-23-8b" -or $model.Key -eq "orion-14b") {
             if (Test-PythonPackage -PackageName "llama_cpp" -PythonExe $venvPython) {
                 Write-Host "    - llama-cpp-python: installed" -ForegroundColor Gray
             } else {
@@ -843,12 +888,21 @@ if ($selectedModels) {
                 $allGood = $false
             }
         }
-        elseif ($model.Key -eq "madlad-400-3b") {
+        elseif ($model.Key -eq "madlad-400-3b" -or $model.Key -eq "seamlessm4t-v2") {
             if (Test-PythonPackage -PackageName "transformers" -PythonExe $venvPython) {
                 Write-Host "    - transformers: installed" -ForegroundColor Gray
             } else {
                 Write-Host "    - transformers: NOT INSTALLED" -ForegroundColor Red
                 $allGood = $false
+            }
+            # Check tiktoken for SeamlessM4T
+            if ($model.Config.requires_tiktoken) {
+                if (Test-PythonPackage -PackageName "tiktoken" -PythonExe $venvPython) {
+                    Write-Host "    - tiktoken: installed" -ForegroundColor Gray
+                } else {
+                    Write-Host "    - tiktoken: NOT INSTALLED" -ForegroundColor Red
+                    $allGood = $false
+                }
             }
         }
     }
