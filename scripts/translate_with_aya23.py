@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from renpy_utils import detect_language_from_path
 from translation_pipeline import RenpyTranslationPipeline
-from translators import Aya23Translator
+from translators.aya23_translator import Aya23Translator
 
 
 def main():

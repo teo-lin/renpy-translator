@@ -5,9 +5,21 @@ Uses Hugging Face transformers for translation with Meta's latest multimodal mod
 Optimized for high-quality text translation with nearly 100 languages supported.
 """
 
-import torch
-from transformers import AutoProcessor, SeamlessM4Tv2Model
 from pathlib import Path
+
+# Try to import transformers dependencies
+try:
+    import torch
+    from transformers import AutoProcessor, SeamlessM4Tv2Model
+    TRANSFORMERS_AVAILABLE = True
+    IMPORT_ERROR = None
+except ImportError as e:
+    TRANSFORMERS_AVAILABLE = False
+    IMPORT_ERROR = str(e)
+    # Define dummy classes to avoid NameError
+    AutoProcessor = None
+    SeamlessM4Tv2Model = None
+    torch = None
 
 
 class SeamlessM4Tv2Translator:
@@ -66,6 +78,14 @@ class SeamlessM4Tv2Translator:
             glossary: Optional dict of EN→target language term mappings
             model_name: Model variant to use. Default: "facebook/seamless-m4t-v2-large"
         """
+        if not TRANSFORMERS_AVAILABLE:
+            raise ImportError(
+                f"SeamlessM4Tv2Translator requires transformers and torch packages.\n"
+                f"Original error: {IMPORT_ERROR}\n"
+                f"This is likely due to triton/torch version incompatibility.\n"
+                f"See: https://github.com/pytorch/ao/issues/2919"
+            )
+
         self._target_language = target_language
         self.glossary = glossary or {}
 

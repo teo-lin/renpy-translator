@@ -36,7 +36,7 @@ from extract import RenpyExtractor
 from merger import RenpyMerger
 from aya23_translator import Aya23Translator
 from translate_modular import ModularBatchTranslator
-from tests.utils import (
+from utils import (
     discover_characters, count_translations, backup_file,
     restore_file, cleanup_files, validate_rpy_structure, get_rpy_files
 )

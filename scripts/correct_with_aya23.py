@@ -101,8 +101,26 @@ class PatternBasedCorrector:
         # Apply exact replacements first
         for wrong, right in self.corrections.get('exact_replacements', {}).items():
             if wrong in corrected:
-                if not self._is_protected(wrong, corrected):
-                    corrected = corrected.replace(wrong, right)
+                # Need to replace selectively (only unprotected occurrences)
+                new_text = []
+                last_end = 0
+                replaced = False
+
+                for i in range(len(corrected) - len(wrong) + 1):
+                    if corrected[i:i+len(wrong)] == wrong:
+                        # Found occurrence - check if protected
+                        if not self._is_occurrence_protected(i, wrong, corrected):
+                            # Add text before this occurrence
+                            new_text.append(corrected[last_end:i])
+                            # Add replacement
+                            new_text.append(right)
+                            last_end = i + len(wrong)
+                            replaced = True
+
+                if replaced:
+                    # Add remaining text
+                    new_text.append(corrected[last_end:])
+                    corrected = ''.join(new_text)
                     changes.append({
                         'type': 'exact',
                         'old': wrong,
@@ -163,11 +181,25 @@ class PatternBasedCorrector:
 
         return corrected, changes
 
-    def _is_protected(self, text: str, context: str) -> bool:
-        """Check if text is part of a protected word"""
+    def _is_occurrence_protected(self, position: int, text: str, context: str) -> bool:
+        """Check if a specific occurrence of text at position is adjacent to a protected word"""
+        # Get surrounding text (a few characters before and after)
+        start = max(0, position - 20)
+        end = min(len(context), position + len(text) + 20)
+        surrounding = context[start:end]
+
         for protected in self.protected_words:
-            if protected.lower() in context.lower():
-                return True
+            if protected in surrounding:
+                # Find position of protected word in surrounding text
+                protected_pos_in_surrounding = surrounding.find(protected)
+                text_pos_in_surrounding = position - start
+
+                # Check if they're adjacent (within a few characters)
+                distance = abs(protected_pos_in_surrounding - text_pos_in_surrounding)
+                # Adjacent means the protected word and the text are touching or very close
+                # e.g., "Ceau !" - "Ceau" and " !" are adjacent
+                if distance <= len(protected) + 2:
+                    return True
         return False
 
 
@@ -501,14 +533,14 @@ class RenpyFileCorrector:
         r'(# game/[^\n]+\n'
         r'translate \w+ \w+:\s*\n'
         r'\s*# [^\n]+\n'
-        r'\s*\w+ ")(.+?)("(?:\s*#.*)?)\s*$',
+        r'\s*\w+ ")(.+?)("(?:[ \t]*#.*)?)[ \t]*$',
         re.MULTILINE
     )
 
     STRING_BLOCK_PATTERN = re.compile(
         r'(# game/[^\n]+\n'
         r'\s*old "[^\n]*?"\s*\n'
-        r'\s*new ")(.+?)("(?:\s*#.*)?)\s*$',
+        r'\s*new ")(.+?)("(?:[ \t]*#.*)?)[ \t]*$',
         re.MULTILINE
     )
 

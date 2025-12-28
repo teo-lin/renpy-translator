@@ -570,11 +570,36 @@ if (-not $SkipPython) {
     }
 
     # Check and install PyTorch
-    if (Test-PythonPackage -PackageName "torch" -PythonExe $venvPython) {
-        Write-Host "  PyTorch already installed" -ForegroundColor Gray
+    $torchInstalled = Test-PythonPackage -PackageName "torch" -PythonExe $venvPython
+    $torchHasCuda = $false
+
+    if ($torchInstalled) {
+        # Check if CUDA support is available
+        try {
+            $cudaCheck = & $venvPython -c "import torch; print(torch.cuda.is_available())" 2>&1
+            if ($cudaCheck -match "True") {
+                $torchHasCuda = $true
+            }
+        } catch {
+            $torchHasCuda = $false
+        }
+    }
+
+    if ($torchHasCuda) {
+        Write-Host "  PyTorch already installed with CUDA support" -ForegroundColor Gray
     } else {
-        Write-Host "  Installing PyTorch with CUDA 12.4 (this may take a few minutes)..." -ForegroundColor Gray
-        & $venvPython -m pip install torch --index-url https://download.pytorch.org/whl/cu124
+        if ($torchInstalled) {
+            Write-Host "  PyTorch found but without CUDA support, reinstalling with CUDA 12.4..." -ForegroundColor Yellow
+        } else {
+            Write-Host "  Installing PyTorch with CUDA 12.4 (this may take a few minutes)..." -ForegroundColor Gray
+        }
+        & $venvPython -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124 --force-reinstall
+
+        # Also reinstall xformers if present to match torch version
+        if (Test-PythonPackage -PackageName "xformers" -PythonExe $venvPython) {
+            Write-Host "  Reinstalling xformers to match CUDA torch version..." -ForegroundColor Gray
+            & $venvPython -m pip install xformers --index-url https://download.pytorch.org/whl/cu124 --force-reinstall --no-cache-dir
+        }
     }
 
     # Check and install llama-cpp-python (only if Aya-23-8B or Orion-14B is selected)

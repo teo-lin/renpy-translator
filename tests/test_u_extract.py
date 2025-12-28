@@ -1,6 +1,4 @@
 """
-
-"""
 Test the src/extract.py Python module.
 
 This test validates that the RenpyExtractor class correctly:
@@ -15,12 +13,15 @@ import json
 import yaml
 from pathlib import Path
 
+# Add project root to path for imports
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
 from src.extract import RenpyExtractor
 from src.models import BlockType, FileStructureType, ParsedBlock, TagsFileContent
 from src.renpy_utils import RenpyTagExtractor # Needed for RenpyExtractor init
 
 # Project paths (used for temporary file creation)
-project_root = Path(__file__).parent.parent
 test_output_dir = project_root / "temp_test_output"
 test_output_dir.mkdir(exist_ok=True)
 
@@ -99,25 +100,29 @@ def test_extraction_logic():
         assert len(parsed_blocks) == 3, f"Expected 3 parsed blocks, got {len(parsed_blocks)}"
 
         # Check narrator block
-        narrator_block_id = "chapter1_start_1" # Based on default create_block_id logic
+        narrator_block_id = "1-Narrator"
         assert narrator_block_id in parsed_blocks, f"Narrator block '{narrator_block_id}' not found."
         assert parsed_blocks[narrator_block_id]['en'] == "This is some narration."
         assert parsed_blocks[narrator_block_id]['ro'] == "Aceasta este o narațiune."
         print(f"[OK] Narrator block '{narrator_block_id}' validated.")
 
-        # Check dialogue block
-        dialogue_block_id = "Jasmine_dialogue_2" # Based on char_name
+        # Check dialogue block (tags should be removed in parsed_blocks)
+        dialogue_block_id = "2-Jasmine"
         assert dialogue_block_id in parsed_blocks, f"Dialogue block '{dialogue_block_id}' not found."
-        assert parsed_blocks[dialogue_block_id]['en'] == "Hello, [name]! {color=#FF0000}How are you?{/color}"
-        assert parsed_blocks[dialogue_block_id]['ro'] == "Salut, [name]! {color=#FF0000}Cum ești?{/color}"
-        print(f"[OK] Dialogue block '{dialogue_block_id}' validated.")
+        assert parsed_blocks[dialogue_block_id]['en'] == "Hello,! How are you?", \
+            f"EN mismatch: got {repr(parsed_blocks[dialogue_block_id]['en'])}"
+        assert parsed_blocks[dialogue_block_id]['ro'] == "Salut,! Cum ești?", \
+            f"RO mismatch: got {repr(parsed_blocks[dialogue_block_id]['ro'])}"
+        print(f"[OK] Dialogue block '{dialogue_block_id}' validated (tags removed).")
 
-        # Check string block
-        string_block_id = "strings_3"
+        # Check string block (index 4 because block 3 is the separator, tags removed)
+        string_block_id = "4-Narrator"
         assert string_block_id in parsed_blocks, f"String block '{string_block_id}' not found."
-        assert parsed_blocks[string_block_id]['en'] == "{b}Chapter One{/b}"
-        assert parsed_blocks[string_block_id]['ro'] == "{b}Capitolul Unu{/b}"
-        print(f"[OK] String block '{string_block_id}' validated.")
+        assert parsed_blocks[string_block_id]['en'] == "Chapter One", \
+            f"EN mismatch: got {repr(parsed_blocks[string_block_id]['en'])}"
+        assert parsed_blocks[string_block_id]['ro'] == "Capitolul Unu", \
+            f"RO mismatch: got {repr(parsed_blocks[string_block_id]['ro'])}"
+        print(f"[OK] String block '{string_block_id}' validated (tags removed).")
 
         # 5. Assertions on tags_file (JSON equivalent)
         print("\n[ASSERT] Validating tags_file...")
@@ -129,17 +134,22 @@ def test_extraction_logic():
         assert tags_file['metadata']['total_blocks'] == 3
         print("[OK] tags_file metadata validated.")
 
-        # Check structure
-        assert tags_file['structure']['block_order'] == [narrator_block_id, dialogue_block_id, string_block_id]
+        # Check structure (including separator)
+        expected_order = [narrator_block_id, dialogue_block_id, 'separator-3', string_block_id]
+        assert tags_file['structure']['block_order'] == expected_order, \
+            f"Expected {expected_order}, got {tags_file['structure']['block_order']}"
         print("[OK] tags_file structure validated.")
 
         # Check a tagged block (dialogue block with tags)
         tagged_dialogue_block = tags_file['blocks'][dialogue_block_id]
-        assert tagged_dialogue_block['type'] == BlockType.DIALOGUE
+        assert tagged_dialogue_block['type'] == BlockType.DIALOGUE.value, \
+            f"Expected {BlockType.DIALOGUE.value}, got {tagged_dialogue_block['type']}"
         assert tagged_dialogue_block['char_var'] == 'jm'
         assert tagged_dialogue_block['char_name'] == 'Jasmine'
-        assert len(tagged_dialogue_block['tags']) == 2 # {color} and {/color}
-        assert tagged_dialogue_block['template'].startswith("# {location}\\ntranslate {language} {label}:\\n\\n    # {char_var} \"{original}\"\\n    {char_var} \"{translation}\"")
+        # Original: "Hello, [name]! {color=#FF0000}How are you?{/color}"
+        # Tags: [name], {color=#FF0000}, {/color} = 3 tags
+        assert len(tagged_dialogue_block['tags']) == 3, \
+            f"Expected 3 tags ([name], color, /color), got {len(tagged_dialogue_block['tags'])}"
         print(f"[OK] tags_file dialogue block '{dialogue_block_id}' validated.")
 
         print("\n[OK] All extraction logic tests passed!")

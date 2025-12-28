@@ -2,7 +2,7 @@
 # Run as: .\test.ps1
 
 param(
-    [int]$Model = 0  # Model number to test (1-based), 0 = prompt user
+    [int]$Model = 2  # Model number to test (1-based), 2 = Aya-23 (default), 0 = prompt user
 )
 
 $ErrorActionPreference = "Stop"
@@ -38,7 +38,7 @@ function Write-Header {
 # Main script
 $testDir = Join-Path $PSScriptRoot "tests"
 $pythonExe = Join-Path $PSScriptRoot "venv\Scripts\python.exe"
-$configFile = Join-Path $PSScriptRoot "models\current_config.json"
+$configFile = Join-Path $PSScriptRoot "games\current_config.json"
 $results = @()
 
 # Add PyTorch lib directory to PATH for CUDA DLLs (needed by llama-cpp-python)
@@ -97,15 +97,16 @@ if ($installedModels.Count -eq 0) {
     Write-Failure "ERROR: No translation models found in $configFile"
     exit 1
 } elseif ($Model -gt 0) {
-    # Model specified via parameter
+    # Model specified via parameter (or default)
     if ($Model -le $installedModels.Count) {
         $selectedModel = $installedModels[$Model - 1]
-        Write-Info "Auto-selecting model $Model`: $($selectedModel.Name)"
+        Write-Info "Using model $Model`: $($selectedModel.Name)"
     } else {
         Write-Failure "Invalid model number: $Model. Available models: 1-$($installedModels.Count)"
         exit 1
     }
 } else {
+    # Model = 0 means prompt user (legacy behavior)
     try {
         $selectedModel = Select-Item `
             -Title "Select Translation Model for Testing" `
@@ -148,18 +149,32 @@ foreach ($testFile in $testFiles) {
 
     $startTime = Get-Date
 
-            # Build arguments
-            Write-Host "DEBUG: PSScriptRoot is: $PSScriptRoot"
-            Write-Host "DEBUG: selectedModel.Config.script is: $($selectedModel.Config.script)"
-            $modelScriptPath = Join-Path $PSScriptRoot $selectedModel.Config.script
-            Write-Host "DEBUG: modelScriptPath (constructed) is: $modelScriptPath"
-        
-            $scriptArgs = @(
-                "--model_script", $modelScriptPath,
-                "--language", $selectedLanguage.Code
-            )    
-        # Run the test and capture exit code
+    # Only pass model script arguments to tests that need them
+    $testsNeedingModelScript = @(
+        "test_e2e_example_game.py",
+        "test_e2e_translate_aio.py",
+        "test_e2e_translate_aio_uncensored.py"
+    )
+
+    if ($testsNeedingModelScript -contains $testFile.Name) {
+        # Build arguments for tests that need model script
+        Write-Host "DEBUG: PSScriptRoot is: $PSScriptRoot"
+        Write-Host "DEBUG: selectedModel.Config.script is: $($selectedModel.Config.script)"
+        $modelScriptPath = Join-Path $PSScriptRoot $selectedModel.Config.script
+        Write-Host "DEBUG: modelScriptPath (constructed) is: $modelScriptPath"
+
+        $scriptArgs = @(
+            "--model_script", $modelScriptPath,
+            "--language", $selectedLanguage.Code
+        )
+
+        # Run the test with model script arguments
         & $pythonExe $testFile.FullName $scriptArgs
+    } else {
+        # Run the test without arguments
+        & $pythonExe $testFile.FullName
+    }
+
     $exitCode = $LASTEXITCODE
 
     $duration = (Get-Date) - $startTime

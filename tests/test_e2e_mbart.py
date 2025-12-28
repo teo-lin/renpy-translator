@@ -1,16 +1,16 @@
 """
-End-to-End Test: Full Modular Pipeline with MADLAD-400-3B Model
+End-to-End Test: Full Modular Pipeline with MBART-En-Ro Model
 
-This test runs the complete modular translation pipeline with the actual MADLAD-400 model:
+This test runs the complete modular translation pipeline with the MBART-En-Ro model:
 - Step 1: Config (discover characters from .rpy files → characters.json)
 - Step 2: Extract (.rpy → .parsed.yaml + .tags.json)
-- Step 3: Translate (ModularBatchTranslator + MADLAD400Translator)
+- Step 3: Translate (ModularBatchTranslator + MBARTTranslator)
 - Step 4: Merge (.parsed.yaml + .tags.json → .translated.rpy)
 - Step 5: Validate and cleanup
 
 Usage:
-    python tests/test_e2e_madlad.py
-    python tests/test_e2e_madlad.py --file 1    # Process specific file by number
+    python tests/test_e2e_mbart.py
+    python tests/test_e2e_mbart.py --file 1    # Process specific file by number
 """
 
 import sys
@@ -34,8 +34,17 @@ sys.path.insert(0, str(project_root / "tests"))
 
 from extract import RenpyExtractor
 from merger import RenpyMerger
-from madlad400_translator import MADLAD400Translator
-from translate_modular import ModularBatchTranslator
+
+# Try to import MBARTTranslator
+try:
+    from mbart_translator import MBARTTranslator
+    from translate_modular import ModularBatchTranslator
+    TRANSLATOR_AVAILABLE = True
+except ImportError as e:
+    print(f"[WARN] MBARTTranslator not available: {e}")
+    print("[INFO] This test requires src/translators/mbart_translator.py to be implemented")
+    TRANSLATOR_AVAILABLE = False
+
 from utils import (
     discover_characters, count_translations, backup_file,
     restore_file, cleanup_files, validate_rpy_structure, get_rpy_files
@@ -43,12 +52,12 @@ from utils import (
 
 # Test configuration
 example_dir = project_root / "games" / "Example" / "game" / "tl" / "romanian"
-model_path = project_root / "models" / "madlad400-3b-mt-GGUF" / "madlad400-3b-mt-q4_k_m.gguf"
+model_path = project_root / "models" / "mbart-large-en-ro"
 
 
 def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dict]:
     """
-    Test the full e2e pipeline on a single .rpy file with MADLAD-400 model.
+    Test the full e2e pipeline on a single .rpy file with MBART-En-Ro model.
 
     Args:
         rpy_file: Path to .rpy file to test
@@ -112,26 +121,21 @@ def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dic
         print(f"[OK] Created: {parsed_yaml.name}")
         print(f"[OK] Created: {tags_json.name}")
 
-        # Step 3: Translate with MADLAD-400 model
-        print("\n[3/5] Translating with MADLAD-400 model...")
-        print(f"[INFO] Loading model from: {model_path.name}")
+        # Step 3: Translate with MBART model
+        print("\n[3/5] Translating with MBART-En-Ro model...")
+        print(f"[INFO] Loading model from: {model_path}")
 
         # Check if model exists
         if not model_path.exists():
             print(f"[FAIL] Model not found: {model_path}")
-            print("[INFO] Please download the MADLAD-400-3B model first")
+            print("[INFO] Please download the MBART-En-Ro model first")
             return False, stats
 
-        # Initialize MADLAD-400 translator
-        try:
-            translator = MADLAD400Translator(
-                target_language='Romanian'
-            )
-        except ImportError as e:
-            print(f"[FAIL] Cannot load MADLAD400Translator: {e}")
-            print("[INFO] This is likely due to triton/torch version incompatibility")
-            print("[INFO] See: https://github.com/pytorch/ao/issues/2919")
-            return False, stats
+        # Initialize MBART translator
+        translator = MBARTTranslator(
+            model_path=str(model_path),
+            target_language='Romanian'
+        )
 
         # Create batch translator
         batch_translator = ModularBatchTranslator(
@@ -217,7 +221,7 @@ def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dic
         print(f"  - Initial translations: {initial_count}")
         print(f"  - Translations added: {stats['translations_added']}")
         print(f"  - Final translations: {final_count}")
-        print(f"  - Pipeline: Config → Extract → Translate (MADLAD-400) → Merge ✓")
+        print(f"  - Pipeline: Config → Extract → Translate (MBART-En-Ro) → Merge ✓")
         print("=" * 70)
 
         stats['success'] = True
@@ -241,20 +245,27 @@ def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dic
 
 def test_e2e_pipeline() -> bool:
     """
-    Test the full e2e pipeline with MADLAD-400 model.
+    Test the full e2e pipeline with MBART-En-Ro model.
 
     Returns:
         True if test passed, False otherwise
     """
     print("\n" + "=" * 70)
-    print("  E2E TEST: MADLAD-400-3B Modular Pipeline")
+    print("  E2E TEST: MBART-En-Ro Modular Pipeline")
     print("=" * 70)
+
+    # Check if translator is available
+    if not TRANSLATOR_AVAILABLE:
+        print("\n[SKIP] MBARTTranslator not implemented")
+        print("[INFO] Please implement src/translators/mbart_translator.py first")
+        print("[INFO] Expected API: MBARTTranslator(model_path, target_language)")
+        return False
 
     # Check if model exists
     if not model_path.exists():
         print(f"\n[SKIP] Model not found: {model_path}")
-        print("[INFO] Please download the MADLAD-400-3B model to run this test")
-        print("[INFO] Expected location: models/madlad400-3b-mt-GGUF/madlad400-3b-mt-q4_k_m.gguf")
+        print("[INFO] Please download the MBART-En-Ro model to run this test")
+        print("[INFO] Expected location: models/mbart-large-en-ro/")
         return False
 
     # Get .rpy files to test
@@ -265,7 +276,7 @@ def test_e2e_pipeline() -> bool:
         return False
 
     # Parse arguments for file selection
-    parser = argparse.ArgumentParser(description="E2E test with MADLAD-400 model")
+    parser = argparse.ArgumentParser(description="E2E test with MBART-En-Ro model")
     parser.add_argument("--file", type=int, help="Process specific file by number (1-based index)")
     args = parser.parse_args()
 

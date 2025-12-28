@@ -5,9 +5,21 @@ Uses Hugging Face transformers for translation with 400+ language support.
 Optimized for broad language coverage including rare and low-resource languages.
 """
 
-import torch
-from transformers import T5ForConditionalGeneration, T5Tokenizer
 from pathlib import Path
+
+# Try to import transformers dependencies
+try:
+    import torch
+    from transformers import T5ForConditionalGeneration, T5Tokenizer
+    TRANSFORMERS_AVAILABLE = True
+    IMPORT_ERROR = None
+except ImportError as e:
+    TRANSFORMERS_AVAILABLE = False
+    IMPORT_ERROR = str(e)
+    # Define dummy classes to avoid NameError
+    T5ForConditionalGeneration = None
+    T5Tokenizer = None
+    torch = None
 
 
 class MADLAD400Translator:
@@ -66,6 +78,14 @@ class MADLAD400Translator:
             unsloth: Whether to use unsloth for faster inference
             trust_remote_code: Whether to trust remote code for the model
         """
+        if not TRANSFORMERS_AVAILABLE:
+            raise ImportError(
+                f"MADLAD400Translator requires transformers and torch packages.\n"
+                f"Original error: {IMPORT_ERROR}\n"
+                f"This is likely due to triton/torch version incompatibility.\n"
+                f"See: https://github.com/pytorch/ao/issues/2919"
+            )
+
         self._target_language = target_language
         self.glossary = glossary or {}
 

@@ -148,7 +148,7 @@ class RenpyExtractor:
         # Extract separators and add to blocks
         if has_separators:
             blocks.extend(self._extract_separators(content))
-            print(f"🔀 Found {len([b for b in blocks if b['type'] == 'separator'])} separator lines")
+            print(f"[Separators] Found {len([b for b in blocks if b['type'] == 'separator'])} separator lines")
 
         # Sort blocks by position to preserve order
         blocks.sort(key=lambda b: b.get('start_pos', 0))
@@ -163,9 +163,8 @@ class RenpyExtractor:
             block_type = block['type']
 
             if block_type == 'separator':
-                # Separator block
+                # Separator block - add to tags_file but NOT to parsed_blocks (YAML)
                 block_id = f"separator-{idx}"
-                parsed_blocks[block_id] = {"type": "separator"}
                 tagged_blocks[block_id] = {
                     "type": BlockType.SEPARATOR,
                     "label": None,
@@ -228,7 +227,8 @@ class RenpyExtractor:
                 "separator_content": None
             }
 
-        # Build metadata
+        # Build metadata (excluding separators from counts)
+        non_separator_blocks = [b for b in blocks if b['type'] != 'separator']
         metadata: ParsedFileMetadata = {
             "source_file": str(rpy_file_path),
             "target_language": target_language,
@@ -236,8 +236,8 @@ class RenpyExtractor:
             "extracted_at": datetime.now().isoformat(),
             "file_structure_type": file_structure_type.value,
             "has_separator_lines": has_separators,
-            "total_blocks": len(blocks),
-            "untranslated_blocks": len([b for b in blocks if not b.get('current_translation', '').strip()])
+            "total_blocks": len(non_separator_blocks),
+            "untranslated_blocks": len([b for b in non_separator_blocks if not b.get('current_translation', '').strip()])
         }
 
         # Build structure

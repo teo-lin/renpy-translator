@@ -175,7 +175,7 @@ If setup completes with warnings about missing packages:
 
 **Common Issues:**
 - **"llama-cpp-python: NOT INSTALLED"** - CUDA wheel didn't install properly. Re-run setup with skip flags.
-- **"Could not find module 'llama.dll'"** - CPU version installed instead of CUDA. Re-run setup.
+- **"Could not find module 'llama.dll'"** - CPU-only torch installed instead of CUDA. The setup script now automatically detects this and reinstalls torch with CUDA support. Re-run `.\setup.ps1`.
 - **"CMake Error: CMAKE_C_COMPILER not set" or "Building wheel failed"** - Setup tried to build from source instead of using prebuilt wheel:
   - **Cause:** Your Python version (3.12+) may not have prebuilt CUDA wheels available
   - **Solution 1:** Use Python 3.10 or 3.11 (best wheel support)
@@ -648,10 +648,21 @@ git commit -m "Normalize line endings"
 
 ### CUDA DLL Not Found
 
-If you get CUDA errors, add torch's lib directory to PATH:
+**Root Cause:** CPU-only torch installed instead of CUDA-enabled torch. The `llama.dll` from llama-cpp-python requires CUDA runtime DLLs (cublas, cudart, etc.) that only come with CUDA-enabled torch.
+
+**Fix:** The setup script now automatically detects CPU-only torch and reinstalls with CUDA support. Simply re-run:
 
 ```powershell
-$env:PATH = "path\to\venv\Lib\site-packages\torch\lib;" + $env:PATH
+.\setup.ps1
+```
+
+**Manual Fix (if needed):**
+```powershell
+# Uninstall CPU-only torch
+venv\Scripts\python.exe -m pip uninstall -y torch torchvision
+
+# Install CUDA-enabled torch
+venv\Scripts\python.exe -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 ```
 
 ### Out of Memory

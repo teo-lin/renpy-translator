@@ -114,7 +114,7 @@ class BatchTranslator:
         )
 
         # Translate blocks
-        print(f"\n🚀 Starting translation...")
+        print(f"\n[Starting] Translation...")
         translated_count = 0
         failed_count = 0
 
@@ -158,7 +158,7 @@ class BatchTranslator:
             'failed': failed_count
         }
 
-        print(f"\n📊 Translation complete!")
+        print(f"\n[Complete] Translation complete!")
         print(f"   Total blocks: {stats['total']}")
         print(f"   Translated: {stats['translated']}")
         print(f"   Already done: {stats['skipped']}")

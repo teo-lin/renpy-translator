@@ -36,7 +36,7 @@ from extract import RenpyExtractor
 from merger import RenpyMerger
 from seamlessm4t_translator import SeamlessM4Tv2Translator
 from translate_modular import ModularBatchTranslator
-from tests.utils import (
+from utils import (
     discover_characters, count_translations, backup_file,
     restore_file, cleanup_files, validate_rpy_structure, get_rpy_files
 )
@@ -118,11 +118,17 @@ def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dic
         print(f"[INFO] Using model: {model_name}")
 
         # Initialize SeamlessM4T-v2 translator
-        translator = SeamlessM4Tv2Translator(
-            target_language='Romanian',
-            lang_code='ro',
-            model_name=model_name
-        )
+        try:
+            translator = SeamlessM4Tv2Translator(
+                target_language='Romanian',
+                lang_code='ro',
+                model_name=model_name
+            )
+        except ImportError as e:
+            print(f"[FAIL] Cannot load SeamlessM4Tv2Translator: {e}")
+            print("[INFO] This is likely due to triton/torch version incompatibility")
+            print("[INFO] See: https://github.com/pytorch/ao/issues/2919")
+            return False, stats
 
         # Create batch translator
         batch_translator = ModularBatchTranslator(

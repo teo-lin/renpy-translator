@@ -23,16 +23,16 @@ from merger import RenpyMerger
 
 # --- Test Data ---
 
-# Handcrafted YAML file with translations
+# Handcrafted YAML file with translations (clean text without tags)
 PARSED_YAML_CONTENT = """
 dialogue-1:
-  en: Hello, [name]!
-  ro: Salut, [name]!
+  en: 'Hello,!'
+  ro: 'Salut,!'
 separator-1:
   type: separator
 strings-1:
-  en: '{b}Chapter 1{/b}'
-  ro: '{b}Capitolul 1{/b}'
+  en: 'Chapter 1'
+  ro: 'Capitolul 1'
 """
 
 # Handcrafted JSON file with metadata and tags
@@ -43,7 +43,7 @@ TAGS_JSON_CONTENT = """
     "target_language": "romanian",
     "source_language": "english",
     "extracted_at": "2025-12-28T12:00:00Z",
-    "file_structure_type": "DIALOGUE_AND_STRINGS",
+    "file_structure_type": "dialogue_and_strings",
     "has_separator_lines": true,
     "total_blocks": 3,
     "untranslated_blocks": 0
@@ -64,7 +64,9 @@ TAGS_JSON_CONTENT = """
       "location": "game/script.rpy:10",
       "char_var": "s",
       "char_name": "Sylvie",
-      "tags": [],
+      "tags": [
+        {"pos": 6, "tag": " [name]", "type": "variable"}
+      ],
       "template": "# {location}\\ntranslate {language} {label}:\\n\\n    # {char_var} \\"{original}\\"\\n    {char_var} \\"{translation}\\"",
       "separator_content": null
     },
@@ -107,7 +109,9 @@ translate romanian start_dialogue:
     # s "Hello, [name]!"
     s "Salut, [name]!"
 
+
 # ----------------------------------------
+
 
 translate romanian strings:
 
@@ -161,10 +165,22 @@ def test_merge_in_isolation():
         assert output_rpy_path.exists(), "Output .rpy file was not created."
         print(f"[OK] Output file created: {output_rpy_path.name}")
 
-        actual_content = output_rpy_path.read_text(encoding='utf-8').strip().replace('\\r\\n', '\\n')
-        expected_content = EXPECTED_RPY_CONTENT.strip().replace('\\r\\n', '\\n')
+        actual_content = output_rpy_path.read_text(encoding='utf-8').strip().replace('\r\n', '\n')
+        expected_content = EXPECTED_RPY_CONTENT.strip().replace('\r\n', '\n')
 
-        assert actual_content == expected_content, "Output content does not match expected content."
+        if actual_content != expected_content:
+            import difflib
+            diff = list(difflib.unified_diff(
+                expected_content.splitlines(keepends=True),
+                actual_content.splitlines(keepends=True),
+                fromfile='expected',
+                tofile='actual',
+                lineterm=''
+            ))
+            print("\n[DEBUG] Content mismatch:")
+            for line in diff[:50]:  # Show first 50 lines of diff
+                print(line, end='')
+            assert False, "Output content does not match expected content."
         print("[OK] Output content matches expected golden file.")
 
         print("\n[PASS] Merge test completed successfully!")
@@ -186,12 +202,12 @@ def main():
     success = test_merge_in_isolation()
     if success:
         print("\n" + "="*70)
-        print("✅ ALL MERGE TESTS PASSED")
+        print("[Success] ALL MERGE TESTS PASSED")
         print("="*70)
         return 0
     else:
         print("\n" + "="*70)
-        print("❌ MERGE TESTS FAILED")
+        print("[Failed] MERGE TESTS FAILED")
         print("="*70)
         return 1
 

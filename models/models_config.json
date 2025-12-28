@@ -2,19 +2,6 @@
     "description":  "Translation models configuration",
     "version":  "1.0.0",
     "available_models":  {
-                             "llmic-3b":  {
-                                              "name":  "LLMic-3B",
-                                              "repo":  "faur-ai/LLMic",
-                                              "file":  null,
-                                              "size":  "~3.5GB",
-                                              "destination":  "models/LLMic",
-                                              "script":  "scripts/translate_with_llmic.py",
-                                              "description":  "Bilingual Ro-En safetensors, 3B params, BLEU 41.01 WMT16, VRAM 3.5GB. Best EN-RO BLEU score, massive RO corpus. Needs GGUF quantization. Best RO-specific if quantized.",
-                                              "languages":  [
-                                                                "ro"
-                                                            ],
-                                              "huggingface_download":  true
-                                          },
                              "aya-23-8b":  {
                                                "name":  "Aya-23-8B",
                                                "repo":  "bartowski/aya-23-8B-GGUF",
@@ -49,6 +36,19 @@
                                                                  "fi"
                                                              ]
                                            },
+                             "llmic-3b":  {
+                                              "name":  "LLMic-3B",
+                                              "repo":  "faur-ai/LLMic",
+                                              "file":  null,
+                                              "size":  "~3.5GB",
+                                              "destination":  "models/LLMic",
+                                              "script":  "scripts/translate_with_llmic.py",
+                                              "description":  "Bilingual Ro-En safetensors, 3B params, BLEU 41.01 WMT16, VRAM 3.5GB. Best EN-RO BLEU score, massive RO corpus. Needs GGUF quantization. Best RO-specific if quantized.",
+                                              "languages":  [
+                                                                "ro"
+                                                            ],
+                                              "huggingface_download":  true
+                                          },
                              "mbart-en-ro":  {
                                                  "name":  "MBART-En-Ro",
                                                  "repo":  "facebook/mbart-large-en-ro",
@@ -162,8 +162,8 @@
                                                }
                          },
     "installed_models":  [
-                             "llmic-3b",
                              "aya-23-8b",
+                             "llmic-3b",
                              "mbart-en-ro",
                              "madlad-400-3b",
                              "seamlessm4t-v2",

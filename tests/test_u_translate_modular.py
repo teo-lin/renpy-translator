@@ -102,7 +102,7 @@ def test_context_extraction():
         context_after=1
     )
 
-    print("\n📖 Testing context extraction...")
+    print("\n[Testing] Context extraction...")
 
     # Test 1: DIALOGUE block should have context
     print("\n  Test 1a: DIALOGUE block context")
@@ -232,7 +232,7 @@ def test_translation_workflow():
         temp_json = Path(f.name)
 
     try:
-        print(f"\n📖 Created test files:")
+        print(f"\n[Created] Test files:")
         print(f"    YAML: {temp_yaml.name}")
         print(f"    JSON: {temp_json.name}")
 
@@ -258,7 +258,7 @@ def test_translation_workflow():
         )
 
         # Translate
-        print("\n🔄 Running translation...")
+        print("\n[Running] Translation...")
         stats = batch_translator.translate_file(
             parsed_yaml_path=temp_yaml,
             tags_json_path=temp_json,
@@ -266,7 +266,7 @@ def test_translation_workflow():
         )
 
         # Verify statistics
-        print(f"\n📊 Statistics:")
+        print(f"\n[Statistics]:")
         print(f"    Total blocks: {stats['total']}")
         print(f"    Translated: {stats['translated']}")
         print(f"    Skipped: {stats['skipped']}")
@@ -278,7 +278,7 @@ def test_translation_workflow():
         assert stats['failed'] == 0, f"Expected 0 failed blocks, got {stats['failed']}"
 
         # Verify translations were written to file
-        print("\n📄 Verifying output file...")
+        print("\n[Verifying] Output file...")
         with open(temp_yaml, 'r', encoding='utf-8') as f:
             updated_blocks = yaml.safe_load(f)
 
@@ -294,7 +294,7 @@ def test_translation_workflow():
         print(f"    ✓ Block 5: {updated_blocks['5-Amelia']['ro']}")
 
         # Verify context was used for DIALOGUE but not for CHOICE
-        print("\n🔍 Verifying context usage...")
+        print("\n[Verifying] Context usage...")
         calls = mock_translator.translations_called
 
         # Find the DIALOGUE translation (block 2: "Hi!")
@@ -319,7 +319,7 @@ def test_translation_workflow():
         print(f"    ✓ CHOICE block '{choice_call['text']}' had no context (as expected)")
 
         # Verify glossary was used
-        print("\n📖 Verifying glossary usage...")
+        print("\n[Verifying] Glossary usage...")
         hi_translation = updated_blocks['2-MainCharacter']['ro']
         assert 'Salut' in hi_translation or 'Bună ziua' in hi_translation, \
             "Glossary should have been applied"
@@ -372,7 +372,7 @@ def test_untranslated_identification():
         context_after=1
     )
 
-    print("\n📖 Identifying untranslated blocks...")
+    print("\n[Identifying] Untranslated blocks...")
     untranslated = batch_translator._identify_untranslated(parsed_blocks, 'ro')
 
     print(f"\n  Found {len(untranslated)} untranslated blocks:")
@@ -436,7 +436,7 @@ def test_language_agnostic():
         temp_json = Path(f.name)
 
     try:
-        print(f"\n📖 Testing Spanish translation...")
+        print(f"\n[Testing] Spanish translation...")
 
         # Create mock translator for Spanish
         mock_translator = MockTranslator(target_language='Spanish')
@@ -457,7 +457,7 @@ def test_language_agnostic():
             output_yaml_path=None
         )
 
-        print(f"\n📊 Statistics:")
+        print(f"\n[Statistics]:")
         print(f"    Total: {stats['total']}, Translated: {stats['translated']}")
 
         assert stats['translated'] == 2, f"Expected 2 translations, got {stats['translated']}"
@@ -531,10 +531,10 @@ def main():
     print("=" * 70)
 
     if all_passed:
-        print("\n🎉 All tests passed!")
+        print("\n[Success] All tests passed!")
         return 0
     else:
-        print("\n⚠️  Some tests failed")
+        print("\n[Warning] Some tests failed")
         return 1
 
 
