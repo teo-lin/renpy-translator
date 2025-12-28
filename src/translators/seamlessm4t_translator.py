@@ -190,6 +190,7 @@ class SeamlessM4Tv2Translator:
             num_beams: Number of beams for beam search (default 5 for quality)
             context: Optional list of previous dialogue lines (for consistency)
             speaker: Optional character name/identifier
+            max_new_tokens: The maximum number of tokens to generate in the completion.
 
         Returns:
             Translated text
@@ -205,6 +206,13 @@ class SeamlessM4Tv2Translator:
         # Move inputs to device
         text_inputs = {k: v.to(self.device) for k, v in text_inputs.items()}
 
+        # Ensure input_ids and attention_mask are of type long
+        # This addresses the 'float object cannot be interpreted as an integer' error
+        if 'input_ids' in text_inputs:
+            text_inputs['input_ids'] = text_inputs['input_ids'].to(torch.long)
+        if 'attention_mask' in text_inputs:
+            text_inputs['attention_mask'] = text_inputs['attention_mask'].to(torch.long)
+
         # Generate translation
         with torch.no_grad():
             output_tokens = self.model.generate(
@@ -213,10 +221,22 @@ class SeamlessM4Tv2Translator:
                 max_length=max_length,
                 num_beams=num_beams,
                 early_stopping=True,
+                generate_speech=False,              # Explicitly disable speech generation
+                return_intermediate_token_ids=True, # Explicitly request text token IDs
             )
 
-        # Decode translation
-        translation = self.processor.decode(output_tokens[0].tolist()[0], skip_special_tokens=True)
+        # When return_intermediate_token_ids=True and generate_speech=False,
+        # output_tokens is a ModelOutput object with a 'sequences' attribute for text tokens.
+        generated_sequences = output_tokens.sequences
+
+        # Explicitly ensure generated_sequences are integers before decoding
+        # This addresses the 'float object cannot be interpreted as an integer' error that might appear
+        if generated_sequences.dtype != torch.long:
+            generated_sequences = generated_sequences.to(torch.long)
+
+        # Decode translation using the tokenizer directly
+        # The generated_sequences[0] is the 1D tensor of token IDs for the first (and only) batch item
+        translation = self.processor.tokenizer.decode(generated_sequences[0], skip_special_tokens=True)
 
         # Apply glossary if available
         translation = self._apply_glossary(text, translation)
