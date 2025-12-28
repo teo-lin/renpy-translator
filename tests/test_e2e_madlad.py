@@ -43,7 +43,8 @@ from utils import (
 
 # Test configuration
 example_dir = project_root / "games" / "Example" / "game" / "tl" / "romanian"
-model_path = project_root / "models" / "madlad400-3b-mt-GGUF" / "madlad400-3b-mt-q4_k_m.gguf"
+# MADLAD uses Hugging Face models (auto-downloaded, no local path needed)
+model_name = "google/madlad400-3b-mt"
 
 
 def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dict]:
@@ -114,13 +115,7 @@ def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dic
 
         # Step 3: Translate with MADLAD-400 model
         print("\n[3/5] Translating with MADLAD-400 model...")
-        print(f"[INFO] Loading model from: {model_path.name}")
-
-        # Check if model exists
-        if not model_path.exists():
-            print(f"[FAIL] Model not found: {model_path}")
-            print("[INFO] Please download the MADLAD-400-3B model first")
-            return False, stats
+        print(f"[INFO] Using model: {model_name}")
 
         # Initialize MADLAD-400 translator
         try:
@@ -131,6 +126,10 @@ def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dic
             print(f"[FAIL] Cannot load MADLAD400Translator: {e}")
             print("[INFO] This is likely due to triton/torch version incompatibility")
             print("[INFO] See: https://github.com/pytorch/ao/issues/2919")
+            return False, stats
+        except MemoryError as e:
+            print(f"[SKIP] Insufficient memory to load MADLAD-400-3B")
+            print(f"[INFO] {e}")
             return False, stats
 
         # Create batch translator
@@ -249,13 +248,8 @@ def test_e2e_pipeline() -> bool:
     print("\n" + "=" * 70)
     print("  E2E TEST: MADLAD-400-3B Modular Pipeline")
     print("=" * 70)
-
-    # Check if model exists
-    if not model_path.exists():
-        print(f"\n[SKIP] Model not found: {model_path}")
-        print("[INFO] Please download the MADLAD-400-3B model to run this test")
-        print("[INFO] Expected location: models/madlad400-3b-mt-GGUF/madlad400-3b-mt-q4_k_m.gguf")
-        return False
+    print(f"[INFO] Using Hugging Face model: {model_name}")
+    print("[INFO] Model will be auto-downloaded if not cached")
 
     # Get .rpy files to test
     rpy_files = get_rpy_files(example_dir)

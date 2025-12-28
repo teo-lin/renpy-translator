@@ -10,7 +10,7 @@ from pathlib import Path
 # Try to import transformers dependencies
 try:
     import torch
-    from transformers import T5ForConditionalGeneration, T5Tokenizer
+    from transformers import T5ForConditionalGeneration, T5Tokenizer, BitsAndBytesConfig
     TRANSFORMERS_AVAILABLE = True
     IMPORT_ERROR = None
 except ImportError as e:
@@ -19,6 +19,7 @@ except ImportError as e:
     # Define dummy classes to avoid NameError
     T5ForConditionalGeneration = None
     T5Tokenizer = None
+    BitsAndBytesConfig = None
     torch = None
 
 
@@ -108,7 +109,7 @@ class MADLAD400Translator:
             device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = device
 
-        print(f"Initializing MADLAD-400-3B Translation (EN→{target_language})...")
+        print(f"Initializing MADLAD-400-3B Translation (EN->{target_language})...")
         print(f"  Language code: {lang_code}")
         print(f"  Device: {device}")
         print(f"  Loading model... This may take 30-60 seconds...")
@@ -123,10 +124,59 @@ class MADLAD400Translator:
             )
         else:
             self.tokenizer = T5Tokenizer.from_pretrained(model_name)
-            self.model = T5ForConditionalGeneration.from_pretrained(model_name, trust_remote_code=trust_remote_code)
-        self.model.to(self.device)
-        self.model.eval()
 
+            # Use memory-efficient loading to avoid paging file errors
+            # Configure 8-bit quantization for reduced memory usage
+            try:
+                print("  Attempting 8-bit quantization for reduced memory usage...")
+                quantization_config = BitsAndBytesConfig(
+                    load_in_8bit=True,
+                    llm_int8_threshold=6.0
+                )
+                self.model = T5ForConditionalGeneration.from_pretrained(
+                    model_name,
+                    trust_remote_code=trust_remote_code,
+                    quantization_config=quantization_config,
+                    device_map="auto",  # Automatically manages memory across CPU/GPU
+                )
+                print("  [OK] Using 8-bit quantization")
+            except OSError as e:
+                if "paging file" in str(e).lower() or "1455" in str(e):
+                    # Windows paging file error
+                    raise MemoryError(
+                        f"MADLAD-400-3B requires more memory than currently available.\n"
+                        f"Error: {e}\n\n"
+                        f"SOLUTION: Increase your Windows paging file size:\n"
+                        f"  1. Open System Properties > Advanced > Performance Settings\n"
+                        f"  2. Go to Advanced tab > Virtual Memory > Change\n"
+                        f"  3. Uncheck 'Automatically manage paging file'\n"
+                        f"  4. Set custom size: Initial=16384MB, Maximum=32768MB\n"
+                        f"  5. Click Set, then OK, and restart your computer\n\n"
+                        f"Alternative: Use a smaller model like LLMic-3B or QuickMT-En-Ro instead."
+                    )
+                else:
+                    raise
+            except Exception as e:
+                print(f"  [WARN] 8-bit loading failed: {e}")
+                print("  [INFO] Falling back to float16...")
+                try:
+                    self.model = T5ForConditionalGeneration.from_pretrained(
+                        model_name,
+                        trust_remote_code=trust_remote_code,
+                        low_cpu_mem_usage=True,
+                        device_map="auto",
+                        dtype=torch.float16 if device == "cuda" else torch.float32
+                    )
+                except OSError as e2:
+                    if "paging file" in str(e2).lower() or "1455" in str(e2):
+                        raise MemoryError(
+                            f"MADLAD-400-3B requires more memory than currently available.\n"
+                            f"Please increase your Windows paging file size (see error above)."
+                        )
+                    raise
+            # Note: Don't call .to(device) when using device_map="auto"
+
+        self.model.eval()
         print("Model loaded successfully!")
 
     @property

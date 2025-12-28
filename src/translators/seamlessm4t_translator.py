@@ -75,7 +75,7 @@ class SeamlessM4Tv2Translator:
             target_language: Target language name (e.g., "Romanian", "Spanish", "Japanese")
             lang_code: 2-letter language code (e.g., "ro", "es", "ja"). Auto-converted to 3-letter.
             device: Device to use ('cuda' or 'cpu'). If None, auto-detected.
-            glossary: Optional dict of EN→target language term mappings
+            glossary: Optional dict of EN->target language term mappings
             model_name: Model variant to use. Default: "facebook/seamless-m4t-v2-large"
         """
         if not TRANSFORMERS_AVAILABLE:
@@ -123,7 +123,7 @@ class SeamlessM4Tv2Translator:
             model_name = "facebook/seamless-m4t-v2-large"
         self.model_name = model_name
 
-        print(f"Initializing SeamlessM4T-v2 Translation (EN→{target_language})...")
+        print(f"Initializing SeamlessM4T-v2 Translation (EN->{target_language})...")
         print(f"  Language code: {lang_code} ({self.lang_code_3letter})")
         print(f"  Device: {device}")
         print(f"  Model: {model_name}")
@@ -131,8 +131,16 @@ class SeamlessM4Tv2Translator:
 
         # Load processor and model
         self.processor = AutoProcessor.from_pretrained(model_name)
-        self.model = SeamlessM4Tv2Model.from_pretrained(model_name)
-        self.model.to(self.device)
+
+        # Use memory-efficient loading to avoid paging file errors
+        self.model = SeamlessM4Tv2Model.from_pretrained(
+            model_name,
+            low_cpu_mem_usage=True,  # Reduces RAM usage during loading
+            device_map="auto",  # Automatically manages memory across CPU/GPU
+            torch_dtype=torch.float16 if device == "cuda" else torch.float32  # Use half precision on GPU
+        )
+        # Note: Don't call .to(device) when using device_map="auto"
+
         self.model.eval()
 
         print("Model loaded successfully!")

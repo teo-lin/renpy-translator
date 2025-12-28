@@ -10,9 +10,13 @@ Provides reusable functions for:
 
 import re
 import shutil
+import sys
+import unittest
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, TypeVar, Type
 
+
+# --- Existing Utility Functions (unchanged) ---
 
 def discover_characters(tl_path: Path, game_path: Path) -> Dict[str, dict]:
     """
@@ -72,7 +76,7 @@ def discover_characters(tl_path: Path, game_path: Path) -> Dict[str, dict]:
         content = script_file.read_text(encoding='utf-8')
 
         # Match: define var = Character('Name', ...) or Character(None)
-        pattern = r'define\s+(\w+)\s*=\s*Character\((?:["\'](.+?)["\']|None)\s*[,)]'
+        pattern = r'define\s+(\w+)\s*=\s*Character\((?:["\\](.+?)["\\]|None)\s*[,)]'
         matches = re.finditer(pattern, content)
 
         for match in matches:
@@ -88,15 +92,15 @@ def discover_characters(tl_path: Path, game_path: Path) -> Dict[str, dict]:
                 character_vars[char_var]['name'] = 'Narrator'
                 character_vars[char_var]['type'] = 'narrator'
             # Detect protagonist (common patterns: mc, u, player)
-            elif re.match(r'^(mc|u|player)$', char_var) or re.match(r'^\[.*name.*\]$', char_name):
+            elif re.match(r'^(mc|u|player)$', char_var) or re.match(r'^\\[.*name.*\\]$', char_name):
                 # Use proper name if not a placeholder
-                if not re.match(r'^\[.*\]$', char_name) and char_name:
+                if not re.match(r'^\\[.*\\]$', char_name) and char_name:
                     character_vars[char_var]['name'] = char_name
                 else:
                     character_vars[char_var]['name'] = 'MainCharacter'
                 character_vars[char_var]['type'] = 'protagonist'
             # Regular characters
-            elif not re.match(r'^\?+$|\[.*\]$', char_name) and char_name:
+            elif not re.match(r'^\?+$|\\[.*\\]$', char_name) and char_name:
                 character_vars[char_var]['name'] = char_name
                 character_vars[char_var]['type'] = 'main'
 
@@ -266,3 +270,53 @@ def get_rpy_files(directory: Path, exclude_patterns: List[str] = None) -> List[P
             filtered_files.append(f)
 
     return filtered_files
+
+
+# --- New Base Test Class ---
+
+_TranslatorType = TypeVar('_TranslatorType')
+
+class BaseTranslatorIntegrationTest(unittest.TestCase):
+    """
+    Base class for translator integration tests.
+    Handles common setup like path configuration and provides a template
+    for translator initialization.
+    """
+    project_root = Path(__file__).parent.parent
+    translator: _TranslatorType = None # Type hint for the translator instance
+
+    @classmethod
+    def setUpClass(cls):
+        """
+        Set up the test environment: add project paths to sys.path.
+        Derived classes should call super().setUpClass() and then initialize
+        their specific translator.
+        """
+        print(f"\nSetting up test environment for {cls.__name__}...")
+
+    @classmethod
+    def tearDownClass(cls):
+        """
+        Clean up resources after all tests in this class have run.
+        Derived classes should call super().tearDownClass() and then clean up
+        their specific translator if necessary.
+        """
+        print(f"Tearing down test environment for {cls.__name__}.")
+        if cls.translator:
+            del cls.translator
+            cls.translator = None
+
+    def _get_model_path(self, model_subdir: str, model_filename: str) -> Path:
+        """
+        Helper method to construct model paths.
+        """
+        return self.project_root / "models" / model_subdir / model_filename
+
+    def _assert_translation(self, english_text: str, expected_romanian: str):
+        """
+        Helper method for common translation assertion.
+        """
+        print(f"Translating: '{english_text}'")
+        translation = self.translator.translate(english_text)
+        print(f"Received translation: '{translation}'")
+        self.assertEqual(translation, expected_romanian)

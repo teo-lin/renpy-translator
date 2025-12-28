@@ -52,7 +52,8 @@ from utils import (
 
 # Test configuration
 example_dir = project_root / "games" / "Example" / "game" / "tl" / "romanian"
-model_path = project_root / "models" / "LLMic"
+# LLMic uses Hugging Face models (auto-downloaded, no local path needed)
+model_name = "faur-ai/LLMic"
 
 
 def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dict]:
@@ -123,19 +124,19 @@ def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dic
 
         # Step 3: Translate with LLMic-3B model
         print("\n[3/5] Translating with LLMic-3B model...")
-        print(f"[INFO] Loading model from: {model_path}")
-
-        # Check if model exists
-        if not model_path.exists():
-            print(f"[FAIL] Model not found: {model_path}")
-            print("[INFO] Please download the LLMic-3B model first")
-            return False, stats
+        print(f"[INFO] Using model: {model_name}")
 
         # Initialize LLMic translator
-        translator = LLMicTranslator(
-            model_path=str(model_path),
-            target_language='Romanian'
-        )
+        try:
+            translator = LLMicTranslator(
+                target_language='Romanian',
+                model_name=model_name
+            )
+        except ImportError as e:
+            print(f"[FAIL] Cannot load LLMicTranslator: {e}")
+            print("[INFO] This is likely due to triton/torch version incompatibility")
+            print("[INFO] See: https://github.com/pytorch/ao/issues/2919")
+            return False, stats
 
         # Create batch translator
         batch_translator = ModularBatchTranslator(
@@ -253,19 +254,13 @@ def test_e2e_pipeline() -> bool:
     print("\n" + "=" * 70)
     print("  E2E TEST: LLMic-3B Modular Pipeline")
     print("=" * 70)
+    print(f"[INFO] Using Hugging Face model: {model_name}")
+    print("[INFO] Model will be auto-downloaded if not cached")
 
     # Check if translator is available
     if not TRANSLATOR_AVAILABLE:
         print("\n[SKIP] LLMicTranslator not implemented")
         print("[INFO] Please implement src/translators/llmic_translator.py first")
-        print("[INFO] Expected API: LLMicTranslator(model_path, target_language)")
-        return False
-
-    # Check if model exists
-    if not model_path.exists():
-        print(f"\n[SKIP] Model not found: {model_path}")
-        print("[INFO] Please download the LLMic-3B model to run this test")
-        print("[INFO] Expected location: models/LLMic/")
         return False
 
     # Get .rpy files to test
