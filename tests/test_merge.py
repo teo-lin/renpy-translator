@@ -1,9 +1,9 @@
 """
-Test the merge operation on the Example game
+Test the full end-to-end modular pipeline on the Example game
 
-This test runs the full modular pipeline on the Example game:
-- Step 1: Backup original file(s)
-- Step 2: Setup (create characters.json if needed)
+This test runs the complete modular pipeline on the Example game:
+- Step 1: Config (discover characters from .rpy files → characters.json)
+- Step 2: Backup original file(s)
 - Step 3: Extract (.rpy → .parsed.yaml + .tags.json)
 - Step 4: Translate (fill in missing translations)
 - Step 5: Merge (.parsed.yaml + .tags.json → .translated.rpy)
@@ -20,7 +20,7 @@ import yaml
 import shutil
 import subprocess
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 import argparse
 
 # Set UTF-8 encoding for console output on Windows
@@ -29,12 +29,15 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='repla
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # Add src directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root / "src"))
+sys.path.insert(0, str(project_root / "tests"))
+
 from extraction import RenpyExtractor
 from merger import RenpyMerger
+from test_utils import discover_characters, count_translations, get_rpy_files
 
 # Project paths
-project_root = Path(__file__).parent.parent
 example_dir = project_root / "games" / "Example" / "game" / "tl" / "romanian"
 python_exe = project_root / "venv" / "Scripts" / "python.exe"
 
@@ -46,47 +49,6 @@ parser.add_argument("--file", type=int, help="Process specific file by number (1
 args = parser.parse_args()
 
 target_language = args.language
-
-
-def get_rpy_files() -> List[Path]:
-    """Get list of .rpy files in the Example game directory"""
-    if not example_dir.exists():
-        print(f"[FAIL] Example directory not found at {example_dir}")
-        return []
-
-    rpy_files = sorted(example_dir.glob("*.rpy"))
-    # Exclude backup and generated files
-    rpy_files = [f for f in rpy_files if not f.name.endswith('.backup')
-                 and not f.name.endswith('.translated.rpy')]
-
-    return rpy_files
-
-
-def count_translations(file_path):
-    """Count how many non-empty translations exist in the file"""
-    content = file_path.read_text(encoding='utf-8')
-    lines = content.split('\n')
-
-    count = 0
-    for i, line in enumerate(lines):
-        stripped = line.strip()
-
-        # Skip comments
-        if not stripped or stripped.startswith('#'):
-            continue
-
-        # Skip "old" lines (source text, not translations)
-        if stripped.startswith('old '):
-            continue
-
-        # Count character dialogue lines with non-empty translations
-        # Format: character_var "translation text"
-        if '"' in stripped and '""' not in stripped:
-            # Check if it's a character line (starts with identifier) or "new" line
-            if stripped.startswith('new ') or (not stripped.startswith('translate') and ' "' in stripped):
-                count += 1
-
-    return count
 
 
 def test_single_file(rpy_file: Path, character_map: dict) -> Tuple[bool, dict]:
@@ -114,8 +76,8 @@ def test_single_file(rpy_file: Path, character_map: dict) -> Tuple[bool, dict]:
         'success': False
     }
 
-    # Step 1: Backup original file
-    print("\n[1/6] Backing up original file...")
+    # Step 2: Backup original file
+    print("\n[2/7] Backing up original file...")
     if not rpy_file.exists():
         print(f"[FAIL] File not found at {rpy_file}")
         return False, stats
@@ -129,12 +91,12 @@ def test_single_file(rpy_file: Path, character_map: dict) -> Tuple[bool, dict]:
     print(f"[OK] Initial translations: {initial_count}")
 
     try:
-        # Step 2: Character map already provided
-        print("\n[2/6] Using provided character map...")
+        # Step 3: Character map already generated in test_merge_pipeline
+        print("\n[3/7] Using generated character map...")
         print(f"[OK] Character map has {len(character_map)} characters")
 
-        # Step 3: Extract
-        print("\n[3/6] Extracting .rpy file...")
+        # Step 4: Extract
+        print("\n[4/7] Extracting .rpy file...")
 
         extractor = RenpyExtractor(character_map)
         parsed_blocks, tags_file = extractor.extract_file(
@@ -155,8 +117,8 @@ def test_single_file(rpy_file: Path, character_map: dict) -> Tuple[bool, dict]:
         print(f"[OK] Created: {parsed_yaml.name}")
         print(f"[OK] Created: {tags_json.name}")
 
-        # Step 4: Translate (manually fill in some translations)
-        print("\n[4/6] Adding sample translations to YAML...")
+        # Step 5: Translate (manually fill in some translations)
+        print("\n[5/7] Adding sample translations to YAML...")
 
         # Add translations to untranslated blocks
         translations_added = 0
@@ -197,8 +159,8 @@ def test_single_file(rpy_file: Path, character_map: dict) -> Tuple[bool, dict]:
         stats['translations_added'] = translations_added
         print(f"[OK] Added {translations_added} sample translations")
 
-        # Step 5: Merge
-        print("\n[5/6] Merging YAML + JSON back to .rpy...")
+        # Step 6: Merge
+        print("\n[6/7] Merging YAML + JSON back to .rpy...")
 
         merger = RenpyMerger()
         success = merger.merge_file(
@@ -255,8 +217,8 @@ def test_single_file(rpy_file: Path, character_map: dict) -> Tuple[bool, dict]:
             print("[FAIL] Some structure checks failed")
             return False, stats
 
-        # Step 6: Restore original file and cleanup
-        print("\n[6/6] Restoring original file and cleaning up...")
+        # Step 7: Restore original file and cleanup
+        print("\n[7/7] Restoring original file and cleaning up...")
 
         shutil.copy2(backup_file, rpy_file)
         backup_file.unlink()
@@ -282,7 +244,7 @@ def test_single_file(rpy_file: Path, character_map: dict) -> Tuple[bool, dict]:
         print(f"  - Initial translations: {initial_count}")
         print(f"  - Translations added: {translations_added}")
         print(f"  - Final translations: {final_count}")
-        print(f"  - Pipeline steps: Extract → Translate → Merge ✓")
+        print(f"  - Pipeline steps: Config → Extract → Translate → Merge ✓")
         print(f"  - All generated files cleaned up ✓")
         print("=" * 70)
 
@@ -324,42 +286,26 @@ def test_merge_pipeline(files_to_process: List[Path]) -> bool:
     print(f"TEST: Merge Pipeline on {len(files_to_process)} file(s)")
     print("=" * 70)
 
-    # Step 1: Setup characters.json (shared for all files)
-    print("\n[Setup] Creating characters.json...")
+    # Step 1: Setup - Generate character map from .rpy files
+    print("\n[1/6] Config: Discovering and generating character map...")
     characters_json = example_dir / "characters.json"
 
-    character_map = {
-        'narrator': {
-            'name': 'Narrator',
-            'gender': 'neutral',
-            'type': 'narrator',
-            'description': 'Story narrator'
-        },
-        'mc': {
-            'name': 'Player',
-            'gender': 'male',
-            'type': 'protagonist',
-            'description': 'Main character (player)'
-        },
-        'sarah': {
-            'name': 'Sarah',
-            'gender': 'female',
-            'type': 'main',
-            'description': 'Student guide'
-        },
-        'alex': {
-            'name': 'Alex',
-            'gender': 'neutral',
-            'type': 'side',
-            'description': 'Sarah\'s friend'
-        }
-    }
+    # Get game path (go up from tl/romanian to game root)
+    game_path = example_dir.parent.parent
+
+    # Discover characters automatically
+    character_map = discover_characters(example_dir, game_path)
 
     # Save characters.json
     with open(characters_json, 'w', encoding='utf-8') as f:
         json.dump(character_map, f, indent=2, ensure_ascii=False)
 
-    print(f"[OK] Created characters.json with {len(character_map)} characters")
+    print(f"[OK] Generated characters.json with {len(character_map)} characters")
+
+    # Display discovered characters
+    for char_var, char_info in character_map.items():
+        var_display = f"'{char_var}'" if char_var else "'<narrator>'"
+        print(f"     - {var_display}: {char_info['name']} ({char_info['type']})")
 
     # Test each file
     all_results = []
@@ -414,10 +360,10 @@ def test_merge_pipeline(files_to_process: List[Path]) -> bool:
 if __name__ == "__main__":
     try:
         # Get list of available .rpy files
-        rpy_files = get_rpy_files()
+        rpy_files = get_rpy_files(example_dir)
 
         if not rpy_files:
-            print("[FAIL] No .rpy files found in Example game directory")
+            print(f"[FAIL] No .rpy files found in {example_dir}")
             sys.exit(1)
 
         # Determine which files to process
