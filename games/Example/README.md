@@ -49,7 +49,7 @@ Translate directly using the original pipeline:
 
 ```powershell
 # Using interactive launcher (recommended)
-.\5-translate.ps1
+.\3-translate.ps1
 
 # Or directly with Python
 python src\translators\aya23_translator.py games\Example\game\tl\romanian\script.rpy --language ro
@@ -61,15 +61,15 @@ Use the new modular pipeline for better control:
 
 ```powershell
 # Step 1: Extract clean text and tags
-.\4-extract.ps1 -Source "script.rpy"
+.\2-extract.ps1 -Source "script.rpy"
 # Creates: script.parsed.yaml (human-editable) and script.tags.json (metadata)
 
 # Step 2: Translate (or manually edit the YAML file)
-.\5-translate.ps1
+.\3-translate.ps1
 # Updates: script.parsed.yaml with translations
 
 # Step 3: Merge back to .rpy format
-.\7-merge.ps1 -Source "script"
+.\5-merge.ps1 -Source "script"
 # Creates: script.translated.rpy (with tags restored and validation)
 ```
 

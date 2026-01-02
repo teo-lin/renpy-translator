@@ -1,6 +1,6 @@
 """
 Test script for character extraction from Example game
-Verifies that 3-config.ps1 properly generates characters.json with:
+Verifies that 1-config.ps1 properly generates characters.json with:
 - Correct character variables discovered from .rpy files
 - Character names extracted from script.rpy definitions
 - Auto-generated descriptions based on file appearances
@@ -14,13 +14,13 @@ import subprocess
 from pathlib import Path
 
 def test_u_config():
-    """Test that 3-config.ps1 creates characters.json correctly"""
+    """Test that 1-config.ps1 creates characters.json correctly"""
 
     # Paths
     project_root = Path(__file__).parent.parent
     characters_file = project_root / "games" / "Example" / "game" / "tl" / "romanian" / "characters.json"
     backup_file = characters_file.with_suffix(".json.backup")
-    stage_script = project_root / "3-config.ps1"
+    stage_script = project_root / "1-config.ps1"
 
     print("=" * 70)
     print("TEST: Character Discovery & Generation")
@@ -38,8 +38,8 @@ def test_u_config():
         print("   [OK] No existing file to backup")
     print()
 
-    # Step 2: Run 3-config.ps1 to generate characters.json
-    print("[2/5] Running 3-config.ps1 to generate characters.json...")
+    # Step 2: Run 1-config.ps1 to generate characters.json
+    print("[2/5] Running 1-config.ps1 to generate characters.json...")
     try:
         result = subprocess.run(
             [
@@ -60,9 +60,9 @@ def test_u_config():
             print(f"   STDERR: {result.stderr}")
             return False
 
-        print("   [OK] 3-config.ps1 executed successfully")
+        print("   [OK] 1-config.ps1 executed successfully")
     except Exception as e:
-        print(f"   [FAIL] Error running 3-config.ps1: {e}")
+        print(f"   [FAIL] Error running 1-config.ps1: {e}")
         return False
     print()
 
@@ -169,7 +169,7 @@ def test_u_config():
         print()
         print("\033[92m[SUCCESS] All tests passed!\033[0m")
         print()
-        print("3-config.ps1 successfully:")
+        print("1-config.ps1 successfully:")
         print("  - Generated characters.json from scratch")
         print("  - Discovered all character variables from .rpy files")
         print("  - Extracted character names from script.rpy")

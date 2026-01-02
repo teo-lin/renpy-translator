@@ -1,7 +1,7 @@
 """
 Test the modular translation pipeline
 
-Tests the new 5-translate.ps1 workflow:
+Tests the new 3-translate.ps1 workflow:
 - Loading .parsed.yaml and .tags.json files
 - Context extraction (DIALOGUE: 3 before + 1 after, CHOICE: no context)
 - Translation with glossary and prompt fallback
@@ -492,7 +492,7 @@ def main():
     print("\n" + "=" * 70)
     print("  MODULAR TRANSLATION PIPELINE - TEST SUITE")
     print("=" * 70)
-    print("\nTesting the new 5-translate.ps1 workflow")
+    print("\nTesting the new 3-translate.ps1 workflow")
     print("This test uses a mock translator (no model required)")
 
     all_passed = True

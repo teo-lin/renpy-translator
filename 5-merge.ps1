@@ -115,7 +115,7 @@ if ($All) {
 
     if ($yamlFiles.Count -eq 0) {
         Write-Host " No .parsed.yaml files found!" -ForegroundColor Red
-        Write-Host "   Run 4-extract.ps1 first" -ForegroundColor Yellow
+        Write-Host "   Run 2-extract.ps1 first" -ForegroundColor Yellow
         exit 1
     }
 
@@ -134,7 +134,7 @@ if ($All) {
     # Merge single file
     if ($Source -eq "") {
         Write-Host " Please specify -Source <filename> or use -All" -ForegroundColor Red
-        Write-Host "   Example: .\7-merge.ps1 -Source Cell01_JM" -ForegroundColor Yellow
+        Write-Host "   Example: .\5-merge.ps1 -Source Cell01_JM" -ForegroundColor Yellow
         exit 1
     }
 

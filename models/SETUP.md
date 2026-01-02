@@ -26,7 +26,7 @@
 5. **Language Configuration** - Select which languages you'll work with
    - Only shows languages supported by your selected models
    - Saves to `data/local_languages.json`
-   - Used to filter language choices in `5-translate.ps1` and `6-correct.ps1`
+   - Used to filter language choices in `3-translate.ps1` and `4-correct.ps1`
 
 6. **Verification** - Tests all components:
    - Verifies Python packages can actually import (not just installed)

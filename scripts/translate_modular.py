@@ -346,7 +346,7 @@ def load_config(project_root: Path, game_name: Optional[str] = None) -> Dict:
 
     if not config_file.exists():
         print(f"ERROR: Configuration not found at {config_file}")
-        print("Please run 3-config.ps1 first to set up your game.")
+        print("Please run 1-config.ps1 first to set up your game.")
         sys.exit(1)
 
     with open(config_file, 'r', encoding='utf-8-sig') as f:
@@ -363,7 +363,7 @@ def load_config(project_root: Path, game_name: Optional[str] = None) -> Dict:
         current_game = config.get('current_game')
         if not current_game:
             print("ERROR: No current_game set in configuration.")
-            print("Please run 3-config.ps1 first.")
+            print("Please run 1-config.ps1 first.")
             sys.exit(1)
         game_config = config['games'][current_game]
 
@@ -517,7 +517,7 @@ def main():
 
     if not parsed_files:
         print(f"\nERROR: No .parsed.yaml files found in {tl_dir}")
-        print("Please run 4-extract.ps1 first to extract translation files.")
+        print("Please run 2-extract.ps1 first to extract translation files.")
         sys.exit(1)
 
     print(f"\nFound {len(parsed_files)} file(s) to process")

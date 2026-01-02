@@ -236,5 +236,5 @@ Write-Host " Extraction complete!" -ForegroundColor Green
 Write-Host ""
 Write-Host " Next steps:" -ForegroundColor Yellow
 Write-Host "   1. Review the .parsed.yaml files for any issues" -ForegroundColor Gray
-Write-Host "   2. Run '5-translate.ps1' to translate untranslated blocks" -ForegroundColor Gray
+Write-Host "   2. Run '3-translate.ps1' to translate untranslated blocks" -ForegroundColor Gray
 Write-Host ""

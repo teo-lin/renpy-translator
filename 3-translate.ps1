@@ -19,12 +19,12 @@ if ($Help) {
     Write-Host "Translates .parsed.yaml files using batch translation."
     Write-Host ""
     Write-Host "USAGE:" -ForegroundColor Yellow
-    Write-Host "  .\5-translate.ps1                  # Use current_game from config"
-    Write-Host "  .\5-translate.ps1 -Game 'MyGame'   # Translate specific game"
+    Write-Host "  .\3-translate.ps1                  # Use current_game from config"
+    Write-Host "  .\3-translate.ps1 -Game 'MyGame'   # Translate specific game"
     Write-Host ""
     Write-Host "REQUIREMENTS:" -ForegroundColor Yellow
-    Write-Host "  1. Run .\3-config.ps1 first to set up game configuration"
-    Write-Host "  2. Run .\4-extract.ps1 to create .parsed.yaml files"
+    Write-Host "  1. Run .\1-config.ps1 first to set up game configuration"
+    Write-Host "  2. Run .\2-extract.ps1 to create .parsed.yaml files"
     Write-Host "  3. Then run this script to translate"
     Write-Host ""
     Write-Host "WHAT IT DOES:" -ForegroundColor Yellow
@@ -37,7 +37,7 @@ if ($Help) {
     Write-Host "  - Saves translations back to .parsed.yaml files"
     Write-Host ""
     Write-Host "NEXT STEPS:" -ForegroundColor Yellow
-    Write-Host "  After translation, run .\7-merge.ps1 to reconstruct .rpy files"
+    Write-Host "  After translation, run .\5-merge.ps1 to reconstruct .rpy files"
     Write-Host ""
     exit 0
 }
@@ -71,7 +71,7 @@ if (-not (Test-Path $pythonScript)) {
 # Check configuration exists
 if (-not (Test-Path $configFile)) {
     Write-Host "ERROR: Configuration not found at $configFile" -ForegroundColor Red
-    Write-Host "Please run 3-config.ps1 first to set up your game." -ForegroundColor Yellow
+    Write-Host "Please run 1-config.ps1 first to set up your game." -ForegroundColor Yellow
     exit 1
 }
 
@@ -110,5 +110,5 @@ Write-Host "=================================================================" -
 Write-Host ""
 Write-Host "NEXT STEPS:" -ForegroundColor Yellow
 Write-Host "  1. Review the .parsed.yaml files for translation quality"
-Write-Host "  2. Run .\7-merge.ps1 to reconstruct .rpy files"
+Write-Host "  2. Run .\5-merge.ps1 to reconstruct .rpy files"
 Write-Host ""

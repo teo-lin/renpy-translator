@@ -26,7 +26,7 @@ function Get-GameConfig {
 
     if (-not (Test-Path $configPath)) {
         Write-Host " Configuration file not found!" -ForegroundColor Red
-        Write-Host "   Please run 3-config.ps1 first to configure your game" -ForegroundColor Yellow
+        Write-Host "   Please run 1-config.ps1 first to configure your game" -ForegroundColor Yellow
         exit 1
     }
 
@@ -48,7 +48,7 @@ function Get-GameConfig {
     }
 
     Write-Host " No game configured!" -ForegroundColor Red
-    Write-Host "   Please run 3-config.ps1 first" -ForegroundColor Yellow
+    Write-Host "   Please run 1-config.ps1 first" -ForegroundColor Yellow
     exit 1
 }
 
@@ -57,7 +57,7 @@ function Select-ConfiguredGame {
 
     if (-not (Test-Path $configPath)) {
         Write-Host " No games configured!" -ForegroundColor Red
-        Write-Host "   Please run 3-config.ps1 first" -ForegroundColor Yellow
+        Write-Host "   Please run 1-config.ps1 first" -ForegroundColor Yellow
         exit 1
     }
 

@@ -36,10 +36,10 @@ Mixed line endings (LF vs CRLF) or UTF-8 encoding issues. This can happen when:
 ```powershell
 # View git's line ending configuration
 git config core.autocrlf
-git ls-files --eol 3-config.ps1
+git ls-files --eol 1-config.ps1
 
 # Check actual file encoding
-file 3-config.ps1
+file 1-config.ps1
 ```
 
 2. **Fix line endings for all PowerShell scripts:**
@@ -186,10 +186,10 @@ translator = Aya23Translator(model_path, n_gpu_layers=30)  # Instead of -1
 ## Troubleshooting
 
 ### "Configuration file not found"
-**Solution:** Run `.\3-config.ps1` first to set up the game.
+**Solution:** Run `.\1-config.ps1` first to set up the game.
 
 ### "No .parsed.yaml files found"
-**Solution:** Run `.\4-4-extract.ps1 -All` first.
+**Solution:** Run `.\4-2-extract.ps1 -All` first.
 
 ### "Validation errors found"
 **Solution:** Review the error report. Common issues:
@@ -197,7 +197,7 @@ translator = Aya23Translator(model_path, n_gpu_layers=30)  # Instead of -1
 - Unmatched `{color}` tags
 - Missing `[variable]` placeholders
 
-Fix in the `.parsed.yaml` file and re-run `.\7-7-merge.ps1`.
+Fix in the `.parsed.yaml` file and re-run `.\7-5-merge.ps1`.
 
 ### "Python not found"
 **Solution:** The scripts use the system Python. Install Python 3.8+ or run `.\setup.ps1` to create a venv.

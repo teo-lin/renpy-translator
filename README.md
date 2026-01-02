@@ -33,7 +33,7 @@ This app supports **three translation workflows**:
 Simple, automated translation in a single step. Best for quick translations.
 
 ```powershell
-.\5-5-translate.ps1  # Processes .rpy files directly
+.\5-3-translate.ps1  # Processes .rpy files directly
 ```
 
 ### 2. **Modular Workflow** (Recommended for Control)
@@ -41,11 +41,11 @@ Three-phase pipeline with human review checkpoints. See Pipelines section below 
 
 ```powershell
 # interactive scripts - allow you to select desired game, target language(s), model(s)
-.\3-config.ps1  # game setup (one-time)
-.\4-extract.ps1  # extract clean text and tags to separate files, token-efficient
-.\5-translate.ps1 # batched
-.\6-correct.ps1 # optional. human readable format
-.\7-merge.ps1 # merge translation and tags back to .rpy
+.\1-config.ps1  # game setup (one-time)
+.\2-extract.ps1  # extract clean text and tags to separate files, token-efficient
+.\3-translate.ps1 # batched
+.\4-correct.ps1 # optional. human readable format
+.\5-merge.ps1 # merge translation and tags back to .rpy
 ```
 ---
 
@@ -60,13 +60,13 @@ python scripts\translate_with_aya23.py "path\to\file.rpy" # Translate single fil
 python scripts\correct_with_aya23.py "path\to\game\game\tl\<language>"
 
 # Fast pattern corrections only
-.\6-correct.ps1 "path\to\game\game\tl\<language>" --patterns-only
+.\4-correct.ps1 "path\to\game\game\tl\<language>" --patterns-only
 
 # Full correction (patterns + LLM)
-.\6-correct.ps1 "path\to\game\game\tl\<language>"
+.\4-correct.ps1 "path\to\game\game\tl\<language>"
 
 # Preview changes without modifying files
-.\6-correct.ps1 "path\to\game\game\tl\<language>" --dry-run
+.\4-correct.ps1 "path\to\game\game\tl\<language>" --dry-run
 ```
 
 ### 4. Optional: Benchmark Script: `scripts\benchmark.py`
@@ -94,13 +94,13 @@ Create `data/<language>_benchmark.json` with reference translations:
 **Usage:**
 ```powershell
 # Run benchmark with auto-detected glossary
-.\1-benchmark.ps1 data\ro_benchmark.json
+.\9-benchmark.ps1 data\ro_benchmark.json
 
 # Run with explicit glossary
-.\1-benchmark.ps1 data\ro_benchmark.json --glossary data\ro_glossary.json
+.\9-benchmark.ps1 data\ro_benchmark.json --glossary data\ro_glossary.json
 
 # Run for other languages
-.\1-benchmark.ps1 data\de_benchmark.json
+.\9-benchmark.ps1 data\de_benchmark.json
 ```
 
 **Template Files:**
@@ -209,13 +209,13 @@ Place in `data\<language>_corrections.json`
 │           └── *.translated.rpy       # Merged output (NEW)
 ├── requirements.txt       # Python dependencies
 ├── 0-setup.ps1            # Automated setup script
-├── 1-benchmark.ps1        # PowerShell launcher for benchmark.py
+├── 9-benchmark.ps1        # PowerShell launcher for benchmark.py
 ├── 2-test.ps1             # Test runner
-├── 3-config.ps1           # Character discovery & game setup (NEW)
-├── 4-extract.ps1          # Extract .rpy → YAML/JSON (NEW)
-├── 5-translate.ps1        # Interactive launcher (selects model, language, game)
-├── 6-correct.ps1          # Interactive launcher for grammar correction
-├── 7-merge.ps1            # Merge YAML/JSON → .rpy (NEW)
+├── 1-config.ps1           # Character discovery & game setup (NEW)
+├── 2-extract.ps1          # Extract .rpy → YAML/JSON (NEW)
+├── 3-translate.ps1        # Interactive launcher (selects model, language, game)
+├── 4-correct.ps1          # Interactive launcher for grammar correction
+├── 5-merge.ps1            # Merge YAML/JSON → .rpy (NEW)
 ├── PIPELINE_USAGE.md      # Modular pipeline user guide (NEW)
 ├── MODULARISATION_PLAN.md # Technical specification (NEW)
 └── IMPLEMENTATION_SUMMARY.md # Implementation details (NEW)
