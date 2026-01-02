@@ -1,7 +1,7 @@
 """
-Integration Test: MBART-En-Ro Model Translation
+Integration Test: SeamlessM4T-v2 Model Translation
 
-This test verifies that the MBARTTranslator can successfully translate a simple phrase
+This test verifies that the SeamlessM4Tv2Translator can successfully translate a simple phrase
 from English to Romanian. It's a lightweight check to ensure the model loads
 and produces the expected output.
 """
@@ -22,23 +22,22 @@ from tests.utils import (BaseTranslatorIntegrationTest, get_test_device,
                          skip_if_transformers_unavailable, safe_init_translator)
 
 # Import the specific translator and its related flags
-from mbart_translator import MBARTTranslator, TRANSFORMERS_AVAILABLE, IMPORT_ERROR
+from seamless96_translator import SeamlessM4Tv2Translator, TRANSFORMERS_AVAILABLE, IMPORT_ERROR
 
 
-class TestMBARTIntegration(BaseTranslatorIntegrationTest):
+class TestSeamlessM4TIntegration(BaseTranslatorIntegrationTest):
 
     @classmethod
     def setUpClass(cls):
         """Set up the translator instance once for all tests in this class."""
         super().setUpClass()  # Call base class setup
 
-        skip_if_transformers_unavailable(TRANSFORMERS_AVAILABLE, IMPORT_ERROR, "MBARTTranslator")
+        skip_if_transformers_unavailable(TRANSFORMERS_AVAILABLE, IMPORT_ERROR, "SeamlessM4Tv2Translator")
 
         cls.translator = safe_init_translator(
-            translator_class=MBARTTranslator,
-            translator_name="MBARTTranslator",
+            translator_class=SeamlessM4Tv2Translator,
+            translator_name="SeamlessM4Tv2Translator",
             init_kwargs={
-                'model_path': 'facebook/mbart-large-en-ro',  # Use default HuggingFace model
                 'target_language': 'Romanian',
                 'lang_code': 'ro',
                 'device': get_test_device()
@@ -47,12 +46,11 @@ class TestMBARTIntegration(BaseTranslatorIntegrationTest):
 
     def test_translate_hello_world(self):
         """
-        Tests translation of "Hello World!" to Romanian.
+        Tests translation of a simple phrase to Romanian.
         """
-        english_text = "Hello World!"
-        # MBART translates "Hello World!" - expected output may vary
-        # This is a placeholder - update after first successful run
-        expected_romanian = "Bună lumea!"
+        english_text = "The quick brown fox jumps over the lazy dog."
+        # SeamlessM4T-v2 expected translation (update after first successful run)
+        expected_romanian = "Vulpea maro rapidă sare peste câinele leneș."
 
         self._assert_translation(english_text, expected_romanian)
 

@@ -3,10 +3,9 @@
 
 # Core ML/Translation
 torch>=2.1.0
-unsloth>=2024.1
 llama-cpp-python>=0.2.0
 transformers>=4.35.0
-peft>=0.6.0
+sacremoses>=0.1.0
 
 # HuggingFace Hub
 huggingface-hub>=0.19.0

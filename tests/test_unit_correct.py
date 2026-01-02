@@ -17,8 +17,8 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 sys.path.insert(0, str(project_root / "scripts"))
 
-# The script being tested is correct_with_aya23.py, but we import its classes
-from correct_with_aya23 import PatternBasedCorrector, CombinedCorrector, RenpyFileCorrector
+# The script being tested is correct.py, but we import its classes
+from correct import PatternBasedCorrector, CombinedCorrector, RenpyFileCorrector
 
 # --- Test Data ---
 

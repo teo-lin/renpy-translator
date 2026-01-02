@@ -5,6 +5,7 @@ Uses Hugging Face transformers for translation with 400+ language support.
 Optimized for broad language coverage including rare and low-resource languages.
 """
 
+import warnings
 from pathlib import Path
 
 # Try to import transformers dependencies
@@ -114,34 +115,38 @@ class MADLAD400Translator:
         print(f"  Device: {device}")
         print(f"  Loading model... This may take 30-60 seconds...")
 
+        # Suppress non-critical warnings
+        warnings.filterwarnings("ignore", message=".*device_map.*", category=UserWarning)
+        warnings.filterwarnings("ignore", message=".*swigvarlink.*", category=DeprecationWarning)
+
+        # Use local model path
+        project_root = Path(__file__).parent.parent.parent
+        model_path = project_root / "models" / "madlad400"
+
         # Load model and tokenizer
-        model_name = "google/madlad400-3b-mt"
         if unsloth:
             from unsloth import FastLanguageModel
             self.model, self.tokenizer = FastLanguageModel.from_pretrained(
-                model_name = model_name,
+                model_name=str(model_path),
                 trust_remote_code=trust_remote_code
             )
         else:
-            self.tokenizer = T5Tokenizer.from_pretrained(model_name)
+            self.tokenizer = T5Tokenizer.from_pretrained(model_path)
 
-            # Use memory-efficient loading to avoid paging file errors
-            # Configure 8-bit quantization for reduced memory usage
+            # Use memory-efficient loading with float16 (like other models)
+            # NOTE: We avoid device_map="auto" for MADLAD because the large vocabulary (400 languages)
+            # causes it to incorrectly offload layers to CPU even when GPU has enough memory
             try:
-                print("  Attempting 8-bit quantization for reduced memory usage...")
-                quantization_config = BitsAndBytesConfig(
-                    load_in_8bit=True,
-                    llm_int8_threshold=6.0
-                )
                 self.model = T5ForConditionalGeneration.from_pretrained(
-                    model_name,
+                    model_path,
                     trust_remote_code=trust_remote_code,
-                    quantization_config=quantization_config,
-                    device_map="auto",  # Automatically manages memory across CPU/GPU
+                    torch_dtype=torch.float16 if device == "cuda" else torch.float32
                 )
-                print("  [OK] Using 8-bit quantization")
-            except OSError as e:
-                if "paging file" in str(e).lower() or "1455" in str(e):
+                # Manually move to device (more reliable than device_map for this model)
+                self.model = self.model.to(self.device)
+            except (OSError, RuntimeError) as e:
+                error_msg = str(e).lower()
+                if "paging file" in error_msg or "1455" in error_msg:
                     # Windows paging file error
                     raise MemoryError(
                         f"MADLAD-400-3B requires more memory than currently available.\n"
@@ -152,29 +157,19 @@ class MADLAD400Translator:
                         f"  3. Uncheck 'Automatically manage paging file'\n"
                         f"  4. Set custom size: Initial=16384MB, Maximum=32768MB\n"
                         f"  5. Click Set, then OK, and restart your computer\n\n"
-                        f"Alternative: Use a smaller model like LLMic-3B or QuickMT-En-Ro instead."
+                        f"Alternative: Use a smaller model like QuickMT-En-Ro or MBART instead."
+                    )
+                elif "out of memory" in error_msg or "cuda" in error_msg:
+                    raise MemoryError(
+                        f"MADLAD-400-3B requires more GPU memory than available.\n"
+                        f"Your GPU may not have enough VRAM for this model (needs ~6-7GB).\n\n"
+                        f"SOLUTIONS:\n"
+                        f"  1. Close other applications using GPU memory\n"
+                        f"  2. Use a smaller model like Helsinki-Ro, MBART, or SeamlessM4T\n"
+                        f"  3. Use CPU mode (slower): set device='cpu' in config"
                     )
                 else:
                     raise
-            except Exception as e:
-                print(f"  [WARN] 8-bit loading failed: {e}")
-                print("  [INFO] Falling back to float16...")
-                try:
-                    self.model = T5ForConditionalGeneration.from_pretrained(
-                        model_name,
-                        trust_remote_code=trust_remote_code,
-                        low_cpu_mem_usage=True,
-                        device_map="auto",
-                        dtype=torch.float16 if device == "cuda" else torch.float32
-                    )
-                except OSError as e2:
-                    if "paging file" in str(e2).lower() or "1455" in str(e2):
-                        raise MemoryError(
-                            f"MADLAD-400-3B requires more memory than currently available.\n"
-                            f"Please increase your Windows paging file size (see error above)."
-                        )
-                    raise
-            # Note: Don't call .to(device) when using device_map="auto"
 
         self.model.eval()
         print("Model loaded successfully!")
@@ -239,19 +234,23 @@ class MADLAD400Translator:
         inputs = self.tokenizer(input_text, return_tensors="pt")
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
+        # Debug: Print first translation attempt
+        import os
+        if os.getenv('DEBUG_MADLAD'):
+            print(f"[DEBUG] Input text: {input_text}")
+            print(f"[DEBUG] Input tokens shape: {inputs['input_ids'].shape}")
+            print(f"[DEBUG] Device: {self.device}")
+            print(f"[DEBUG] Model device: {next(self.model.parameters()).device}")
+
         # Generate translation
         with torch.no_grad():
-            # Use greedy decoding for better quality (num_beams=1)
-            # early_stopping only works with beam search (num_beams > 1)
-            gen_kwargs = {
-                "max_new_tokens": max_length,
-                "do_sample": False,
-            }
-            if num_beams > 1:
-                gen_kwargs["num_beams"] = num_beams
-                gen_kwargs["early_stopping"] = True
+            # Use simple generation (following HuggingFace docs pattern)
+            # NOTE: MADLAD works best with minimal generation parameters
+            outputs = self.model.generate(input_ids=inputs['input_ids'])
 
-            outputs = self.model.generate(**inputs, **gen_kwargs)
+        if os.getenv('DEBUG_MADLAD'):
+            print(f"[DEBUG] Output tokens shape: {outputs.shape}")
+            print(f"[DEBUG] Output tokens: {outputs[0][:20]}")  # First 20 tokens
 
         # Decode translation
         translation = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
@@ -261,15 +260,6 @@ class MADLAD400Translator:
 
         # Clean up translation
         translation = translation.strip()
-
-        # MADLAD sometimes generates extra text beyond the translation
-        # Extract just the first sentence if there's punctuation
-        if '!' in translation:
-            translation = translation.split('!')[0] + '!'
-        elif '.' in translation:
-            translation = translation.split('.')[0] + '.'
-        elif '?' in translation:
-            translation = translation.split('?')[0] + '?'
 
         return translation
 

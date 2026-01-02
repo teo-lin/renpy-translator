@@ -22,7 +22,7 @@ from tests.utils import (BaseTranslatorIntegrationTest, get_test_device,
                          skip_if_transformers_unavailable, safe_init_translator)
 
 # Import the specific translator and its related flags
-from quickmt_translator import QuickMTTranslator, TRANSFORMERS_AVAILABLE, IMPORT_ERROR
+from helsinkyRo_translator import QuickMTTranslator, TRANSFORMERS_AVAILABLE, IMPORT_ERROR
 
 
 class TestQuickMTIntegration(BaseTranslatorIntegrationTest):
@@ -38,7 +38,7 @@ class TestQuickMTIntegration(BaseTranslatorIntegrationTest):
             translator_class=QuickMTTranslator,
             translator_name="QuickMTTranslator",
             init_kwargs={
-                'model_path': 'Helsinki-NLP/opus-mt-en-ro',  # Use default HuggingFace model
+                'model_path': 'models/helsinkiRo',  # Use default HuggingFace model
                 'target_language': 'Romanian',
                 'lang_code': 'ro',
                 'device': get_test_device()
@@ -47,11 +47,10 @@ class TestQuickMTIntegration(BaseTranslatorIntegrationTest):
 
     def test_translate_hello_world(self):
         """
-        Tests translation of "Hello World!" to Romanian.
+        Tests translation of a simple phrase to Romanian.
         """
-        english_text = "Hello World!"
-        # QuickMT (Marian) translates "Hello World!" to "Bună, lume!"
-        expected_romanian = "Bună, lume!"
+        english_text = "The quick brown fox jumps over the lazy dog."
+        expected_romanian = "Vulpea maro rapidă sare peste câinele leneş."
 
         self._assert_translation(english_text, expected_romanian)
 

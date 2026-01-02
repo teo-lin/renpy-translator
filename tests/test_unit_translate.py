@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 from models import ParsedBlock, is_separator_block, parse_block_id
-from translate_modular import ModularBatchTranslator
+from translate import ModularBatchTranslator
 
 
 class MockTranslator:

@@ -5,9 +5,8 @@
 | `test_e2e_aya23.py` | ✅ | ✅ | ✅ Aya-23 | | ✅ | ✅ Mod |
 | `test_e2e_madlad.py` | ✅ | ✅ | ✅ Madlad | | ✅ | ✅ Mod |
 | `test_e2e_seamlessm4t.py`| ✅ | ✅ | ✅ Seamless | | ✅ | ✅ Mod |
-| `test_e2e_llmic.py` | ✅ | ✅ | ⚠️ LLMic | | ✅ | ⚠️ Mod (Pending) |
-| `test_e2e_mbart.py` | ✅ | ✅ | ⚠️ MBART | | ✅ | ⚠️ Mod (Pending) |
-| `test_e2e_quickmt.py` | ✅ | ✅ | ⚠️ QuickMT | | ✅ | ⚠️ Mod (Pending) |
+| `test_e2e_mbart.py` | ✅ | ✅ | ✅ MBART | | ✅ | ✅ Mod |
+| `test_e2e_quickmt.py` | ✅ | ✅ | ✅ QuickMT | | ✅ | ✅ Mod |
 | `test_e2e_example_game.py` | ✅ | ✅ | ✅ Any | | ✅ | ⚠️ Mod (PS) |
 | `test_e2e_translate_aio.py` | | | ✅ Any | | | ⚠️ AIO |
 | `test_e2e_translate_aio_uncensored.py`| | | ✅ Any | | | ⚠️ AIO |
@@ -63,10 +62,9 @@
 
 **YAML/JSON test data**: Parsed YAML should contain **clean text without tags** (tags are stripped during extraction). Tags are stored separately in the JSON file and restored during merge.
 
-**Pending translator implementations**: Tests for `test_e2e_llmic.py`, `test_e2e_mbart.py`, and `test_e2e_quickmt.py` require translator implementations:
-  - `src/translators/llmic_translator.py` (LLMicTranslator)
-  - `src/translators/mbart_translator.py` (MBARTTranslator)
-  - `src/translators/quickmt_translator.py` (QuickMTTranslator)
+**All translator implementations complete**: All working models (MBART, QuickMT, MADLAD, SeamlessM4T, Aya-23) have been implemented and tested.
+
+**LLMic removed**: The LLMic-3B model was removed due to non-functional translation. See `models/MODELS.md` for details.
 
   These tests will skip with a helpful message if the translator module is not available.
 

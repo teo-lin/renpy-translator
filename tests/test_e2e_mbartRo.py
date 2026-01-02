@@ -1,16 +1,16 @@
 """
-End-to-End Test: Full Modular Pipeline with LLMic-3B Model
+End-to-End Test: Full Modular Pipeline with MBART-En-Ro Model
 
-This test runs the complete modular translation pipeline with the LLMic-3B model:
+This test runs the complete modular translation pipeline with the MBART-En-Ro model:
 - Step 1: Config (discover characters from .rpy files → characters.json)
 - Step 2: Extract (.rpy → .parsed.yaml + .tags.json)
-- Step 3: Translate (ModularBatchTranslator + LLMicTranslator)
+- Step 3: Translate (ModularBatchTranslator + MBARTTranslator)
 - Step 4: Merge (.parsed.yaml + .tags.json → .translated.rpy)
 - Step 5: Validate and cleanup
 
 Usage:
-    python tests/test_e2e_llmic.py
-    python tests/test_e2e_llmic.py --file 1    # Process specific file by number
+    python tests/test_e2e_mbart.py
+    python tests/test_e2e_mbart.py --file 1    # Process specific file by number
 """
 
 import sys
@@ -35,14 +35,14 @@ sys.path.insert(0, str(project_root / "tests"))
 from extract import RenpyExtractor
 from merger import RenpyMerger
 
-# Try to import LLMicTranslator
+# Try to import MBARTTranslator
 try:
-    from llmic_translator import LLMicTranslator
-    from translate_modular import ModularBatchTranslator
+    from mbartRo_translator import MBARTTranslator
+    from translate import ModularBatchTranslator
     TRANSLATOR_AVAILABLE = True
 except ImportError as e:
-    print(f"[WARN] LLMicTranslator not available: {e}")
-    print("[INFO] This test requires src/translators/llmic_translator.py to be implemented")
+    print(f"[WARN] MBARTTranslator not available: {e}")
+    print("[INFO] This test requires src/translators/mbart_translator.py to be implemented")
     TRANSLATOR_AVAILABLE = False
 
 from utils import (
@@ -52,13 +52,12 @@ from utils import (
 
 # Test configuration
 example_dir = project_root / "games" / "Example" / "game" / "tl" / "romanian"
-# LLMic uses Hugging Face models (auto-downloaded, no local path needed)
-model_name = "faur-ai/LLMic"
+model_path = project_root / "models" / "mbartRo"
 
 
 def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dict]:
     """
-    Test the full e2e pipeline on a single .rpy file with LLMic-3B model.
+    Test the full e2e pipeline on a single .rpy file with MBART-En-Ro model.
 
     Args:
         rpy_file: Path to .rpy file to test
@@ -122,21 +121,21 @@ def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dic
         print(f"[OK] Created: {parsed_yaml.name}")
         print(f"[OK] Created: {tags_json.name}")
 
-        # Step 3: Translate with LLMic-3B model
-        print("\n[3/5] Translating with LLMic-3B model...")
-        print(f"[INFO] Using model: {model_name}")
+        # Step 3: Translate with MBART model
+        print("\n[3/5] Translating with MBART-En-Ro model...")
+        print(f"[INFO] Loading model from: {model_path}")
 
-        # Initialize LLMic translator
-        try:
-            translator = LLMicTranslator(
-                target_language='Romanian',
-                model_name=model_name
-            )
-        except ImportError as e:
-            print(f"[FAIL] Cannot load LLMicTranslator: {e}")
-            print("[INFO] This is likely due to triton/torch version incompatibility")
-            print("[INFO] See: https://github.com/pytorch/ao/issues/2919")
+        # Check if model exists
+        if not model_path.exists():
+            print(f"[FAIL] Model not found: {model_path}")
+            print("[INFO] Please download the MBART-En-Ro model first")
             return False, stats
+
+        # Initialize MBART translator
+        translator = MBARTTranslator(
+            model_path=str(model_path),
+            target_language='Romanian'
+        )
 
         # Create batch translator
         batch_translator = ModularBatchTranslator(
@@ -222,7 +221,7 @@ def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dic
         print(f"  - Initial translations: {initial_count}")
         print(f"  - Translations added: {stats['translations_added']}")
         print(f"  - Final translations: {final_count}")
-        print(f"  - Pipeline: Config → Extract → Translate (LLMic-3B) → Merge ✓")
+        print(f"  - Pipeline: Config → Extract → Translate (MBART-En-Ro) → Merge ✓")
         print("=" * 70)
 
         stats['success'] = True
@@ -246,21 +245,27 @@ def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dic
 
 def test_e2e_pipeline() -> bool:
     """
-    Test the full e2e pipeline with LLMic-3B model.
+    Test the full e2e pipeline with MBART-En-Ro model.
 
     Returns:
         True if test passed, False otherwise
     """
     print("\n" + "=" * 70)
-    print("  E2E TEST: LLMic-3B Modular Pipeline")
+    print("  E2E TEST: MBART-En-Ro Modular Pipeline")
     print("=" * 70)
-    print(f"[INFO] Using Hugging Face model: {model_name}")
-    print("[INFO] Model will be auto-downloaded if not cached")
 
     # Check if translator is available
     if not TRANSLATOR_AVAILABLE:
-        print("\n[SKIP] LLMicTranslator not implemented")
-        print("[INFO] Please implement src/translators/llmic_translator.py first")
+        print("\n[SKIP] MBARTTranslator not implemented")
+        print("[INFO] Please implement src/translators/mbart_translator.py first")
+        print("[INFO] Expected API: MBARTTranslator(model_path, target_language)")
+        return False
+
+    # Check if model exists
+    if not model_path.exists():
+        print(f"\n[SKIP] Model not found: {model_path}")
+        print("[INFO] Please download the MBART-En-Ro model to run this test")
+        print("[INFO] Expected location: models/mbart-large-en-ro/")
         return False
 
     # Get .rpy files to test
@@ -271,7 +276,7 @@ def test_e2e_pipeline() -> bool:
         return False
 
     # Parse arguments for file selection
-    parser = argparse.ArgumentParser(description="E2E test with LLMic-3B model")
+    parser = argparse.ArgumentParser(description="E2E test with MBART-En-Ro model")
     parser.add_argument("--file", type=int, help="Process specific file by number (1-based index)")
     args = parser.parse_args()
 

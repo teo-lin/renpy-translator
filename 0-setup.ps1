@@ -12,6 +12,10 @@ param(
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
+# Set HuggingFace home to local models directory
+$env:HF_HOME = Join-Path $PSScriptRoot "models"
+Write-Host "Hugging Face cache set to: $($env:HF_HOME)" -ForegroundColor DarkGray
+
 Write-Host "=====================================================================" -ForegroundColor Cyan
 Write-Host "  Ren'Py Translation System - Setup Script" -ForegroundColor Cyan
 Write-Host "=====================================================================" -ForegroundColor Cyan
@@ -466,6 +470,9 @@ if (-not $SkipModel) {
     $installedModelKeys = $selectedModels | ForEach-Object { $_.Key }
     $modelsConfig.installed_models = $installedModelKeys
 
+    # Add selected languages to the config
+    $modelsConfig | Add-Member -MemberType NoteProperty -Name "installed_languages" -Value $selectedLanguages -Force
+
     # Save updated models_config.json
     $modelsConfig | ConvertTo-Json -Depth 4 | Set-Content -Path $configFile -Encoding UTF8
 
@@ -606,7 +613,7 @@ if (-not $SkipPython) {
     $needsLlamaCpp = $false
     if ($selectedModels) {
         foreach ($model in $selectedModels) {
-            if ($model.Key -eq "aya-23-8b" -or $model.Key -eq "orion-14b") {
+            if ($model.Key -eq "aya23" -or $model.Key -eq "orion-14b") {
                 $needsLlamaCpp = $true
                 break
             }
@@ -765,8 +772,8 @@ if (-not $SkipModel -and $selectedModels) {
         if ($modelConfig.huggingface_download) {
             # MADLAD-400-3B uses transformers auto-download
             $modelPath = Join-Path $scriptDir $modelConfig.destination
-            if (Test-Path $modelPath) {
-                Write-Host "    Already downloaded" -ForegroundColor Gray
+            if ((Test-Path $modelPath) -and (Get-ChildItem -Path $modelPath)) {
+                Write-Host "    Already downloaded to: $modelPath" -ForegroundColor Gray
             } else {
                 Write-Host "    Repository: $($modelConfig.repo)" -ForegroundColor Gray
                 Write-Host "    Size: $($modelConfig.size)" -ForegroundColor Gray
@@ -780,18 +787,17 @@ if (-not $SkipModel -and $selectedModels) {
                 $modelPathUnix = $modelPath -replace '\\', '/'
                 & $venvPython -c "from transformers import AutoModelForSeq2SeqLM, AutoTokenizer; model = AutoModelForSeq2SeqLM.from_pretrained('$($modelConfig.repo)'); tokenizer = AutoTokenizer.from_pretrained('$($modelConfig.repo)'); model.save_pretrained('$modelPathUnix'); tokenizer.save_pretrained('$modelPathUnix')"
 
-                if (Test-Path $modelPath) {
-                    Write-Host "    Downloaded successfully!" -ForegroundColor Green
+                if ((Test-Path $modelPath) -and (Get-ChildItem -Path $modelPath)) {
+                    Write-Host "    Downloaded successfully to: $modelPath" -ForegroundColor Green
                 } else {
-                    Write-Host "    WARNING: Download may have failed" -ForegroundColor Yellow
+                    Write-Host "    WARNING: Download may have failed for $modelPath" -ForegroundColor Yellow
                 }
             }
         } else {
             # Aya-23-8B uses GGUF file download
             $modelPath = Join-Path $scriptDir $modelConfig.destination
-
             if (Test-Path $modelPath) {
-                Write-Host "    Already downloaded" -ForegroundColor Gray
+                Write-Host "    Already downloaded to: $modelPath" -ForegroundColor Gray
             } else {
                 Write-Host "    File: $($modelConfig.file)" -ForegroundColor Gray
                 Write-Host "    Size: $($modelConfig.size)" -ForegroundColor Gray
@@ -807,7 +813,7 @@ if (-not $SkipModel -and $selectedModels) {
                 & $venvPython -c "from huggingface_hub import hf_hub_download; hf_hub_download(repo_id='$($modelConfig.repo)', filename='$($modelConfig.file)', local_dir='$modelDirUnix')"
 
                 if (Test-Path $modelPath) {
-                    Write-Host "    Downloaded successfully!" -ForegroundColor Green
+                    Write-Host "    Downloaded successfully to: $modelPath" -ForegroundColor Green
                 } else {
                     Write-Host "    ERROR: Download failed" -ForegroundColor Red
                     exit 1

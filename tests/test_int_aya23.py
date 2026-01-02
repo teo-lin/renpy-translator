@@ -25,7 +25,7 @@ from aya23_translator import Aya23Translator
 
 
 # Test configuration
-MODEL_SUBDIR = "aya-23-8B-GGUF"
+MODEL_SUBDIR = "aya23"
 MODEL_FILENAME = "aya-23-8B-Q4_K_M.gguf"
 
 
@@ -51,11 +51,10 @@ class TestAya23Integration(BaseTranslatorIntegrationTest):
 
     def test_translate_hello_world(self):
         """
-        Tests translation of "Hello World!" to Romanian.
+        Tests translation of a simple phrase to Romanian.
         """
-        english_text = "Hello World!"
-        # Aya-23 translates "Hello World!" to "Bună ziua!"
-        expected_romanian = "Bună ziua!"
+        english_text = "The quick brown fox jumps over the lazy dog."
+        expected_romanian = "Foxul brun rapid sare peste câinele leneș."
 
         self._assert_translation(english_text, expected_romanian)
 

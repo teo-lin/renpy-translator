@@ -10,6 +10,9 @@ param(
 # Import common functions
 . "$PSScriptRoot\scripts\common.ps1"
 
+# Set HuggingFace home to local models directory
+$env:HF_HOME = Join-Path $PSScriptRoot "models"
+
 function Show-Banner {
     Write-Host ""
     Write-Host "" -ForegroundColor Cyan
@@ -56,29 +59,33 @@ function Select-Game {
 }
 
 function Select-Language {
-    param([string]$GamePath)
-
     Write-Host "[Language] Available Languages:" -ForegroundColor Yellow
     Write-Host ""
 
-    $tlDir = Join-Path $GamePath "game\tl"
-    if (-not (Test-Path $tlDir)) {
-        Write-Host "   no translation folders found in game!" -ForegroundColor Red
+    $modelsConfigPath = Join-Path $PSScriptRoot "models\models_config.json"
+    if (-not (Test-Path $modelsConfigPath)) {
+        Write-Host "Models configuration not found at $modelsConfigPath. Please run 0-setup.ps1." -ForegroundColor Red
+        exit 1
+    }
+    $modelsConfig = Get-Content $modelsConfigPath -Raw | ConvertFrom-Json
+
+    if (-not $modelsConfig.installed_languages -or $modelsConfig.installed_languages.Count -eq 0) {
+        Write-Host "No languages configured in models_config.json. Please run 0-setup.ps1 and select languages." -ForegroundColor Red
         exit 1
     }
 
-    $languages = Get-ChildItem -Path $tlDir -Directory
-
-    if ($languages.Count -eq 0) {
-        Write-Host "   no language folders found!" -ForegroundColor Red
-        exit 1
-    }
+    $languages = $modelsConfig.installed_languages
 
     for ($i = 0; $i -lt $languages.Count; $i++) {
-        Write-Host "   [$($i + 1)] $($languages[$i].name)" -ForegroundColor Cyan
+        Write-Host "   [$($i + 1)] $($languages[$i].Name) ($($languages[$i].Code))" -ForegroundColor Cyan
     }
 
     Write-Host ""
+    if ($languages.Count -eq 1) {
+        Write-Host "Auto-selecting the only available language: $($languages[0].Name)" -ForegroundColor Green
+        return $languages[0].Code
+    }
+
     $selection = Read-Host "Select language (1-$($languages.Count))"
 
     try {
@@ -87,7 +94,7 @@ function Select-Language {
             Write-Host "Invalid selection!" -ForegroundColor Red
             exit 1
         }
-        return $languages[$index].name
+        return $languages[$index].Code
     } catch {
         Write-Host "Invalid input!" -ForegroundColor Red
         exit 1
@@ -142,7 +149,7 @@ function Select-Model {
     if ($installedModels.Count -eq 1) {
         $selectedModel = $installedModels[0]
         Write-Host "Auto-selecting the only installed model: $($selectedModel.Name)" -ForegroundColor Green
-        return $selectedModel.Name
+        return $selectedModel.Key
     }
 
     # Get user selection
@@ -151,7 +158,7 @@ function Select-Model {
     try {
         $index = [int]$selection - 1
         if ($index -ge 0 -and $index -lt $installedModels.Count) {
-            return $installedModels[$index].Name
+            return $installedModels[$index].Key
         }
         else {
             Write-Host "Invalid selection!" -ForegroundColor Red
@@ -384,16 +391,14 @@ if (Test-Path $configPath) {
 
 # Step 1: Select Game
 if ($GamePath -eq "") {
-    # Use configured game if available
+    # Show current config if available
     if ($currentGameConfig) {
-        $Gamename = $currentGameConfig.name
-        $GamePath = $currentGameConfig.path
-        Write-Host "[Config] Using configured game: $Gamename" -ForegroundColor Cyan
-    } else {
-        $selectedGame = Select-Game
-        $GamePath = $selectedGame.Fullname
-        $Gamename = $selectedGame.name
+        Write-Host "[Config] Current configured game: $($currentGameConfig.name)" -ForegroundColor Gray
+        Write-Host ""
     }
+    $selectedGame = Select-Game
+    $GamePath = $selectedGame.Fullname
+    $Gamename = $selectedGame.name
 } else {
     $Gamename = Split-Path $GamePath -Leaf
 }
@@ -404,13 +409,12 @@ Write-Host ""
 
 # Step 2: Select Language
 if ($Language -eq "") {
-    # Use configured language if available
+    # Show current config if available
     if ($currentGameConfig -and $currentGameConfig.target_language) {
-        $Language = $currentGameConfig.target_language
-        Write-Host "[Config] Using configured language: $Language" -ForegroundColor Cyan
-    } else {
-        $Language = Select-Language -GamePath $GamePath
+        Write-Host "[Config] Current configured language: $($currentGameConfig.target_language)" -ForegroundColor Gray
+        Write-Host ""
     }
+    $Language = Select-Language
 }
 
 Write-Host "[Language] Selected language: $Language" -ForegroundColor Green
@@ -418,16 +422,31 @@ Write-Host ""
 
 # Step 3: Select Model
 if ($Model -eq "") {
-    # Use configured model if available
+    # Show current config if available
     if ($currentGameConfig -and $currentGameConfig.model) {
-        $Model = $currentGameConfig.model
-        Write-Host "[Config] Using configured model: $Model" -ForegroundColor Cyan
-    } else {
-        $Model = Select-Model
+        # Load model name for display
+        $modelsConfigPath = Join-Path $PSScriptRoot "models\models_config.json"
+        $modelsConfig = Get-Content $modelsConfigPath -Raw | ConvertFrom-Json
+        $currentModelConfig = $modelsConfig.available_models.($currentGameConfig.model)
+        if ($currentModelConfig) {
+            Write-Host "[Config] Current configured model: $($currentModelConfig.name) ($($currentGameConfig.model))" -ForegroundColor Gray
+        } else {
+            Write-Host "[Config] Current configured model: $($currentGameConfig.model)" -ForegroundColor Gray
+        }
+        Write-Host ""
     }
+    $Model = Select-Model
 }
 
-Write-Host "[Model] Selected model: $Model" -ForegroundColor Green
+# Display selected model with friendly name
+$modelsConfigPath = Join-Path $PSScriptRoot "models\models_config.json"
+$modelsConfig = Get-Content $modelsConfigPath -Raw | ConvertFrom-Json
+$selectedModelConfig = $modelsConfig.available_models.$Model
+if ($selectedModelConfig) {
+    Write-Host "[Model] Selected model: $($selectedModelConfig.name) ($Model)" -ForegroundColor Green
+} else {
+    Write-Host "[Model] Selected model: $Model" -ForegroundColor Green
+}
 
 # Step 4: Discover Characters
 $tlPath = Join-Path $GamePath "game\tl\$Language"

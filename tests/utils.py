@@ -12,6 +12,7 @@ Provides reusable functions for:
 import re
 import shutil
 import sys
+import time
 import unittest
 from pathlib import Path
 from typing import Dict, List, TypeVar, Type, Callable, Any
@@ -285,6 +286,7 @@ class BaseTranslatorIntegrationTest(unittest.TestCase):
     """
     project_root = Path(__file__).parent.parent
     translator: _TranslatorType = None # Type hint for the translator instance
+    _test_start_time: float = None  # Track test start time for timing measurements
 
     @classmethod
     def setUpClass(cls):
@@ -294,6 +296,7 @@ class BaseTranslatorIntegrationTest(unittest.TestCase):
         their specific translator.
         """
         print(f"\nSetting up test environment for {cls.__name__}...")
+        cls._test_start_time = time.time()
 
     @classmethod
     def tearDownClass(cls):
@@ -313,18 +316,29 @@ class BaseTranslatorIntegrationTest(unittest.TestCase):
         """
         return self.project_root / "models" / model_subdir / model_filename
 
-    def _assert_translation(self, english_text: str, expected_romanian: str):
+    def _assert_translation(self, english_text: str, expected_romanian: str, **translate_kwargs):
         """
-        Helper method for common translation assertion.
+        Helper method for common translation assertion with timing.
+
+        Args:
+            english_text: Text to translate
+            expected_romanian: Expected translation
+            **translate_kwargs: Additional arguments to pass to translate() (e.g., temperature=0)
         """
         print(f"Translating: '{english_text}'")
-        translation = self.translator.translate(english_text)
+
+        # Time the translation
+        start_time = time.time()
+        translation = self.translator.translate(english_text, **translate_kwargs)
+        elapsed_time = time.time() - start_time
+
         # Handle Unicode characters on Windows console (cp1252 encoding)
         try:
-            print(f"Received translation: '{translation}'")
+            print(f"Received translation: '{translation}' (took {elapsed_time:.3f}s)")
         except UnicodeEncodeError:
             # Use ASCII representation for characters that can't be printed
-            print("Received translation:", ascii(translation))
+            print(f"Received translation: {ascii(translation)} (took {elapsed_time:.3f}s)")
+
         self.assertEqual(translation, expected_romanian)
 
 

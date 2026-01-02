@@ -5,6 +5,7 @@ Uses Hugging Face transformers for translation with Meta's latest multimodal mod
 Optimized for high-quality text translation with nearly 100 languages supported.
 """
 
+import warnings
 from pathlib import Path
 
 # Try to import transformers dependencies
@@ -118,23 +119,32 @@ class SeamlessM4Tv2Translator:
             device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = device
 
-        # Default model
+        # Use local model path
+        project_root = Path(__file__).parent.parent.parent
         if model_name is None:
-            model_name = "facebook/seamless-m4t-v2-large"
-        self.model_name = model_name
+            model_path = project_root / "models" / "seamless96"
+        else:
+            model_path = Path(model_name)
+
+        self.model_name = str(model_path)
 
         print(f"Initializing SeamlessM4T-v2 Translation (EN->{target_language})...")
         print(f"  Language code: {lang_code} ({self.lang_code_3letter})")
         print(f"  Device: {device}")
-        print(f"  Model: {model_name}")
+        print(f"  Model: {model_path}")
         print(f"  Loading model... This may take 60-90 seconds...")
 
-        # Load processor and model
-        self.processor = AutoProcessor.from_pretrained(model_name)
+        # Suppress non-critical warnings
+        warnings.filterwarnings("ignore", message=".*SwigPy.*", category=DeprecationWarning)
+        warnings.filterwarnings("ignore", message=".*swigvarlink.*", category=DeprecationWarning)
+        warnings.filterwarnings("ignore", message=".*layer_idx.*", category=UserWarning)
+
+        # Load processor and model from local path
+        self.processor = AutoProcessor.from_pretrained(model_path)
 
         # Use memory-efficient loading to avoid paging file errors
         self.model = SeamlessM4Tv2Model.from_pretrained(
-            model_name,
+            model_path,
             low_cpu_mem_usage=True,  # Reduces RAM usage during loading
             device_map="auto",  # Automatically manages memory across CPU/GPU
             dtype=torch.float16 if device == "cuda" else torch.float32  # Use half precision on GPU
@@ -242,6 +252,10 @@ class SeamlessM4Tv2Translator:
 
         # Clean up translation
         translation = translation.strip()
+
+        # Fix for Romanian diacritics (s-cedilla to s-comma, t-cedilla to t-comma)
+        if self.lang_code == 'ro':
+            translation = translation.replace('ş', 'ș').replace('ţ', 'ț')
 
         return translation
 

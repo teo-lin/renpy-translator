@@ -35,7 +35,7 @@ sys.path.insert(0, str(project_root / "tests"))
 from extract import RenpyExtractor
 from merger import RenpyMerger
 from aya23_translator import Aya23Translator
-from translate_modular import ModularBatchTranslator
+from translate import ModularBatchTranslator
 from utils import (
     discover_characters, count_translations, backup_file,
     restore_file, cleanup_files, validate_rpy_structure, get_rpy_files
@@ -43,7 +43,7 @@ from utils import (
 
 # Test configuration
 example_dir = project_root / "games" / "Example" / "game" / "tl" / "romanian"
-model_path = project_root / "models" / "aya-23-8B-GGUF" / "aya-23-8B-Q4_K_M.gguf"
+model_path = project_root / "models" / "aya23" / "aya-23-8B-Q4_K_M.gguf"
 
 
 def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dict]:

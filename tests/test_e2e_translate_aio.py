@@ -13,8 +13,12 @@ sys.path.insert(0, str(project_root / "src" / "translators")) # Add translators 
 import re
 from translation_pipeline import RenpyTranslationPipeline, BaseTranslator
 from renpy_utils import RenpyTranslationParser
-from aya23_translator import Aya23Translator # Import the specific translator
-from madlad400_translator import MADLAD400Translator # Import MADLAD translator
+from aya23_translator import Aya23Translator
+from madlad400_translator import MADLAD400Translator
+from mbartRo_translator import MBARTTranslator
+from seamless96_translator import SeamlessM4Tv2Translator
+from helsinkyRo_translator import QuickMTTranslator
+
 
 
 class MockRenpyGame:
@@ -319,45 +323,60 @@ translate romanian test_2:
         print("\n✓ PASSED: Output format is valid Ren'Py format")
 
 
-def run_all_tests(model_script_path: Path, language: str):
+def run_all_tests(model_key: str, language: str):
     """Run complete end-to-end test suite"""
     print("\n" + "=" * 70)
     print("COMPREHENSIVE END-TO-END TEST SUITE")
     print("Testing Ren'Py Translation System")
+    print(f"Using model: {model_key}")
     print("=" * 70)
 
     results = []
 
-    # Initialize the translator backend once for all tests
-    # This will dynamically load the correct translator class (Aya23Translator or MADLAD400Translator)
-    # based on the model_script_path
-    translator_class_name = model_script_path.stem.replace('_translator', '').replace('translate_with_', '').capitalize() + "Translator"
-    translator_module_name = model_script_path.stem
+    # --- Translator Initialization ---
+    MODEL_MAP = {
+        "mbartRo": {
+            "class": MBARTTranslator,
+            "path": project_root / "models" / "mbartRo"
+        },
+        "seamlessm96": {
+            "class": SeamlessM4Tv2Translator,
+            "path": project_root / "models" / "seamless96"
+        },
+        "madlad400": {
+            "class": MADLAD400Translator,
+            "path": project_root / "models" / "madlad400"
+        },
+        "aya23": {
+            "class": Aya23Translator,
+            "path": project_root / "models" / "aya23" / "aya-23-8B-Q4_K_M.gguf"
+        },
+        "helsinkiRo": {
+            "class": QuickMTTranslator,
+            "path": project_root / "models" / "helsinkiRo"
+        }
+    }
 
-    sys.path.insert(0, str(model_script_path.parent.parent)) # Add src to path
-    sys.path.insert(0, str(model_script_path.parent)) # Add translators dir to path
+    model_info = MODEL_MAP.get(model_key)
+    if not model_info:
+        raise ValueError(f"Unsupported model key for this test: {model_key}")
 
-    # Dynamic import
-    translator_module = __import__(translator_module_name)
-    translator_backend_class = getattr(translator_module, translator_class_name)
-
-    # Default model path assumptions - need to be more dynamic
-    # This test is hardcoded for Aya-23-8B model
-    model_path = project_root / "models" / "aya-23-8B-GGUF" / "aya-23-8B-Q4_K_M.gguf"
+    model_path = model_info["path"]
     if not model_path.exists():
-        print("\n⚠ WARNING: Default model not found, skipping tests that require it.")
-        print(f"  Expected: {model_path}")
-        return False # Exit early if model isn't found
+        print(f"\n⚠ WARNING: Model not found for key '{model_key}', skipping tests.")
+        print(f"  Expected path: {model_path}")
+        return False
+
+    translator_class = model_info["class"]
+    translator_instance = translator_class(
+        model_path=str(model_path),
+        target_language=language,
+        glossary=None
+    )
+    # --- End Translator Initialization ---
 
     # Generic glossary path (can be overridden by specific tests)
     glossary_path = project_root / "data" / f"ro_glossary.json" # Adjust for target language
-
-    # Initialize the specific translator instance
-    translator_instance = translator_backend_class(
-        model_path=str(model_path),
-        target_language=language,
-        glossary=None # Glossary is handled by pipeline in these tests
-    )
 
 
     # Create a single temporary directory for all tests
@@ -433,15 +452,17 @@ def run_all_tests(model_script_path: Path, language: str):
 if __name__ == "__main__":
     # --- Argument Parsing ---
     parser = argparse.ArgumentParser(description="End-to-end tests for Ren'Py translation system.")
-    parser.add_argument("--model_script", type=str, required=True, help="Path to the Python translation script to use (e.g., scripts/aya23_translator.py).")
+    parser.add_argument("--model_key", type=str, required=True, help="Model key (e.g., 'mbart-en-ro').")
     parser.add_argument("--language", type=str, required=True, help="Target language code (e.g., 'ro').")
+    # The --model_script argument is now unused but kept for compatibility with the test runner
+    parser.add_argument("--model_script", type=str, required=False, help="[UNUSED] Path to the Python translation script.")
     args = parser.parse_args()
 
     # --- Debugging ---
     print(f"\nDEBUG: sys.argv = {sys.argv}")
-    print(f"DEBUG: args.model_script = {args.model_script}")
+    print(f"DEBUG: args.model_key = {args.model_key}")
     print(f"DEBUG: args.language = {args.language}")
 
     # Pass args to run_all_tests
-    success = run_all_tests(Path(args.model_script), args.language)
+    success = run_all_tests(args.model_key, args.language)
     sys.exit(0 if success else 1)

@@ -6,12 +6,11 @@ The core requirements are: Gramatically correct, culturally and contextually awa
 
 | Model | Type | Params (B, billions) | BLEU Score | Tatoeba Score | Flores Score | VRAM GB required | Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **[LLMic 3B](https://huggingface.co/faur-ai/LLMic)** | Bilingual Ro-En <br> safetensors | 3 | __41.01__ (WMT16) | | | 3.5 |👍 Best EN-RO BLEU score, massive RO corpus.<br>👎 Needs GGUF quantization.  Best RO-specific if quantized. |
 | **[Aya-23-8B](https://huggingface.co/cohere/aya-23-8B)** | Multilingual LLM <br> GGUF | 8 | | | 34.8 | 5.8 |👍 Uncensored, GGUF, 23 languages <br>👎 Slower, larger VRAM |
-| **[MBART-En-Ro](https://huggingface.co/facebook/mbart-large-en-ro)** | __Ro-Translation__ <br> safetensors | 0.6 | __38.0__ (WMT16) | | | 2 |👍 Largest RO-specific, good context.<br>👎 Smaller than multilinguals |
-| **[MADLAD-400](https://huggingface.co/google/madlad-400-3b-mt)** | Translations <br> safetensors | 3 | ~35.11 | | 38.4 | 4 |👍 Uncensored, safetensors, 400+ languages <br>👎 Requires `trust_remote_code`, lower quality for some languages |
-| **[SeamlessM4T-v2](https://huggingface.co/facebook/seamless-m4t-v2-large)** | Multimodal <br> safetensors | 2.3 | | | 38.8 | 5+ |👍 Most recent from Meta, better than NLLB.<br>👎 Includes unneeded speech features |
-| **[QuickMT-En-Ro](https://huggingface.co/quickmt/quickmt-en-ro)**| __Ro-Translation__ <br> safetensors | ? | | | 42.29 | 0.5 |👍 Most recent RO model (Oct 2024).<br>👎 Unproven, unknown architecture.  Experimental. |
+| **[MBART-Ro-1B](https://huggingface.co/facebook/mbart-large-en-ro)** | __Ro-Translation__ <br> safetensors | 0.6 | __38.0__ (WMT16) | | | 2 |👍 Largest RO-specific, good context.<br>👎 Smaller than multilinguals |
+| **[MADLAD-400-3B](https://huggingface.co/google/madlad-400-3b-mt)** | Translations <br> safetensors | 3 | ~35.11 | | 38.4 | 4 |👍 Uncensored, safetensors, 400+ languages <br>👎 Requires `trust_remote_code`, lower quality for some languages |
+| **[Seamless-96-2B](https://huggingface.co/facebook/seamless-m4t-v2-large)** | Multimodal <br> safetensors | 2.3 | | | 38.8 | 5+ |👍 Most recent from Meta, better than NLLB.<br>👎 Includes unneeded speech features |
+| **[Helsinki-Ro-0B](https://huggingface.co/Helsinki-NLP/opus-mt-en-ro)**| __Ro-Translation__ <br> safetensors | 0.075 | 34.0 (WMT16) | | | 0.3 |👍 Fast, lightweight Marian MT model.<br>👎 Smaller than MBART. Good for low VRAM. |
 | **[NLLB-200](https://huggingface.co/facebook/nllb-200-3.3B)** | Translations <br> safetensors | 3.3 | ~31.17 | | 37.5 | 4.5 |👍 Proven, stable, large community.<br>👎 Older model (2022).  Good for reliability. |
 | **[OPUS-MT-TC-Big](https://huggingface.co/Helsinki-NLP/opus-mt-tc-big-en-ro)**| Large OPUS <br> safetensors | 0.2 | 34.0 (Newstest2016) | 48.6 | 40.4 | 1 |👍 Good grammar for size, small footprint.<br>👎 Smaller than MBART, may be censored.  Good for low VRAM. |
 | **[Helsinki-Tatoeba](https://huggingface.co/Helsinki-NLP/opus-tatoeba-en-ro)**| Transformer-align <br> safetensors | 0.078 | 31.7 (Newstest2016) | 46.9 | | 0.2 |👍 Better than standard OPUS, tiny footprint.<br>👎 Small model, not for complex grammar.  Requires `>>ron<<` token. |
@@ -24,6 +23,24 @@ The core requirements are: Gramatically correct, culturally and contextually awa
 
 ---
 
+## Removed/Unsupported Models
+
+### LLMic-3B ❌ REMOVED
+**Reason:** Translation functionality non-operational
+
+While the [faur-ai/LLMic](https://huggingface.co/faur-ai/LLMic) model claims BLEU 41.01 on WMT16 EN-RO translation in its paper ([arXiv:2501.07721](https://arxiv.org/abs/2501.07721)), the publicly available Hugging Face model does not translate.
+
+**Issues encountered:**
+- Model generates random Romanian text unrelated to English input
+- Multiple prompt formats tested (parallel corpus, few-shot, instruction-based) - all failed
+- Model appears to be base pretrained version, not the translation-tuned variant
+- No documentation on Hugging Face for translation usage or prompt format
+- Suspected missing: translation adapter/LoRA or specific fine-tuned checkpoint
+
+**Status:** The translation-capable version referenced in the paper is not publicly available or requires undocumented configuration. Removed from available models until proper translation checkpoint is released.
+
+---
+
 ## Model Types Explained
 - **Multilingual LLM:** General-purpose Large Language Models trained on many languages (e.g., Aya, Orion). They are good at understanding context but are not exclusively built for translation.
 - **Instruct LLM:** A general-purpose LLM that has been fine-tuned to be good at following user commands or "instructions." Their translation ability varies.
@@ -33,34 +50,16 @@ The core requirements are: Gramatically correct, culturally and contextually awa
 - **OPUS / Transformer-align:** Architectures that are highly effective for translation. OPUS is a popular framework, and many models are built on it, sometimes with community fine-tuning.
 
 
-
-
-● ✅ SUCCESS! Option 3 Worked!
-
-  Removing torchao completely fixed the transformers import issue!
-
-  What Works Now:
-
-  ✅ No more triton/torch errors - transformers imports cleanly
-  ✅ All 5 safetensors models are now compatible with the app
-  ✅ Models can auto-download from HuggingFace
-
-  Test Results:
-
-  - MADLAD-400: Loads successfully, hits Windows paging file limit (system memory issue, not code issue)
-  - SeamlessM4T-v2: Loads successfully (took 99 seconds to download/load in test)
-  - 10/15 tests still passing (same as before - the other 3 are missing implementations)
-
   Current Status:
 
   | Model          | Status                  | Notes                         |
   |----------------|-------------------------|-------------------------------|
   | Aya-23-8B      | ✅ Production Ready     | Uses llama-cpp-python         |
-  | MADLAD-400-3B  | ✅ Code Ready           | Needs more RAM/paging file    |
-  | SeamlessM4T-v2 | ✅ Code Ready           | Works but slow to load (~90s) |
-  | LLMic-3B       | ✅ Code Ready           | Fails with pagefile error     |
-  | MBART-En-Ro    | ⚠️ Needs Implementation | Translator class not written  |
-  | QuickMT-En-Ro  | ⚠️ Needs Implementation | Translator class not written  |
+  | MADLAD-400-3B  | ✅ Production Ready     | Works with float16 fallback   |
+  | SeamlessM4T-v2 | ✅ Production Ready     | Works, slow to load (~90s)    |
+  | MBART-En-Ro    | ✅ Production Ready     | Fixed source language setting |
+  | Helsinki OPUS-MT | ✅ Production Ready   | Fast Marian MT, sacremoses warning suppressed |
+  | LLMic-3B       | ❌ REMOVED              | Doesn't translate (see above) |
 
   What Changed:
 
@@ -68,10 +67,3 @@ The core requirements are: Gramatically correct, culturally and contextually awa
   2. ✅ Fixed Unicode arrows in translator print statements
   3. ✅ Fixed MADLAD test to use HuggingFace auto-download instead of looking for GGUF file
 
-  Next Steps (if you want):
-
-  1. Increase Windows paging file to handle larger models (MADLAD needs ~6GB)
-  2. Implement missing translators (LLMic, MBART, QuickMT)
-  3. All 6 models can now work together in your app!
-
-  The fundamental blocking issue is resolved - all safetensors models are now compatible! 🎉

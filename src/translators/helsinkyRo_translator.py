@@ -1,38 +1,39 @@
 """
-MBART-En-Ro Translator Implementation
+QuickMT-En-Ro Translator Implementation
 
-Uses Hugging Face transformers for translation with Facebook's MBART model.
-Optimized for English to Romanian translation.
+Uses Hugging Face transformers for fast English to Romanian translation.
+Lightweight model optimized for speed.
 """
 
+import warnings
 from pathlib import Path
 
 # Try to import transformers dependencies
 try:
     import torch
-    from transformers import MBartForConditionalGeneration, MBart50TokenizerFast
+    from transformers import MarianMTModel, MarianTokenizer
     TRANSFORMERS_AVAILABLE = True
     IMPORT_ERROR = None
 except ImportError as e:
     TRANSFORMERS_AVAILABLE = False
     IMPORT_ERROR = str(e)
     # Define dummy classes to avoid NameError
-    MBartForConditionalGeneration = None
-    MBart50TokenizerFast = None
+    MarianMTModel = None
+    MarianTokenizer = None
     torch = None
 
 
-class MBARTTranslator:
+class QuickMTTranslator:
     """
-    MBART translator using Hugging Face transformers
+    QuickMT translator using Hugging Face transformers
 
-    Facebook's multilingual BART model fine-tuned for English-Romanian translation.
+    Lightweight Marian MT model for fast English-Romanian translation.
     """
 
     def __init__(self, model_path: str = None, target_language: str = "Romanian",
                  lang_code: str = "ro", device: str = None, glossary: dict = None):
         """
-        Initialize MBART translator
+        Initialize QuickMT translator
 
         Args:
             model_path: Path to local model or HuggingFace model ID
@@ -43,7 +44,7 @@ class MBARTTranslator:
         """
         if not TRANSFORMERS_AVAILABLE:
             raise ImportError(
-                f"MBARTTranslator requires transformers and torch packages.\n"
+                f"QuickMTTranslator requires transformers and torch packages.\n"
                 f"Original error: {IMPORT_ERROR}"
             )
 
@@ -56,22 +57,29 @@ class MBARTTranslator:
             device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = device
 
-        # Default to facebook/mbart-large-en-ro if no path provided
+        # Use local model path if not provided
+        project_root = Path(__file__).parent.parent.parent
         if model_path is None:
-            model_path = "facebook/mbart-large-en-ro"
-        self.model_path = model_path
+            model_path = project_root / "models" / "helsinkiRo"
+        else:
+            model_path = Path(model_path)
 
-        print(f"Initializing MBART Translation (EN->{target_language})...")
+        self.model_path = str(model_path)
+
+        print(f"Initializing QuickMT Translation (EN->{target_language})...")
         print(f"  Language code: {lang_code}")
         print(f"  Device: {device}")
         print(f"  Model: {model_path}")
-        print(f"  Loading model... This may take 30-60 seconds...")
+        print(f"  Loading model... This may take 10-30 seconds...")
 
-        # Load tokenizer and model
-        self.tokenizer = MBart50TokenizerFast.from_pretrained(model_path)
+        # Suppress sacremoses warning (it's optional and not needed for basic translation)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=".*sacremoses.*")
+            # Load tokenizer and model from local path
+            self.tokenizer = MarianTokenizer.from_pretrained(model_path)
 
         # Use memory-efficient loading
-        self.model = MBartForConditionalGeneration.from_pretrained(
+        self.model = MarianMTModel.from_pretrained(
             model_path,
             low_cpu_mem_usage=True,
             device_map="auto",
@@ -79,13 +87,6 @@ class MBARTTranslator:
         )
 
         self.model.eval()
-
-        # Set source and target language codes for MBART
-        # MBART uses language codes like "en_XX" for English, "ro_RO" for Romanian
-        self.src_lang = "en_XX"
-        self.tgt_lang = "ro_RO"
-        self.tokenizer.src_lang = self.src_lang
-
         print("Model loaded successfully!")
 
     @property
@@ -93,15 +94,15 @@ class MBARTTranslator:
         """Return the target language name"""
         return self._target_language
 
-    def translate(self, text: str, max_length: int = 256, num_beams: int = 5,
+    def translate(self, text: str, max_length: int = 256, num_beams: int = 4,
                   context: list = None, speaker: str = None) -> str:
         """
-        Translate text using MBART
+        Translate text using QuickMT
 
         Args:
             text: English text to translate
             max_length: Maximum number of new tokens to generate
-            num_beams: Number of beams for beam search (default 5 for quality)
+            num_beams: Number of beams for beam search (default 4)
             context: Optional list of previous dialogue lines (for consistency)
             speaker: Optional character name/identifier
 
@@ -116,7 +117,6 @@ class MBARTTranslator:
         with torch.no_grad():
             generated_tokens = self.model.generate(
                 **inputs,
-                forced_bos_token_id=self.tokenizer.lang_code_to_id[self.tgt_lang],
                 max_new_tokens=max_length,
                 num_beams=num_beams,
                 early_stopping=True
@@ -136,10 +136,10 @@ if __name__ == "__main__":
     CLI entry point for standalone translation script usage.
 
     Usage:
-        python mbart_translator.py <input_file> --language ro
+        python quickmt_translator.py <input_file> --language ro
 
     Example:
-        python mbart_translator.py script.rpy --language ro
+        python quickmt_translator.py script.rpy --language ro
     """
     import sys
     import json
@@ -151,7 +151,7 @@ if __name__ == "__main__":
     from translation_pipeline import RenpyTranslationPipeline
 
     if len(sys.argv) < 3:
-        print("Usage: python mbart_translator.py <input_file> --language ro")
+        print("Usage: python quickmt_translator.py <input_file> --language ro")
         sys.exit(1)
 
     # Parse arguments
@@ -165,7 +165,7 @@ if __name__ == "__main__":
             break
 
     if lang_code != 'ro':
-        print("Error: MBART-En-Ro only supports Romanian translation (--language ro)")
+        print("Error: QuickMT-En-Ro only supports Romanian translation (--language ro)")
         sys.exit(1)
 
     if not input_file.exists():
@@ -184,7 +184,7 @@ if __name__ == "__main__":
             break
 
     # Initialize translator
-    translator = MBARTTranslator(
+    translator = QuickMTTranslator(
         target_language="Romanian",
         lang_code="ro",
         glossary=glossary

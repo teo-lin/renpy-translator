@@ -34,8 +34,8 @@ sys.path.insert(0, str(project_root / "tests"))
 
 from extract import RenpyExtractor
 from merger import RenpyMerger
-from seamlessm4t_translator import SeamlessM4Tv2Translator
-from translate_modular import ModularBatchTranslator
+from seamless96_translator import SeamlessM4Tv2Translator
+from translate import ModularBatchTranslator
 from utils import (
     discover_characters, count_translations, backup_file,
     restore_file, cleanup_files, validate_rpy_structure, get_rpy_files
@@ -44,7 +44,7 @@ from utils import (
 # Test configuration
 example_dir = project_root / "games" / "Example" / "game" / "tl" / "romanian"
 # SeamlessM4T uses Hugging Face models (auto-downloaded, no local path needed)
-model_name = "facebook/seamless-m4t-v2-large"
+model_name = "facebook/seamless96"
 
 
 def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dict]:

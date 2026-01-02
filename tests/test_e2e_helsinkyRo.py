@@ -37,12 +37,12 @@ from merger import RenpyMerger
 
 # Try to import QuickMTTranslator
 try:
-    from quickmt_translator import QuickMTTranslator
-    from translate_modular import ModularBatchTranslator
+    from helsinkyRo_translator import QuickMTTranslator
+    from translate import ModularBatchTranslator
     TRANSLATOR_AVAILABLE = True
 except ImportError as e:
     print(f"[WARN] QuickMTTranslator not available: {e}")
-    print("[INFO] This test requires src/translators/quickmt_translator.py to be implemented")
+    print("[INFO] This test requires src/translators/helsinkyRo_translator.py to be implemented")
     TRANSLATOR_AVAILABLE = False
 
 from utils import (
@@ -52,7 +52,7 @@ from utils import (
 
 # Test configuration
 example_dir = project_root / "games" / "Example" / "game" / "tl" / "romanian"
-model_path = project_root / "models" / "quickmt-en-ro"
+model_path = project_root / "models" / "helsinkiRo"
 
 
 def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dict]:

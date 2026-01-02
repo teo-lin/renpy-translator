@@ -35,7 +35,7 @@ sys.path.insert(0, str(project_root / "tests"))
 from extract import RenpyExtractor
 from merger import RenpyMerger
 from madlad400_translator import MADLAD400Translator
-from translate_modular import ModularBatchTranslator
+from translate import ModularBatchTranslator
 from utils import (
     discover_characters, count_translations, backup_file,
     restore_file, cleanup_files, validate_rpy_structure, get_rpy_files
