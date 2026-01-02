@@ -47,8 +47,8 @@ def test_unit_config():
                 "-ExecutionPolicy", "Bypass",
                 "-File", str(stage_script),
                 "-GamePath", str(project_root / "games" / "Example"),
-                "-Language", "romanian",
-                "-Model", "Aya-23-8B"
+                "-Language", "ro",
+                "-Model", "aya23"
             ],
             capture_output=True,
             text=True,
@@ -58,6 +58,7 @@ def test_unit_config():
         if result.returncode != 0:
             print(f"   [FAIL] Script failed with exit code {result.returncode}")
             print(f"   STDERR: {result.stderr}")
+            print(f"   STDOUT: {result.stdout}")
             return False
 
         print("   [OK] 1-config.ps1 executed successfully")

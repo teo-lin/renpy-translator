@@ -1,5 +1,5 @@
 """
-Unit test for the correction script (scripts/correct_with_aya23.py).
+Unit test for the correction script (scripts/correct.py).
 
 This test focuses on the PatternBasedCorrector to ensure that correction
 rules are applied correctly to a file, testing the logic in isolation

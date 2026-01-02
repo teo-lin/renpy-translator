@@ -57,7 +57,7 @@ You can also call the Python scripts directly with specific arguments:
 ```powershell
 python scripts\translate_with_aya23.py "Example\game\tl\<language>" --language <Language> # Translate entire game
 python scripts\translate_with_aya23.py "path\to\file.rpy" # Translate single file
-python scripts\correct_with_aya23.py "path\to\game\game\tl\<language>"
+python scripts\correct.py "path\to\game\game\tl\<language>"
 
 # Fast pattern corrections only
 .\4-correct.ps1 "path\to\game\game\tl\<language>" --patterns-only
@@ -179,7 +179,7 @@ Place in `data\<language>_corrections.json`
 ├── scripts/               # Translation engine scripts (called by launchers)
 │   ├── translate_with_aya23.py     # Aya-23-8B translation engine
 │   ├── translate_with_madlad.py    # MADLAD-400-3B translation engine
-│   ├── correct_with_aya23.py       # Aya-23-8B grammar correction engine
+│   ├── correct.py       # Aya-23-8B grammar correction engine
 │   ├── benchmark.py       # BLEU benchmark script
 │   ├── common.ps1         # Shared PowerShell functions
 │   └── select.ps1 # Interactive game/language selection

@@ -37,17 +37,16 @@ from pathlib import Path
 from typing import List, Tuple, Dict, Optional
 import time
 
-# Fix Windows PATH for CUDA DLLs and console encoding
-if sys.platform == "win32":
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
-    torch_lib = str(Path(__file__).parent.parent / "venv" / "Lib" / "site-packages" / "torch" / "lib")
-    if os.path.exists(torch_lib) and torch_lib not in os.environ["PATH"]:
-        os.environ["PATH"] = torch_lib + os.pathsep + os.environ["PATH"]
+
 
 # Add src directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+# Fix Windows PATH for CUDA DLLs
+if sys.platform == "win32":
+    torch_lib = str(Path(__file__).parent.parent / "venv" / "Lib" / "site-packages" / "torch" / "lib")
+    if os.path.exists(torch_lib) and torch_lib not in os.environ["PATH"]:
+        os.environ["PATH"] = torch_lib + os.pathsep + os.environ["PATH"]
 
 def show_progress(current, total, start_time, prefix=""):
     """Display simple progress bar with >>> characters and time labels"""
@@ -810,7 +809,32 @@ def main():
 
     # Setup paths
     project_root = Path(__file__).parent.parent
-    model_path = project_root / "models" / "aya-23-8B-GGUF" / "aya-23-8B-Q4_K_M.gguf"
+
+    # Load configuration from current_config.json
+    config_file = project_root / "models" / "current_config.json"
+    if not config_file.exists():
+        print(f"ERROR: Configuration not found at {config_file}")
+        print("Please run 1-config.ps1 first to set up your game.")
+        sys.exit(1)
+
+    with open(config_file, 'r', encoding='utf-8-sig') as f:
+        full_config = json.load(f)
+    game_config = full_config['games'][full_config['current_game']] # Load specific game config
+
+    model_name = game_config['model']
+
+    # Load model configuration from models_config.json
+    models_config_path = project_root / "models" / "models_config.json"
+    with open(models_config_path, 'r', encoding='utf-8-sig') as f:
+        all_models_config = json.load(f)['available_models']
+
+    model_config = all_models_config.get(model_name)
+
+    if not model_config:
+        print(f"ERROR: Model '{model_name}' not found in models_config.json")
+        sys.exit(1)
+
+    model_path = project_root / model_config['destination']
 
     # Generic corrections fallback: uncensored → censored → none
     corrections_file = None

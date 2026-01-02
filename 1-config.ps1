@@ -83,7 +83,7 @@ function Select-Language {
     Write-Host ""
     if ($languages.Count -eq 1) {
         Write-Host "Auto-selecting the only available language: $($languages[0].Name)" -ForegroundColor Green
-        return $languages[0].Code
+        return $languages[0]
     }
 
     $selection = Read-Host "Select language (1-$($languages.Count))"
@@ -94,7 +94,7 @@ function Select-Language {
             Write-Host "Invalid selection!" -ForegroundColor Red
             exit 1
         }
-        return $languages[$index].Code
+        return $languages[$index]
     } catch {
         Write-Host "Invalid input!" -ForegroundColor Red
         exit 1
@@ -231,8 +231,14 @@ function Discover-Characters {
             $charVar = $match.Groups[1].Value
             $charName = $match.Groups[2].Value
 
+            # Initialize character in $characterVars if it doesn't exist
             if (-not $characterVars.ContainsKey($charVar)) {
-                continue
+                $characterVars[$charVar] = @{
+                    name = $charVar.ToUpper()
+                    gender = "neutral"
+                    type = "supporting"
+                    description = ""
+                }
             }
 
             # Handle special cases
@@ -303,7 +309,7 @@ function Save-Configuration {
     param(
         [string]$Gamename,
         [string]$GamePath,
-        [string]$Language,
+        [psobject]$SelectedLanguageObject, # Changed from [hashtable]$SelectedLanguageObject
         [string]$Model,
         [hashtable]$Characters
     )
@@ -333,7 +339,7 @@ function Save-Configuration {
     $gameConfig = @{
         name = $Gamename
         path = $GamePath
-        target_language = $Language.ToLower()
+        target_language = $SelectedLanguageObject # Store the full language object
         source_language = "english"
         model = $Model
         context_before = 3
@@ -359,7 +365,7 @@ function Save-Configuration {
     Write-Host "   [OK] Saved game config to: $configPath" -ForegroundColor Green
 
     # Save characters.json
-    $charactersPath = Join-Path $GamePath "game\tl\$Language\characters.json"
+    $charactersPath = Join-Path $GamePath "game\tl\$($SelectedLanguageObject.Name.ToLower())\characters.json"
     $charactersDir = Split-Path $charactersPath -Parent
 
     if (-not (Test-Path $charactersDir)) {
@@ -408,16 +414,35 @@ Write-Host "   Path: $GamePath" -ForegroundColor Gray
 Write-Host ""
 
 # Step 2: Select Language
+$selectedLanguageObj = $null
 if ($Language -eq "") {
     # Show current config if available
     if ($currentGameConfig -and $currentGameConfig.target_language) {
-        Write-Host "[Config] Current configured language: $($currentGameConfig.target_language)" -ForegroundColor Gray
+        # Need to load models_config.json to get the language name
+        $modelsConfigPath = Join-Path $PSScriptRoot "models\models_config.json"
+        $modelsConfig = Get-Content $modelsConfigPath -Raw | ConvertFrom-Json
+        $currentLang = $modelsConfig.installed_languages | Where-Object { $_.Code -eq $currentGameConfig.target_language }
+        if ($currentLang) {
+            Write-Host "[Config] Current configured language: $($currentLang.Name) ($($currentLang.Code))" -ForegroundColor Gray
+        } else {
+            Write-Host "[Config] Current configured language: $($currentGameConfig.target_language)" -ForegroundColor Gray
+        }
         Write-Host ""
     }
-    $Language = Select-Language
+    $selectedLanguageObj = Select-Language
+    $Language = $selectedLanguageObj.Code # Keep $Language as code for parameter passing compatibility
+} else {
+    # If language is passed as a parameter, find the full language object
+    $modelsConfigPath = Join-Path $PSScriptRoot "models\models_config.json"
+    $modelsConfig = Get-Content $modelsConfigPath -Raw | ConvertFrom-Json
+    $selectedLanguageObj = $modelsConfig.installed_languages | Where-Object { $_.Code -eq $Language }
+    if (-not $selectedLanguageObj) {
+        Write-Host "ERROR: Invalid language code provided: $Language" -ForegroundColor Red
+        exit 1
+    }
 }
 
-Write-Host "[Language] Selected language: $Language" -ForegroundColor Green
+Write-Host "[Language] Selected language: $($selectedLanguageObj.Name) ($($selectedLanguageObj.Code))" -ForegroundColor Green
 Write-Host ""
 
 # Step 3: Select Model
@@ -449,14 +474,14 @@ if ($selectedModelConfig) {
 }
 
 # Step 4: Discover Characters
-$tlPath = Join-Path $GamePath "game\tl\$Language"
+$tlPath = Join-Path $GamePath "game\tl\$($selectedLanguageObj.Code)"
 $characters = Discover-Characters -TlPath $tlPath
 
 # Step 5: Save Configuration
 Save-Configuration `
     -Gamename $Gamename `
     -GamePath $GamePath `
-    -Language $Language `
+    -SelectedLanguageObject $selectedLanguageObj `
     -Model $Model `
     -Characters $characters
 

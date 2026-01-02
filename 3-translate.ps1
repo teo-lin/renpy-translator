@@ -44,7 +44,7 @@ if ($Help) {
 
 $pythonExe = Join-Path $scriptDir "venv\Scripts\python.exe"
 $configFile = Join-Path $scriptDir "models\current_config.json"
-$pythonScript = Join-Path $scriptDir "scripts\translate_modular.py"
+$pythonScript = Join-Path $scriptDir "scripts\translate.py"
 
 # Add PyTorch lib directory to PATH for CUDA DLLs (needed by llama-cpp-python)
 $torchLibPath = Join-Path $scriptDir "venv\Lib\site-packages\torch\lib"

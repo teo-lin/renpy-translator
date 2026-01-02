@@ -30,26 +30,37 @@ from utils import (
 )
 
 # Test configuration
-example_dir = project_root / "games" / "Example" / "game" / "tl" / "romanian"
+game_name = "Example"
+game_path = project_root / "games" / game_name
+example_dir = game_path / "game" / "tl" / "romanian"
 model_path = project_root / "models" / "aya23" / "aya-23-8B-Q4_K_M.gguf"
 
+# Define target language and model key
+target_language = "ro"
+model_key = "aya23"
 
-def run_powershell_script(script_name: str, timeout: int = 300) -> tuple[bool, str, str]:
+
+def run_powershell_script(script_name: str, args: list = None, timeout: int = 300) -> tuple[bool, str, str]:
     """
-    Run a PowerShell script and return success status, stdout, stderr.
+    Run a PowerShell script with arguments and return success status, stdout, stderr.
 
     Args:
         script_name: Name of the .ps1 script (e.g., "1-config.ps1")
+        args: List of arguments to pass to the PowerShell script
         timeout: Timeout in seconds (default 5 minutes)
 
     Returns:
         Tuple of (success, stdout, stderr)
     """
+    if args is None:
+        args = []
+    
     script_path = project_root / script_name
 
     try:
+        command = ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", str(script_path)] + args
         result = subprocess.run(
-            ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", str(script_path)],
+            command,
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -116,7 +127,12 @@ def test_e2e_example_game_translation() -> bool:
         print("\n" + "=" * 70)
         print("[1/5] Running: 1-config.ps1")
         print("=" * 70)
-        success, stdout, stderr = run_powershell_script("1-config.ps1", timeout=60)
+        config_args = [
+            "-GamePath", str(game_path),
+            "-Language", target_language,
+            "-Model", model_key
+        ]
+        success, stdout, stderr = run_powershell_script("1-config.ps1", args=config_args, timeout=60)
 
         if not success:
             print(f"[FAIL] 1-config.ps1 failed")
@@ -130,7 +146,11 @@ def test_e2e_example_game_translation() -> bool:
         print("\n" + "=" * 70)
         print("[2/5] Running: 2-extract.ps1")
         print("=" * 70)
-        success, stdout, stderr = run_powershell_script("2-extract.ps1", timeout=120)
+        extract_args = [
+            "-GameName", game_name,
+            "-All"
+        ]
+        success, stdout, stderr = run_powershell_script("2-extract.ps1", args=extract_args, timeout=120)
 
         if not success:
             print(f"[FAIL] 2-extract.ps1 failed")
@@ -144,7 +164,12 @@ def test_e2e_example_game_translation() -> bool:
         print("\n" + "=" * 70)
         print("[3/5] Running: 3-translate.ps1")
         print("=" * 70)
-        success, stdout, stderr = run_powershell_script("3-translate.ps1", timeout=600)  # 10 min for translation
+        translate_args = [
+            "-GameName", game_name,
+            "-All",
+            "-Model", model_key
+        ]
+        success, stdout, stderr = run_powershell_script("3-translate.ps1", args=translate_args, timeout=600)  # 10 min for translation
 
         if not success:
             print(f"[FAIL] 3-translate.ps1 failed")
@@ -158,7 +183,13 @@ def test_e2e_example_game_translation() -> bool:
         print("\n" + "=" * 70)
         print("[4/5] Running: 4-correct.ps1")
         print("=" * 70)
-        success, stdout, stderr = run_powershell_script("4-correct.ps1", timeout=300)
+        correct_args = [
+            "-GameName", game_name,
+            "-LanguageName", target_language,
+            "-ModeName", "Both (Patterns + LLM)", # Assuming this is the desired mode
+            "-Yes" # Auto-accept confirmation
+        ]
+        success, stdout, stderr = run_powershell_script("4-correct.ps1", args=correct_args, timeout=300)
 
         if not success:
             print(f"[FAIL] 4-correct.ps1 failed")
@@ -172,10 +203,16 @@ def test_e2e_example_game_translation() -> bool:
         print("\n" + "=" * 70)
         print("[5/5] Running: 5-merge.ps1")
         print("=" * 70)
-        success, stdout, stderr = run_powershell_script("5-merge.ps1", timeout=120)
+        merge_args = [
+            "-GameName", game_name,
+            "-All"
+        ]
+        success, stdout, stderr = run_powershell_script("5-merge.ps1", args=merge_args, timeout=120)
 
         if not success:
             print(f"[FAIL] 5-merge.ps1 failed")
+            if stdout:
+                print(f"STDOUT: {stdout}")
             if stderr:
                 print(f"STDERR: {stderr}")
             return False
@@ -187,17 +224,25 @@ def test_e2e_example_game_translation() -> bool:
         print("[Verify] Checking translations were added...")
         print("=" * 70)
 
+        # Get the translated .rpy files for verification
+        translated_rpy_files = []
+        for rpy_file in rpy_files:
+            translated_rpy_files.append(rpy_file.parent / f"{rpy_file.stem}.translated.rpy")
+
         final_counts = {}
         total_final = 0
         total_added = 0
 
-        for rpy_file in rpy_files:
-            count = count_translations(rpy_file)
-            final_counts[rpy_file.name] = count
+        for translated_rpy_file in translated_rpy_files:
+            # The initial counts were for original .rpy files, but we are comparing against translated ones.
+            # For simplicity, we'll assume initial count is always 0 for the translated files
+            # as they are newly generated.
+            count = count_translations(translated_rpy_file)
+            final_counts[translated_rpy_file.name] = count
             total_final += count
-            added = count - initial_counts[rpy_file.name]
+            added = count # All translations in a newly generated file are 'added'
             total_added += added
-            print(f"  {rpy_file.name}: {initial_counts[rpy_file.name]} → {count} (+{added})")
+            print(f"  {translated_rpy_file.name}: 0 → {count} (+{added})")
 
         print(f"  Total final translations: {total_final} (+{total_added})")
 

@@ -14,7 +14,7 @@
 | `test_unit_renpy_tags.py` | | ⚠️ Unit | | | ⚠️ Unit | ✅ Mod |
 | `test_unit_config.py` | ✅ | | | | | ⚠️ Mod (PS) |
 | `test_unit_extract.py`| | ✅ | | | | ✅ Mod |
-| `test_unit_translate_modular.py` | | | ⚠️ Mock | | | ✅ Mod |
+| `test_unit_translate.py` | | | ⚠️ Mock | | | ✅ Mod |
 | `test_unit_correct.py` | | | | ✅ | | ✅ Mod |
 | `test_unit_merge.py` | | | | | ✅ | ✅ Mod |
 
@@ -41,7 +41,7 @@
 .\venv\Scripts\python.exe .\tests\test_unit_renpy_tags.py
 
 # Run modular translation test (requires model, uses mock)
-.\venv\Scripts\python.exe .\tests\test_unit_translate_modular.py
+.\venv\Scripts\python.exe .\tests\test_unit_translate.py
 
 # E2E tests (need model files downloaded)
 .\venv\Scripts\python.exe .\tests\test_e2e_aya23.py

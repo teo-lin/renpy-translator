@@ -1,22 +1,15 @@
 # Common PowerShell Functions for Translation Pipeline
 
 function Get-PythonCommand {
-    # Try to find Python command
-    $pythonCandidates = @("python", "python3", "py")
-
-    foreach ($cmd in $pythonCandidates) {
-        try {
-            $version = & $cmd --version 2>&1
-            if ($LASTEXITCODE -eq 0) {
-                return $cmd
-            }
-        } catch {
-            continue
-        }
+    # Explicitly return the Python executable within the virtual environment
+    $venvPythonPath = Join-Path $PSScriptRoot "..\venv\Scripts\python.exe"
+    if (Test-Path $venvPythonPath) {
+        return $venvPythonPath
+    } else {
+        Write-Host "Virtual environment Python not found at: $venvPythonPath" -ForegroundColor Red
+        Write-Host "Please ensure the virtual environment is set up correctly (run 0-setup.ps1)." -ForegroundColor Yellow
+        exit 1
     }
-
-    Write-Host " Python not found! Please install Python 3.8+" -ForegroundColor Red
-    exit 1
 }
 
 function Get-GameConfig {

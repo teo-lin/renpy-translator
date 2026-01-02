@@ -105,7 +105,7 @@ $gameConfig = Get-GameConfig -GameName $GameName
 Show-GameInfo -GameConfig $gameConfig
 
 # Get source file(s)
-$tlPath = Join-Path $gameConfig.path "game\tl\$($gameConfig.target_language)"
+$tlPath = Join-Path $gameConfig.path "game\tl\$($gameConfig.target_language.Name.ToLower())"
 $validate = -not $SkipValidation
 
 if ($All) {

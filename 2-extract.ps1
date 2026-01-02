@@ -44,7 +44,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, r'$PSScriptRoot\src')
 
-from extraction import RenpyExtractor
+from extract import RenpyExtractor
 
 # Load characters.json if exists
 characters_path = Path(r'$GamePath\game\tl\$Language\characters.json')
@@ -109,7 +109,7 @@ $gameConfig = Get-GameConfig -GameName $GameName
 Show-GameInfo -GameConfig $gameConfig
 
 # Get source file(s)
-$tlPath = Join-Path $gameConfig.path "game\tl\$($gameConfig.target_language)"
+$tlPath = Join-Path $gameConfig.path "game\tl\$($gameConfig.target_language.Name.ToLower())"
 
 if ($All) {
     # Extract all .rpy files

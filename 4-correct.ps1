@@ -3,8 +3,11 @@
 
 param(
     [int]$Mode = 0,       # Mode number (1-based), 0 = prompt user
+    [string]$ModeName,    # Mode name (e.g., "Both (Patterns + LLM)")
     [int]$Language = 0,   # Language number (1-based), 0 = prompt user
+    [string]$LanguageName, # Language name (e.g., "romanian")
     [int]$Game = 0,       # Game number (1-based), 0 = prompt user
+    [string]$GameName,     # Game name (e.g., "Example")
     [switch]$Yes,         # Skip confirmation prompt
     [Parameter(ValueFromRemainingArguments=$true)]
     [string[]]$Arguments  # Additional arguments to pass to Python script
@@ -17,7 +20,7 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir "scripts\select.ps1")
 
 $pythonExe = Join-Path $scriptDir "venv\Scripts\python.exe"
-$correctScript = Join-Path $scriptDir "scripts\correct_with_aya23.py"
+$correctScript = Join-Path $scriptDir "scripts\correct.py"
 $gamesFolder = Join-Path $scriptDir "games"
 $configFile = Join-Path $scriptDir "models\current_config.json"
 
@@ -65,19 +68,13 @@ $modes = @(
     }
 )
 
-# Load configuration
-if (Test-Path $configFile) {
-    $config = Get-Content $configFile | ConvertFrom-Json
-
-    # Get languages as an array
-    if ($config.languages -is [array]) {
-        $languages = $config.languages
-    } else {
-        $languages = @($config.languages)
-    }
+# Load available languages from models_config.json
+$modelsConfigPath = Join-Path $scriptDir "models\models_config.json"
+if (Test-Path $modelsConfigPath) {
+    $modelsConfig = Get-Content $modelsConfigPath -Raw | ConvertFrom-Json
+    $languages = $modelsConfig.installed_languages
 } else {
-    Write-Host "WARNING: Configuration not found at models\current_config.json" -ForegroundColor Yellow
-    Write-Host "Please run setup.ps1 first." -ForegroundColor Yellow
+    Write-Host "ERROR: models_config.json not found at $modelsConfigPath" -ForegroundColor Red
     exit 1
 }
 
@@ -88,6 +85,17 @@ Write-Host "       Ren'Py Grammar Correction - Interactive Setup            " -F
 Write-Host "=================================================================" -ForegroundColor Green
 
 # Step 1: Select Mode
+if ($ModeName) {
+    $foundMode = $modes | Where-Object { $_.Name -eq $ModeName }
+    if ($foundMode) {
+        $Mode = ($modes.IndexOf($foundMode) + 1)
+        Write-Host ""
+        Write-Host "Auto-selecting mode by name '$ModeName'. Resolved to index $Mode." -ForegroundColor Cyan
+    } else {
+        Write-Host "ERROR: Invalid mode name: $ModeName. Available modes: $($modes.Name -join ', ')" -ForegroundColor Red
+        exit 1
+    }
+}
 if ($Mode -gt 0) {
     if ($Mode -le $modes.Count) {
         $selectedMode = $modes[$Mode - 1]
@@ -118,6 +126,17 @@ if ($Mode -gt 0) {
 }
 
 # Step 2: Select Language
+if ($LanguageName) {
+    $foundLanguage = $languages | Where-Object { $_.Code -eq $LanguageName }
+    if ($foundLanguage) {
+        $Language = ($languages.IndexOf($foundLanguage) + 1)
+        Write-Host ""
+        Write-Host "Auto-selecting language by name '$LanguageName'. Resolved to index $Language." -ForegroundColor Cyan
+    } else {
+        Write-Host "ERROR: Invalid language name: $LanguageName. Available languages: $($languages.Name -join ', ')" -ForegroundColor Red
+        exit 1
+    }
+}
 if ($Language -gt 0) {
     if ($Language -le $languages.Count) {
         $selectedLanguage = $languages[$Language - 1]
@@ -177,6 +196,17 @@ if ($games.Count -eq 0) {
     exit 1
 }
 
+if ($GameName) {
+    $foundGame = $games | Where-Object { $_.Name -eq $GameName }
+    if ($foundGame) {
+        $Game = ($games.IndexOf($foundGame) + 1)
+        Write-Host ""
+        Write-Host "Auto-selecting game by name '$GameName'. Resolved to index $Game." -ForegroundColor Cyan
+    } else {
+        Write-Host "ERROR: Invalid game name: $GameName. Available games: $($games.Name -join ', ')" -ForegroundColor Red
+        exit 1
+    }
+}
 if ($Game -gt 0) {
     if ($Game -le $games.Count) {
         $selectedGame = $games[$Game - 1]

@@ -6,8 +6,8 @@ Uses configuration from current_config.json and character.json files.
 Supports glossary and custom prompts with fallback hierarchy.
 
 Usage:
-    python translate_modular.py --game <game_name>
-    python translate_modular.py  # Uses current_game from config
+    python translate.py --game <game_name>
+    python translate.py  # Uses current_game from config
 """
 
 import sys
@@ -435,13 +435,16 @@ def main():
 
     game_name = game_config['name']
     game_path = Path(game_config['path'])
-    target_language = game_config['target_language']
+    target_language_obj = game_config['target_language'] # This is the full language object
     model_name = game_config['model']
     context_before = game_config.get('context_before', 3)
     context_after = game_config.get('context_after', 1)
 
+    target_language_code = target_language_obj['Code']
+    target_language_name = target_language_obj['Name']
+
     print(f"  Game: {game_name}")
-    print(f"  Language: {target_language}")
+    print(f"  Language: {target_language_name} ({target_language_code})")
     print(f"  Model: {model_name}")
     print(f"  Context: {context_before} before, {context_after} after")
 
@@ -455,14 +458,16 @@ def main():
         'vietnamese': 'vi', 'thai': 'th', 'indonesian': 'id',
         'arabic': 'ar', 'hebrew': 'he', 'hindi': 'hi'
     }
-    target_lang_code = lang_code_map.get(target_language.lower(), target_language.lower()[:2])
+    # Use the extracted code directly, no need for lang_code_map.get with .lower()
+    # unless mapping to a *different* code (which is not the case here)
+    target_lang_code = lang_code_map.get(target_language_name.lower(), target_language_code)
 
     # Load resources (glossary, corrections, prompts)
     print("\nLoading resources...")
     glossary, corrections, prompt_template = load_resources(project_root, game_config, target_lang_code)
 
     # Load characters.json
-    tl_dir = game_path / "game" / "tl" / target_language.lower()
+    tl_dir = game_path / "game" / "tl" / target_language_name.lower()
     characters_file = tl_dir / "characters.json"
 
     characters = {}
@@ -474,14 +479,18 @@ def main():
         print(f"[WARNING] No characters.json found at {characters_file}")
 
     # Determine model path based on model name
-    if model_name == "Aya-23-8B":
-        model_path = project_root / "models" / "aya-23-8B-GGUF" / "aya-23-8B-Q4_K_M.gguf"
-    elif model_name == "MADLAD-400-3B":
-        print("ERROR: MADLAD-400-3B not yet supported in modular pipeline")
+    # Load model configuration from models_config.json
+    models_config_path = project_root / "models" / "models_config.json"
+    with open(models_config_path, 'r', encoding='utf-8-sig') as f:
+        all_models_config = json.load(f)['available_models']
+
+    model_config = all_models_config.get(model_name)
+
+    if not model_config:
+        print(f"ERROR: Model '{model_name}' not found in models_config.json")
         sys.exit(1)
-    else:
-        print(f"ERROR: Unknown model: {model_name}")
-        sys.exit(1)
+
+    model_path = project_root / model_config['destination']
 
     if not model_path.exists():
         print(f"ERROR: Model file not found: {model_path}")
@@ -494,7 +503,7 @@ def main():
 
     translator = Aya23Translator(
         model_path=str(model_path),
-        target_language=target_language.capitalize(),
+        target_language=target_language_name.capitalize(),
         prompt_template=prompt_template,
         glossary=glossary
     )

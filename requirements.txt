@@ -7,6 +7,9 @@ llama-cpp-python>=0.2.0
 transformers>=4.35.0
 sacremoses>=0.1.0
 
+# General Utilities
+PyYAML>=6.0.1 # Added for yaml parsing in extract.py
+
 # HuggingFace Hub
 huggingface-hub>=0.19.0
 

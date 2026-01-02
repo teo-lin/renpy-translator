@@ -96,8 +96,10 @@ class RenpyMerger:
 
         if file_structure == FileStructureType.STRINGS_ONLY:
             # File starts directly with strings section
-            output_lines.append(structure['string_section_header'])
-            output_lines.append("")
+            # Only append header if it exists
+            if structure['string_section_header']:
+                output_lines.append(structure['string_section_header'])
+                output_lines.append("")
 
         # Process blocks in order
         block_order = structure['block_order']
