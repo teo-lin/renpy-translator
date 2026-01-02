@@ -378,29 +378,44 @@ def skip_if_transformers_unavailable(transformers_available: bool, import_error:
         )
 
 
+import io
+
+class OutputCapturer(object):
+    """Context manager to capture stdout and stderr."""
+    def __enter__(self):
+        self.old_stdout = sys.stdout
+        self.old_stderr = sys.stderr
+        sys.stdout = self.stdout = io.StringIO()
+        sys.stderr = self.stderr = io.StringIO()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout = self.old_stdout
+        sys.stderr = self.old_stderr
+
 def safe_init_translator(translator_class: Type, translator_name: str,
                         init_kwargs: dict) -> Any:
     """
-    Safely initialize a translator with error handling.
-
-    Args:
-        translator_class: The translator class to instantiate
-        translator_name: Name of the translator for logging
-        init_kwargs: Keyword arguments to pass to translator constructor
-
-    Returns:
-        Initialized translator instance
-
-    Raises:
-        unittest.SkipTest: If initialization fails (e.g., memory constraints)
+    Safely initialize a translator. If an exception occurs, it will
+    print captured stdout/stderr and re-raise the exception, causing
+    the test to fail instead of skip.
     """
     print(f"Setting up {translator_name} for integration test...")
-    try:
-        translator = translator_class(**init_kwargs)
-        print("Translator setup complete.")
-        return translator
-    except Exception as e:
-        raise unittest.SkipTest(
-            f"Failed to load {translator_name}, likely due to memory constraints "
-            f"or other issues: {e}"
-        )
+    with OutputCapturer() as capturer:
+        try:
+            translator = translator_class(**init_kwargs)
+            print("Translator setup complete.")
+            return translator
+        except Exception as e:
+            # Print captured output before re-raising the exception
+            captured_stdout = capturer.stdout.getvalue()
+            captured_stderr = capturer.stderr.getvalue()
+            if captured_stdout:
+                sys.stdout.write("\n--- Captured STDOUT during translator init ---\n")
+                sys.stdout.write(captured_stdout)
+                sys.stdout.write("----------------------------------------------\n")
+            if captured_stderr:
+                sys.stderr.write("\n--- Captured STDERR during translator init ---\n")
+                sys.stderr.write(captured_stderr)
+                sys.stderr.write("----------------------------------------------\n")
+            raise e

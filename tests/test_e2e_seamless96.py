@@ -121,8 +121,7 @@ def test_single_file_e2e(rpy_file: Path, character_map: dict) -> Tuple[bool, dic
         try:
             translator = SeamlessM4Tv2Translator(
                 target_language='Romanian',
-                lang_code='ro',
-                model_name=model_name
+                lang_code='ro'
             )
         except ImportError as e:
             print(f"[FAIL] Cannot load SeamlessM4Tv2Translator: {e}")
@@ -246,7 +245,7 @@ def test_e2e_pipeline() -> bool:
     print("\n" + "=" * 70)
     print("  E2E TEST: SeamlessM4T-v2 Modular Pipeline")
     print("=" * 70)
-    print(f"[INFO] Using Hugging Face model: {model_name}")
+    print(f"[INFO] Using local model: {project_root / 'models' / 'seamless96'}")
     print("[INFO] Model will be auto-downloaded if not cached")
 
     # Get .rpy files to test

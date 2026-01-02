@@ -287,6 +287,7 @@ def test_e2e_example_game_translation() -> bool:
                 rpy_file.parent / f"{rpy_file.stem}.parsed.yaml",
                 rpy_file.parent / f"{rpy_file.stem}.tags.json",
                 rpy_file.parent / f"{rpy_file.stem}.translated.rpy",
+                rpy_file.parent / f"{rpy_file.stem}.corrections.txt", # Added cleanup for corrections.txt
             ])
 
         cleanup_files([
