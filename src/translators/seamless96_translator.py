@@ -7,11 +7,25 @@ Optimized for high-quality text translation with nearly 100 languages supported.
 
 import warnings
 from pathlib import Path
+from contextlib import contextmanager
+
+# Suppress known non-critical warnings for this module
+warnings.filterwarnings("ignore", message=".*SwigPy.*", category=DeprecationWarning)
+warnings.filterwarnings("ignore", message=".*swigvarlink.*", category=DeprecationWarning)
+warnings.filterwarnings("ignore", message=".*layer_idx.*", category=UserWarning)
+warnings.filterwarnings("ignore", message=".*were not initialized.*", category=UserWarning)
+warnings.filterwarnings("ignore", message=".*fix_mistral_regex.*", category=UserWarning)
+warnings.filterwarnings("ignore", message=".*TRAIN this model.*", category=UserWarning)
 
 # Try to import transformers dependencies
 try:
     import torch
     from transformers import AutoProcessor, SeamlessM4Tv2Model
+    from transformers import logging as transformers_logging
+
+    # Set transformers logging to error level to suppress warnings
+    transformers_logging.set_verbosity_error()
+
     TRANSFORMERS_AVAILABLE = True
     IMPORT_ERROR = None
 except ImportError as e:
@@ -21,6 +35,7 @@ except ImportError as e:
     AutoProcessor = None
     SeamlessM4Tv2Model = None
     torch = None
+    transformers_logging = None
 
 
 class SeamlessM4Tv2Translator:
@@ -133,11 +148,6 @@ class SeamlessM4Tv2Translator:
         print(f"  Device: {device}")
         print(f"  Model: {model_path}")
         print(f"  Loading model... This may take 60-90 seconds...")
-
-        # Suppress non-critical warnings
-        warnings.filterwarnings("ignore", message=".*SwigPy.*", category=DeprecationWarning)
-        warnings.filterwarnings("ignore", message=".*swigvarlink.*", category=DeprecationWarning)
-        warnings.filterwarnings("ignore", message=".*layer_idx.*", category=UserWarning)
 
         # Load processor and model from local path
         self.processor = AutoProcessor.from_pretrained(model_path)
