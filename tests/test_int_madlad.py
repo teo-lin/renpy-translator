@@ -1,7 +1,7 @@
 """
-Integration Test: SeamlessM4T-v2 Model Translation
+Integration Test: MADLAD-400-3B Model Translation
 
-This test verifies that the SeamlessM4Tv2Translator can successfully translate a simple phrase
+This test verifies that the MADLAD400Translator can successfully translate a simple phrase
 from English to Romanian. It's a lightweight check to ensure the model loads
 and produces the expected output.
 """
@@ -22,25 +22,26 @@ from tests.utils import (BaseTranslatorIntegrationTest, get_test_device,
                          skip_if_transformers_unavailable, safe_init_translator)
 
 # Import the specific translator and its related flags
-from seamlessm4t_translator import SeamlessM4Tv2Translator, TRANSFORMERS_AVAILABLE, IMPORT_ERROR
+from madlad400_translator import MADLAD400Translator, TRANSFORMERS_AVAILABLE, IMPORT_ERROR
 
 
-class TestSeamlessM4TIntegration(BaseTranslatorIntegrationTest):
+class TestMADLADIntegration(BaseTranslatorIntegrationTest):
 
     @classmethod
     def setUpClass(cls):
         """Set up the translator instance once for all tests in this class."""
         super().setUpClass()  # Call base class setup
 
-        skip_if_transformers_unavailable(TRANSFORMERS_AVAILABLE, IMPORT_ERROR, "SeamlessM4Tv2Translator")
+        skip_if_transformers_unavailable(TRANSFORMERS_AVAILABLE, IMPORT_ERROR, "MADLAD400Translator")
 
         cls.translator = safe_init_translator(
-            translator_class=SeamlessM4Tv2Translator,
-            translator_name="SeamlessM4Tv2Translator",
+            translator_class=MADLAD400Translator,
+            translator_name="MADLAD400Translator",
             init_kwargs={
                 'target_language': 'Romanian',
                 'lang_code': 'ro',
-                'device': get_test_device()
+                'device': get_test_device(),
+                'unsloth': False  # Use standard transformers (unsloth needs torchao)
             }
         )
 
@@ -49,8 +50,8 @@ class TestSeamlessM4TIntegration(BaseTranslatorIntegrationTest):
         Tests translation of "Hello World!" to Romanian.
         """
         english_text = "Hello World!"
-        # SeamlessM4T-v2 translates "Hello World!" to "Bună lumea!"
-        expected_romanian = "Bună lumea!"
+        # MADLAD-400 translates "Hello World!" to "Salut lume!"
+        expected_romanian = "Salut lume!"
 
         self._assert_translation(english_text, expected_romanian)
 

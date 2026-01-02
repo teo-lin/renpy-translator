@@ -212,7 +212,7 @@ class MADLAD400Translator:
 
         return translation
 
-    def translate(self, text: str, max_length: int = 512, num_beams: int = 4,
+    def translate(self, text: str, max_length: int = 128, num_beams: int = 1,
                   temperature: float = 1.0, context: list = None,
                   speaker: str = None) -> str:
         """
@@ -220,7 +220,7 @@ class MADLAD400Translator:
 
         Args:
             text: English text to translate
-            max_length: Maximum length of translation
+            max_length: Maximum number of new tokens to generate
             num_beams: Number of beams for beam search
             temperature: Sampling temperature (1.0 = default)
             context: Optional list of previous dialogue lines (for consistency)
@@ -235,20 +235,23 @@ class MADLAD400Translator:
         # Prepare input with language tag
         input_text = f"{lang_tag} {text}"
 
-        # Tokenize
-        inputs = self.tokenizer(input_text, return_tensors="pt", padding=True)
+        # Tokenize (no padding for single input - padding causes translation artifacts)
+        inputs = self.tokenizer(input_text, return_tensors="pt")
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
         # Generate translation
         with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs,
-                max_length=max_length,
-                num_beams=num_beams,
-                temperature=temperature,
-                early_stopping=True,
-                do_sample=False,  # Use beam search, not sampling
-            )
+            # Use greedy decoding for better quality (num_beams=1)
+            # early_stopping only works with beam search (num_beams > 1)
+            gen_kwargs = {
+                "max_new_tokens": max_length,
+                "do_sample": False,
+            }
+            if num_beams > 1:
+                gen_kwargs["num_beams"] = num_beams
+                gen_kwargs["early_stopping"] = True
+
+            outputs = self.model.generate(**inputs, **gen_kwargs)
 
         # Decode translation
         translation = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
@@ -258,6 +261,15 @@ class MADLAD400Translator:
 
         # Clean up translation
         translation = translation.strip()
+
+        # MADLAD sometimes generates extra text beyond the translation
+        # Extract just the first sentence if there's punctuation
+        if '!' in translation:
+            translation = translation.split('!')[0] + '!'
+        elif '.' in translation:
+            translation = translation.split('.')[0] + '.'
+        elif '?' in translation:
+            translation = translation.split('?')[0] + '?'
 
         return translation
 

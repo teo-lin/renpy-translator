@@ -17,8 +17,6 @@ sys.path.insert(0, str(project_root / "src" / "translators"))
 
 import unittest
 
-import pytest
-
 # Import the base test class and utility functions
 from tests.utils import BaseTranslatorIntegrationTest
 
@@ -30,6 +28,7 @@ from aya23_translator import Aya23Translator
 MODEL_SUBDIR = "aya-23-8B-GGUF"
 MODEL_FILENAME = "aya-23-8B-Q4_K_M.gguf"
 
+
 class TestAya23Integration(BaseTranslatorIntegrationTest):
     # Use the helper method from the base class to construct the model path
     model_path = BaseTranslatorIntegrationTest.project_root / "models" / MODEL_SUBDIR / MODEL_FILENAME
@@ -37,10 +36,10 @@ class TestAya23Integration(BaseTranslatorIntegrationTest):
     @classmethod
     def setUpClass(cls):
         """Set up the translator instance once for all tests in this class."""
-        super().setUpClass() # Call base class setup
+        super().setUpClass()  # Call base class setup
 
         if not cls.model_path.exists():
-            pytest.skip(f"Aya-23 model not found at {cls.model_path}")
+            raise unittest.SkipTest(f"Aya-23 model not found at {cls.model_path}")
 
         print("Setting up Aya23Translator for integration test...")
         cls.translator = Aya23Translator(
@@ -55,6 +54,7 @@ class TestAya23Integration(BaseTranslatorIntegrationTest):
         Tests translation of "Hello World!" to Romanian.
         """
         english_text = "Hello World!"
+        # Aya-23 translates "Hello World!" to "Bună ziua!"
         expected_romanian = "Bună ziua!"
 
         self._assert_translation(english_text, expected_romanian)

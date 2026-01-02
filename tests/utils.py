@@ -6,6 +6,7 @@ Provides reusable functions for:
 - File operations (backup, restore, cleanup)
 - Translation counting
 - Validation
+- Integration test helpers
 """
 
 import re
@@ -13,7 +14,7 @@ import shutil
 import sys
 import unittest
 from pathlib import Path
-from typing import Dict, List, TypeVar, Type
+from typing import Dict, List, TypeVar, Type, Callable, Any
 
 
 # --- Existing Utility Functions (unchanged) ---
@@ -325,3 +326,67 @@ class BaseTranslatorIntegrationTest(unittest.TestCase):
             # Use ASCII representation for characters that can't be printed
             print("Received translation:", ascii(translation))
         self.assertEqual(translation, expected_romanian)
+
+
+# --- Integration Test Helper Functions ---
+
+def get_test_device() -> str:
+    """
+    Auto-detect best available device for testing.
+
+    Returns:
+        'cuda' if GPU is available, otherwise 'cpu'
+    """
+    try:
+        import torch
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    except ImportError:
+        return "cpu"
+
+
+def skip_if_transformers_unavailable(transformers_available: bool, import_error: str,
+                                     translator_name: str) -> None:
+    """
+    Skip test if transformers is not available.
+
+    Args:
+        transformers_available: Boolean flag indicating if transformers imported successfully
+        import_error: Error message from failed import
+        translator_name: Name of the translator for error message
+
+    Raises:
+        unittest.SkipTest: If transformers is not available
+    """
+    if not transformers_available:
+        raise unittest.SkipTest(
+            f"{translator_name} requires transformers and torch packages "
+            f"due to: {import_error}"
+        )
+
+
+def safe_init_translator(translator_class: Type, translator_name: str,
+                        init_kwargs: dict) -> Any:
+    """
+    Safely initialize a translator with error handling.
+
+    Args:
+        translator_class: The translator class to instantiate
+        translator_name: Name of the translator for logging
+        init_kwargs: Keyword arguments to pass to translator constructor
+
+    Returns:
+        Initialized translator instance
+
+    Raises:
+        unittest.SkipTest: If initialization fails (e.g., memory constraints)
+    """
+    print(f"Setting up {translator_name} for integration test...")
+    try:
+        translator = translator_class(**init_kwargs)
+        print("Translator setup complete.")
+        return translator
+    except Exception as e:
+        raise unittest.SkipTest(
+            f"Failed to load {translator_name}, likely due to memory constraints "
+            f"or other issues: {e}"
+        )

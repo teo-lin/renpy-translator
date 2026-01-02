@@ -1,12 +1,9 @@
 """
-Integration Test: LLMic-3B Model Translation
+Integration Test: MBART-En-Ro Model Translation
 
-This test verifies that the LLMicTranslator can successfully translate a simple phrase
+This test verifies that the MBARTTranslator can successfully translate a simple phrase
 from English to Romanian. It's a lightweight check to ensure the model loads
 and produces the expected output.
-
-NOTE: This test is currently skipped because LLMic's direct translation for 'Hello World!'
-with simple prompting is unpredictable and requires specific tuning or different prompt format.
 """
 
 import sys
@@ -21,32 +18,27 @@ sys.path.insert(0, str(project_root / "src" / "translators"))
 import unittest
 
 # Import the base test class and utility functions
-from tests.utils import BaseTranslatorIntegrationTest, get_test_device, skip_if_transformers_unavailable, safe_init_translator
+from tests.utils import (BaseTranslatorIntegrationTest, get_test_device,
+                         skip_if_transformers_unavailable, safe_init_translator)
 
 # Import the specific translator and its related flags
-from llmic_translator import LLMicTranslator, TRANSFORMERS_AVAILABLE, IMPORT_ERROR
+from mbart_translator import MBARTTranslator, TRANSFORMERS_AVAILABLE, IMPORT_ERROR
 
 
-class TestLLMicIntegration(BaseTranslatorIntegrationTest):
+class TestMBARTIntegration(BaseTranslatorIntegrationTest):
 
     @classmethod
     def setUpClass(cls):
         """Set up the translator instance once for all tests in this class."""
         super().setUpClass()  # Call base class setup
 
-        # Skip this test suite - LLMic needs specific prompt tuning
-        raise unittest.SkipTest(
-            "LLMic model's direct translation for 'Hello World!' with simple prompting "
-            "is unpredictable; requires specific tuning or different prompt format."
-        )
-
-        # The following code is unreachable but left for reference:
-        skip_if_transformers_unavailable(TRANSFORMERS_AVAILABLE, IMPORT_ERROR, "LLMicTranslator")
+        skip_if_transformers_unavailable(TRANSFORMERS_AVAILABLE, IMPORT_ERROR, "MBARTTranslator")
 
         cls.translator = safe_init_translator(
-            translator_class=LLMicTranslator,
-            translator_name="LLMicTranslator",
+            translator_class=MBARTTranslator,
+            translator_name="MBARTTranslator",
             init_kwargs={
+                'model_path': 'facebook/mbart-large-en-ro',  # Use default HuggingFace model
                 'target_language': 'Romanian',
                 'lang_code': 'ro',
                 'device': get_test_device()
@@ -58,7 +50,9 @@ class TestLLMicIntegration(BaseTranslatorIntegrationTest):
         Tests translation of "Hello World!" to Romanian.
         """
         english_text = "Hello World!"
-        expected_romanian = "Bună ziua!"  # Plausible translation
+        # MBART translates "Hello World!" - expected output may vary
+        # This is a placeholder - update after first successful run
+        expected_romanian = "Bună lumea!"
 
         self._assert_translation(english_text, expected_romanian)
 
