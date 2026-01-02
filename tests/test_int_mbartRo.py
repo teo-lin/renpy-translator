@@ -38,7 +38,6 @@ class TestMBARTIntegration(BaseTranslatorIntegrationTest):
             translator_class=MBARTTranslator,
             translator_name="MBARTTranslator",
             init_kwargs={
-                'model_path': 'facebook/mbart-large-en-ro',  # Use default HuggingFace model
                 'target_language': 'Romanian',
                 'lang_code': 'ro',
                 'device': get_test_device()
