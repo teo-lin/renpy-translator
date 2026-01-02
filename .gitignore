@@ -13,7 +13,7 @@ models/*
 *.gguf
 *.bin
 *.safetensors
-!models/MODELS.md
+!models/*.md
 !models/models_config.json
 
 # Data - ignore directory but track specific files

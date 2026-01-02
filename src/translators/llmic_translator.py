@@ -156,7 +156,7 @@ class LLMicTranslator:
         )
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
-        # Generate translation
+        # Generate translation (max_new_tokens=256)
         with torch.no_grad():
             outputs = self.model.generate(
                 **inputs,
@@ -177,7 +177,11 @@ class LLMicTranslator:
             translation = full_output.split("Romanian:")[-1].strip()
         else:
             # Fallback: remove the prompt from output
-            translation = full_output.replace(prompt, "").strip()
+            translation = full_output.replace(prompt, "", 1).strip()
+
+        # Truncate at the first newline character to prevent excessive generation
+        if "\n" in translation:
+            translation = translation.split("\n")[0].strip()
 
         # Apply glossary if available
         translation = self._apply_glossary(text, translation)
