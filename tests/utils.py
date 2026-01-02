@@ -318,5 +318,10 @@ class BaseTranslatorIntegrationTest(unittest.TestCase):
         """
         print(f"Translating: '{english_text}'")
         translation = self.translator.translate(english_text)
-        print(f"Received translation: '{translation}'")
+        # Handle Unicode characters on Windows console (cp1252 encoding)
+        try:
+            print(f"Received translation: '{translation}'")
+        except UnicodeEncodeError:
+            # Use ASCII representation for characters that can't be printed
+            print("Received translation:", ascii(translation))
         self.assertEqual(translation, expected_romanian)

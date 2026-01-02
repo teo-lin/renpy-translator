@@ -11,13 +11,13 @@
 | `test_e2e_example_game.py` | ✅ | ✅ | ✅ Any | | ✅ | ⚠️ Mod (PS) |
 | `test_e2e_translate_aio.py` | | | ✅ Any | | | ⚠️ AIO |
 | `test_e2e_translate_aio_uncensored.py`| | | ✅ Any | | | ⚠️ AIO |
-| `test_u_extract_merge.py` | | ✅ | | | ✅ | ✅ Mod |
-| `test_u_renpy_tags.py` | | ⚠️ Unit | | | ⚠️ Unit | ✅ Mod |
-| `test_u_config.py` | ✅ | | | | | ⚠️ Mod (PS) |
-| `test_u_extract.py`| | ✅ | | | | ✅ Mod |
-| `test_u_translate_modular.py` | | | ⚠️ Mock | | | ✅ Mod |
-| `test_u_correct.py` | | | | ✅ | | ✅ Mod |
-| `test_u_merge.py` | | | | | ✅ | ✅ Mod |
+| `test_unit_extract_merge.py` | | ✅ | | | ✅ | ✅ Mod |
+| `test_unit_renpy_tags.py` | | ⚠️ Unit | | | ⚠️ Unit | ✅ Mod |
+| `test_unit_config.py` | ✅ | | | | | ⚠️ Mod (PS) |
+| `test_unit_extract.py`| | ✅ | | | | ✅ Mod |
+| `test_unit_translate_modular.py` | | | ⚠️ Mock | | | ✅ Mod |
+| `test_unit_correct.py` | | | | ✅ | | ✅ Mod |
+| `test_unit_merge.py` | | | | | ✅ | ✅ Mod |
 
 ---
 
@@ -35,14 +35,14 @@
 ### Run Individual Tests
 ```powershell
 # Run unit tests directly (no model needed)
-.\venv\Scripts\python.exe .\tests\test_u_config.py
-.\venv\Scripts\python.exe .\tests\test_u_extract.py
-.\venv\Scripts\python.exe .\tests\test_u_merge.py
-.\venv\Scripts\python.exe .\tests\test_u_correct.py
-.\venv\Scripts\python.exe .\tests\test_u_renpy_tags.py
+.\venv\Scripts\python.exe .\tests\test_unit_config.py
+.\venv\Scripts\python.exe .\tests\test_unit_extract.py
+.\venv\Scripts\python.exe .\tests\test_unit_merge.py
+.\venv\Scripts\python.exe .\tests\test_unit_correct.py
+.\venv\Scripts\python.exe .\tests\test_unit_renpy_tags.py
 
 # Run modular translation test (requires model, uses mock)
-.\venv\Scripts\python.exe .\tests\test_u_translate_modular.py
+.\venv\Scripts\python.exe .\tests\test_unit_translate_modular.py
 
 # E2E tests (need model files downloaded)
 .\venv\Scripts\python.exe .\tests\test_e2e_aya23.py

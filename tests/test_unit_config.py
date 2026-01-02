@@ -13,7 +13,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-def test_u_config():
+def test_unit_config():
     """Test that 1-config.ps1 creates characters.json correctly"""
 
     # Paths
@@ -181,5 +181,5 @@ def test_u_config():
         return False
 
 if __name__ == "__main__":
-    success = test_u_config()
+    success = test_unit_config()
     sys.exit(0 if success else 1)

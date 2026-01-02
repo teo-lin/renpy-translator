@@ -1,7 +1,10 @@
 # Ren'Py Translation System - Automated Testing Script
-# Run as: .\test.ps1
+# Run as: .\8-test.ps1 [--unit | --int | --e2e] [-Model <num>]
 
 param(
+    [switch]$Unit,   # Run only test_unit_* tests
+    [switch]$Int,    # Run only test_int_* tests (integration tests)
+    [switch]$E2e,    # Run only test_e2e_* tests (end-to-end tests)
     [int]$Model = 2  # Model number to test (1-based), 2 = Aya-23 (default), 0 = prompt user
 )
 
@@ -128,15 +131,31 @@ if ($installedModels.Count -eq 0) {
 
 Write-Info "Test Language: $($selectedLanguage.Name) ($($selectedLanguage.Code))"
 
-# Find all test files
-$testFiles = Get-ChildItem -Path $testDir -Filter "test_*.py" -File | Sort-Object Name
+# Find all test files based on flags
+$allTestFiles = Get-ChildItem -Path $testDir -Filter "test_*.py" -File | Sort-Object Name
+
+# Apply filtering based on flags
+if ($Unit) {
+    $testFiles = $allTestFiles | Where-Object { $_.Name -like "test_unit_*" }
+    $testCategory = "Unit Tests"
+} elseif ($Int) {
+    $testFiles = $allTestFiles | Where-Object { $_.Name -like "test_int_*" }
+    $testCategory = "Integration Tests"
+} elseif ($E2e) {
+    $testFiles = $allTestFiles | Where-Object { $_.Name -like "test_e2e_*" }
+    $testCategory = "End-to-End Tests"
+} else {
+    $testFiles = $allTestFiles
+    $testCategory = "All Tests"
+}
 
 if ($testFiles.Count -eq 0) {
-    Write-Failure "No test files found in $testDir"
+    Write-Failure "No test files found in $testDir matching the specified category"
     exit 1
 }
 
 Write-Info ""
+Write-Info "Running: $testCategory"
 Write-Info "Found $($testFiles.Count) test file(s):"
 Write-Info ""
 foreach ($file in $testFiles) {

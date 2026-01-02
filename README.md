@@ -185,8 +185,8 @@ Place in `data\<language>_corrections.json`
 │   └── user_selection.ps1 # Interactive game/language selection
 ├── tests/                 # Automated tests
 │   ├── test_end_to_end.py           # End-to-end translation tests
-│   ├── test_u_renpy_tags.py           # Tag preservation tests
-│   └── test_u_extract_merge.py     # Modular pipeline tests (NEW)
+│   ├── test_unit_renpy_tags.py           # Tag preservation tests
+│   └── test_unit_extract_merge.py     # Modular pipeline tests (NEW)
 ├── data/                  # Prompts, glossaries, benchmarks, and correction rules
 │   ├── prompts/
 │   │   ├── translate.txt              # Translation prompt template (customizable)

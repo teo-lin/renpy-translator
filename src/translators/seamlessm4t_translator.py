@@ -137,7 +137,7 @@ class SeamlessM4Tv2Translator:
             model_name,
             low_cpu_mem_usage=True,  # Reduces RAM usage during loading
             device_map="auto",  # Automatically manages memory across CPU/GPU
-            torch_dtype=torch.float16 if device == "cuda" else torch.float32  # Use half precision on GPU
+            dtype=torch.float16 if device == "cuda" else torch.float32  # Use half precision on GPU
         )
         # Note: Don't call .to(device) when using device_map="auto"
 
@@ -179,18 +179,17 @@ class SeamlessM4Tv2Translator:
 
         return translation
 
-    def translate(self, text: str, max_length: int = 512, num_beams: int = 5,
+    def translate(self, text: str, max_length: int = 256, num_beams: int = 5,
                   context: list = None, speaker: str = None) -> str:
         """
         Translate text using SeamlessM4T-v2
 
         Args:
             text: English text to translate
-            max_length: Maximum length of translation
+            max_length: Maximum number of new tokens to generate
             num_beams: Number of beams for beam search (default 5 for quality)
             context: Optional list of previous dialogue lines (for consistency)
             speaker: Optional character name/identifier
-            max_new_tokens: The maximum number of tokens to generate in the completion.
 
         Returns:
             Translated text
@@ -218,7 +217,7 @@ class SeamlessM4Tv2Translator:
             output_tokens = self.model.generate(
                 **text_inputs,
                 tgt_lang=self.lang_code_3letter,
-                max_length=max_length,
+                max_new_tokens=max_length,
                 num_beams=num_beams,
                 early_stopping=True,
                 generate_speech=False,              # Explicitly disable speech generation

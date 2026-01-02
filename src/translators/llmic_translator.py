@@ -76,7 +76,7 @@ class LLMicTranslator:
         # Use memory-efficient loading to avoid paging file errors
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
-            torch_dtype=torch.float16 if device == "cuda" else torch.float32,
+            dtype=torch.float16 if device == "cuda" else torch.float32,
             low_cpu_mem_usage=True,  # Reduces RAM usage during loading
             device_map="auto"  # Automatically manages memory across CPU/GPU
         )

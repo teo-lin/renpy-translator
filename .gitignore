@@ -64,3 +64,5 @@ renpy/*
 !renpy/unRen/
 !renpy/unRen/**
 /src/PROMO.md
+/TROUBLESHOOTING.md
+/STATUS.md
