@@ -1,651 +1,712 @@
-# Enro - Ren'Py Translation System Status
+# Enro - Ren'Py Translation System
 
 **Last Updated:** 2026-01-03
 
 ---
 
-## Current State Summary
+## Current State
 
-**Status:** ✅ Production Ready with 5/6 models working
+**Status:** ✅ Production Ready - 5/6 models working
 
-**Working Models:**
-- ✅ Aya-23-8B (llama.cpp) - Production ready, 5.8GB VRAM
-- ✅ MADLAD-400-3B (T5) - Working, 4GB VRAM
-- ✅ SeamlessM4T-v2 (Multimodal) - Working but slow, 5GB+ VRAM
-- ✅ MBART-En-Ro (BART) - Working, 2GB VRAM
-- ✅ Helsinki-RO (OPUS-MT) - Working, 1GB VRAM
+**Models:**
+- ✅ Aya-23-8B (llama.cpp) - 5.8GB VRAM
+- ✅ MADLAD-400-3B (T5) - 4GB VRAM
+- ✅ SeamlessM4T-v2 (Multimodal) - 5GB+ VRAM
+- ✅ MBART-En-Ro (BART) - 2GB VRAM
+- ✅ Helsinki-RO (OPUS-MT) - 1GB VRAM
 - ❌ QuickMT-En-Ro - Not implemented
 
-**Test Results:** All core tests passing
-
----
-
-## Architecture Overview
-
-### Current Pipeline Flow
-
+**Pipeline:**
 ```
-1-config.ps1          →  Discover games & characters
-2-extract.ps1         →  .rpy → .parsed.yaml + .tags.json
-3-translate.ps1       →  Translate .parsed.yaml files
-4-correct.ps1         →  Grammar/pattern corrections
-5-merge.ps1           →  .parsed.yaml + .tags.json → .translated.rpy
-7-all-in-one.ps1      →  Direct .rpy translation (legacy)
-```
-
-### Directory Structure
-
-```
-enro/
-├── src/                      # Core modules
-│   ├── extract.py           # RenpyExtractor
-│   ├── merger.py            # RenpyMerger
-│   ├── renpy_utils.py       # Tag handling utilities
-│   ├── models.py            # Data type definitions
-│   ├── translation_pipeline.py  # Legacy pipeline
-│   └── translators/         # Translation backends
-│       ├── aya23_translator.py
-│       ├── madlad400_translator.py
-│       ├── mbartRo_translator.py
-│       ├── helsinkyRo_translator.py
-│       └── seamless96_translator.py
-├── scripts/                 # Entry point scripts
-│   ├── translate.py        # Main translation orchestrator
-│   └── correct.py          # Grammar correction
-├── tests/                   # Test suite
-├── data/                    # Prompts, glossaries, corrections
-└── models/                  # Model configs & downloads
+1-config.ps1   → Discover games & characters
+2-extract.ps1  → .rpy → .parsed.yaml + .tags.json
+3-translate.ps1→ Translate .parsed.yaml
+4-correct.ps1  → Grammar/pattern corrections
+5-merge.ps1    → .parsed.yaml + .tags.json → .translated.rpy
 ```
 
 ---
 
-## Architecture Issues: Coupling Analysis
+## Dependency Map
 
-### Current Coupling Problems
+### File Classification
 
-#### 1. **Tight Coupling via Shared Utilities**
-- `renpy_utils.py` contains both Ren'Py-specific logic AND translation utilities
-- `RenpyTagExtractor` is used by extract, merge, AND translation
-- Hard to reuse translation logic for other game engines
+**Pure Translation Logic (Generic):**
+- `src/prompts.py` - Template management ✅
+- `src/batch_translator.py` - Batch processing ✅
+- `src/translators/*.py` - All 5 translator backends ✅
+- `src/models.py` - Type definitions ⚠️ **MIXED - needs splitting**
+- `src/core.py` - LEGACY ❌ **Delete in Phase 2**
 
-#### 2. **Config Monolith**
-- `current_config.json` mixes:
-  - Game-specific settings (paths, character names)
-  - Translation settings (language, model)
-  - Ren'Py-specific settings (SDK paths)
-- Changing one aspect requires understanding all aspects
+**Ren'Py-Specific Logic:**
+- `src/extract.py` - .rpy → YAML/JSON extraction
+- `src/merger.py` - YAML/JSON → .rpy merging
+- `src/renpy_utils.py` - Tag extraction, parsing ⚠️ **MIXED - needs splitting**
+- `src/translation_pipeline.py` - Ren'Py translation pipeline ❌ **Optional, can delete**
 
-#### 3. **Data Model Coupling**
-- `models.py` defines Ren'Py-specific types (`RenpyBlock`, `TaggedBlock`)
-- Translation code depends on these Ren'Py-specific structures
-- Can't easily adapt to other formats (Unity TextMeshPro, etc.)
+**Scripts (Entry Points):**
+- `scripts/translate.py` - Main translation orchestrator
+- `scripts/correct.py` - Correction script (uses legacy core.py)
+- `scripts/benchmark*.py` - Quality benchmarking (uses legacy core.py)
 
-#### 4. **Orchestration Coupling**
-- PowerShell launchers call Python scripts directly
-- No abstraction layer between UI and business logic
-- Hard to create alternative frontends (GUI, web service)
+### Import Dependencies
 
-#### 5. **Translation Backend Coupling**
-- Each translator imports Ren'Py-specific utilities
-- Character context handling is Ren'Py-aware
-- Can't reuse translators in non-Ren'Py projects
+```
+Base Layer (no internal deps):
+├── prompts.py ✅ Pure
+├── models.py ⚠️ Mixed (generic + Ren'Py types)
+└── renpy_utils.py ⚠️ Mixed (progress display + Ren'Py parsing)
+
+Mid Layer (depends on base):
+├── batch_translator.py → models ✅ Pure
+├── extract.py → models, renpy_utils (Ren'Py)
+├── merger.py → models, renpy_utils (Ren'Py)
+├── translation_pipeline.py → renpy_utils ❌ Deletable
+└── core.py (LEGACY) → prompts ❌ Delete
+
+Translators (depends on base): ✅ All Pure
+├── aya23_translator.py → prompts
+├── helsinkyRo_translator.py
+├── mbartRo_translator.py
+├── madlad400_translator.py
+└── seamless96_translator.py
+
+Scripts (terminal nodes):
+├── translate.py → models, aya23_translator, renpy_utils
+├── correct.py → core (LEGACY) ⚠️ Blocks deletion
+└── benchmark*.py → models, translators, renpy_utils ⚠️ Blocks deletion
+```
 
 ---
 
-## Decoupling Plan
+## 🚨 Critical Findings from Dependency Analysis
 
-### Phase 1: Define Core Abstractions 🎯
+### 1. **renpy_utils.py Contains Mixed Concerns**
+**Problem:** Used by 7 files, contains BOTH generic and Ren'Py-specific code:
+- **Generic:** `show_progress()` - UI utility (used by scripts)
+- **Ren'Py-specific:** `RenpyTagExtractor`, parsing logic, regex patterns
 
-**Goal:** Establish clear interfaces between concerns
+**Impact:** Cannot move to `local-translator` as-is without importing Ren'Py logic.
 
-#### 1.1 Create Abstract Game Engine Interface
-
-**New File:** `src/interfaces/game_engine.py`
-
+**Solution:**
 ```python
-from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Tuple
+# src/utils/ui.py (→ local-translator)
+def show_progress(current, total, desc): ...
 
-class GameContent:
-    """Language-agnostic game content block"""
+# src/renpy_utils.py (→ renpy-translator)
+class RenpyTagExtractor: ...
+# All Ren'Py parsing logic stays here
+```
+
+**Files affected:** 7 files import `renpy_utils`
+- `translation_pipeline.py` (deletable)
+- `extract.py`, `merger.py` (use tag extraction)
+- `scripts/translate.py`, `scripts/benchmark*.py` (use show_progress)
+
+---
+
+### 2. **models.py Contains Mixed Types**
+**Problem:** Contains BOTH generic and Ren'Py-specific type definitions:
+
+**Generic types:**
+- `BlockType` enum (dialogue, narrator, choice, etc.)
+- `ParsedBlock` concept (block with text + metadata)
+
+**Ren'Py-specific types:**
+- `RenpyBlock` - Raw .rpy block structure
+- `TaggedBlock` - Ren'Py tag metadata
+- `TagsFileContent` - .tags.json structure
+
+**Impact:** Cannot move to `local-translator` with Ren'Py types included.
+
+**Solution:**
+```python
+# local_translator/models.py (generic)
+@dataclass
+class TranslationBlock:
     id: str
-    type: str  # dialogue, narrator, choice, string
     text: str
+    block_type: str  # 'dialogue', 'narrator', etc.
     metadata: Dict[str, Any]
-    speaker: Optional[str]
+    speaker: Optional[str] = None
 
-class GameEngine(ABC):
-    """Abstract game engine adapter"""
+# renpy_translator/models.py (Ren'Py-specific)
+from local_translator.models import TranslationBlock
 
-    @abstractmethod
-    def extract(self, file_path: str) -> List[GameContent]:
-        """Extract translatable content from game file"""
-        pass
-
-    @abstractmethod
-    def merge(self, file_path: str, content: List[GameContent]) -> str:
-        """Merge translated content back to game format"""
-        pass
-
-    @abstractmethod
-    def validate(self, original: GameContent, translated: GameContent) -> List[str]:
-        """Validate translation integrity"""
-        pass
+@dataclass
+class RenpyBlock(TranslationBlock):
+    tags: List[Tag]
+    original_template: str
+    character_var: str
 ```
 
-#### 1.2 Create Abstract Translation Interface
+**Files affected:** 5 files import `models`
+- `batch_translator.py` (generic)
+- `extract.py`, `merger.py` (Ren'Py-specific)
+- `scripts/translate.py`, `scripts/benchmark*.py`
 
-**New File:** `src/interfaces/translator.py`
+---
 
+### 3. **translation_pipeline.py is Optional/Deletable**
+**Finding:** Only used in `__main__` blocks of translators for standalone testing.
+
+**NOT used by:**
+- Main workflow (`scripts/translate.py`)
+- Extract/merge pipeline
+- Any production code
+
+**Recommendation:** DELETE in Phase 2, replace with proper unit tests.
+
+---
+
+### 4. **core.py Blocks Phase 2 Cleanup**
+**Finding:** Legacy Aya23Translator still used by:
+- `scripts/correct.py` (line 213)
+- `scripts/benchmark.py` (line 46)
+
+**Blocker:** Must migrate these scripts BEFORE deleting `core.py`.
+
+**Solution:** Update scripts to use `translators/aya23_translator.py` instead.
+
+---
+
+### 5. **No Circular Dependencies** ✅
+**Good news:** Clean hierarchical structure:
+- Base → Mid → Scripts
+- No file imports create cycles
+- Safe to refactor
+
+---
+
+## Decoupling Plan - Two Repos
+
+### Goal
+Split into two packages:
+1. **local-translator** - Generic translation engine (reusable)
+2. **renpy-translator** - Ren'Py adapter (uses local-translator)
+
+---
+
+### Phase 1: In-Place Splits (Week 1) 🎯
+
+**Goal:** Prepare files for clean extraction by splitting mixed concerns.
+
+#### Week 1A: Config Split (2 days)
+
+**Current Problem:**
+```json
+// games/current_config.json - WRONG! Mixed concerns
+{
+  "game_path": "...",           // Game-specific
+  "target_language": "ro",      // Translation-specific
+  "selected_model": "aya23"     // Model-specific
+}
+```
+
+**Solution:**
+```yaml
+# games/<game_name>/config.yaml (game-specific)
+game_name: "the_question"
+game_path: "C:\\_____\\_CODE\\enro\\games\\the_question"
+source_language: "en"
+target_language: "ro"
+characters:
+  e: "Eileen"
+
+# config/translation.yaml (translation settings)
+selected_model: "aya23"
+target_language: "ro"
+glossary: "data/glossaries/ro.yaml"
+corrections: "data/corrections/ro.yaml"
+
+# config/models.yaml (model metadata)
+models:
+  aya23:
+    name: "Aya-23-8B"
+    path: "models/aya-23-8B-Q4_K_M.gguf"
+    memory: "5.8GB"
+    backend: "llama-cpp"
+```
+
+**Tasks:**
+- [ ] Create `config/` directory
+- [ ] Create `config/translation.yaml`
+- [ ] Create `config/models.yaml`
+- [ ] Create `games/<game>/config.yaml` for each game
+- [ ] Convert all JSON → YAML
+- [ ] Update loader functions in scripts
+- [ ] Test full pipeline
+- [ ] Keep backward compatibility wrapper (read old JSON if new YAML missing)
+
+---
+
+#### Week 1B: renpy_utils.py Split (2 days)
+
+**Problem:** Mixed generic UI and Ren'Py-specific logic.
+
+**Solution:**
 ```python
-from abc import ABC, abstractmethod
-from typing import List, Optional
+# src/utils/__init__.py (NEW)
+# Empty
 
-class TranslationContext:
-    """Generic translation context"""
+# src/utils/ui.py (NEW - generic, → local-translator)
+def show_progress(current: int, total: int, desc: str = "", width: int = 50) -> None:
+    """Display progress bar (generic, no Ren'Py deps)"""
+    ...
+
+# src/renpy_utils.py (KEEP - Ren'Py-specific, → renpy-translator)
+class RenpyTagExtractor:
+    """Extract/restore Ren'Py tags"""
+    ...
+
+class RenpyTranslationParser:
+    """Parse .rpy translation files"""
+    ...
+
+# All regex patterns, Ren'Py-specific logic stays here
+```
+
+**Tasks:**
+- [ ] Create `src/utils/` directory
+- [ ] Create `src/utils/ui.py`
+- [ ] Move `show_progress()` from `renpy_utils.py` → `utils/ui.py`
+- [ ] Update imports in all files:
+  - `from src.renpy_utils import show_progress` → `from src.utils.ui import show_progress`
+  - Keep `from src.renpy_utils import RenpyTagExtractor` as-is
+- [ ] Test all scripts (translate.py, benchmark*.py)
+- [ ] Verify extract.py, merger.py still work
+
+**Files to update:**
+- `scripts/translate.py` (line 25)
+- `scripts/benchmark_translate.py` (line 29)
+- Any other scripts using `show_progress()`
+
+---
+
+#### Week 1C: models.py Split (1 day)
+
+**Problem:** Mixed generic and Ren'Py-specific types.
+
+**Solution:**
+```python
+# src/models_generic.py (NEW - generic, → local-translator)
+from dataclasses import dataclass
+from typing import Dict, Any, Optional, List
+from enum import Enum
+
+class BlockType(Enum):
+    DIALOGUE = "dialogue"
+    NARRATOR = "narrator"
+    CHOICE = "choice"
+    STRING = "string"
+
+@dataclass
+class TranslationBlock:
+    """Generic translation block (engine-agnostic)"""
+    id: str
     text: str
-    preceding: List[str]
-    following: List[str]
-    speaker: Optional[str]
+    block_type: BlockType
     metadata: Dict[str, Any]
+    speaker: Optional[str] = None
 
-class Translator(ABC):
-    """Abstract translator backend"""
+# src/models.py (KEEP - Ren'Py-specific, → renpy-translator)
+from src.models_generic import TranslationBlock, BlockType
+from typing import TypedDict, List, Dict, Any
 
-    @abstractmethod
-    def translate(self, context: TranslationContext, target_lang: str) -> str:
-        pass
+class RenpyBlock(TypedDict):
+    """Ren'Py-specific block with tags"""
+    type: str
+    character_var: str
+    text: str
+    original_line: str
 
-    @property
-    @abstractmethod
-    def supported_languages(self) -> List[str]:
-        pass
-
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        pass
+class TaggedBlock(TypedDict):
+    """Block with tag metadata for .tags.json"""
+    id: str
+    type: str
+    original_text: str
+    tags: List[Dict[str, Any]]
+    template: str
 ```
 
-#### 1.3 Create Configuration Abstraction
+**Tasks:**
+- [ ] Create `src/models_generic.py`
+- [ ] Move generic types to `models_generic.py`
+- [ ] Update `src/models.py` to import from `models_generic.py`
+- [ ] Update imports in files:
+  - `batch_translator.py` → import from `models_generic`
+  - `extract.py`, `merger.py` → keep importing from `models`
+- [ ] Test extract/merge/translate pipeline
 
-**New Files:**
-- `src/config/game_config.py` - Game-specific settings
-- `src/config/translation_config.py` - Translation settings
-- `src/config/engine_config.py` - Engine-specific settings
+**Files to update:**
+- `src/batch_translator.py` (line 16-19)
+- `scripts/translate.py` (line 23)
+- `scripts/benchmark_translate.py` (line 23)
 
 ---
 
-### Phase 2: Refactor Ren'Py Logic 🔧
+### Phase 2: Cleanup & Legacy Removal (Week 2)
 
-**Goal:** Isolate all Ren'Py-specific code
+**Goal:** Remove legacy code, prepare for extraction.
 
-#### 2.1 Create Ren'Py Engine Adapter
-
-**New File:** `src/engines/renpy/renpy_engine.py`
-
-**Responsibilities:**
-- Implements `GameEngine` interface
-- Contains all Ren'Py parsing logic
-- Manages tag extraction/restoration
-- Validates Ren'Py-specific constraints
-
-**Consolidates:**
-- `src/extract.py` → `RenpyEngine.extract()`
-- `src/merger.py` → `RenpyEngine.merge()`
-- `src/renpy_utils.py` → Internal utilities
-
-#### 2.2 Reorganize Ren'Py Module
-
-**New Structure:**
-```
-src/engines/renpy/
-├── __init__.py
-├── renpy_engine.py          # Main adapter implementing GameEngine
-├── parser.py                # .rpy parsing logic
-├── tag_handler.py           # Tag extraction/restoration
-├── validator.py             # Ren'Py-specific validation
-└── models.py                # Ren'Py-specific data types
-```
-
-#### 2.3 Move Ren'Py Tools
-
-**Relocate:**
-- `renpy/` SDK → `src/engines/renpy/sdk/`
-- `renpy/tools_config.json` → `src/engines/renpy/config.json`
+**Tasks:**
+- [ ] Migrate `scripts/correct.py` from `core.py` to `translators/aya23_translator.py`
+- [ ] Migrate `scripts/benchmark.py` from `core.py` to `translators/aya23_translator.py`
+- [ ] Delete `src/core.py` (no longer used)
+- [ ] Delete `src/translation_pipeline.py` (optional, not used by main workflow)
+- [ ] Convert remaining JSON files to YAML:
+  - `data/ro_glossary.json` → `data/glossaries/ro.yaml`
+  - `data/ro_corrections.json` → `data/corrections/ro.yaml`
+  - `data/en_corrections.json` → `data/corrections/en.yaml`
+- [ ] Update all scripts to load YAML instead of JSON
+- [ ] Test full pipeline (config → extract → translate → correct → merge)
 
 ---
 
-### Phase 3: Refactor Translation Logic 🌍
+### Phase 3: Extract local-translator Package (Week 3)
 
-**Goal:** Make translation engine-agnostic
+**Goal:** Create standalone `local-translator` package.
 
-#### 3.1 Create Generic Translation Service
-
-**New File:** `src/services/translation_service.py`
-
-```python
-class TranslationService:
-    """Engine-agnostic translation orchestrator"""
-
-    def __init__(self,
-                 translator: Translator,
-                 engine: GameEngine,
-                 config: TranslationConfig):
-        self.translator = translator
-        self.engine = engine
-        self.config = config
-
-    def translate_file(self, input_path: str, output_path: str):
-        # 1. Extract using engine
-        content = self.engine.extract(input_path)
-
-        # 2. Translate using translator
-        for block in content:
-            context = self._build_context(block)
-            block.text = self.translator.translate(context)
-
-        # 3. Validate using engine
-        errors = self.engine.validate(original, content)
-
-        # 4. Merge using engine
-        result = self.engine.merge(input_path, content)
-
-        # 5. Save
-        self._save(output_path, result)
+**Create package structure:**
 ```
-
-#### 3.2 Refactor Translator Backends
-
-**For each translator in `src/translators/`:**
-
-1. Remove Ren'Py imports
-2. Implement new `Translator` interface
-3. Accept `TranslationContext` instead of raw strings
-4. Remove character-specific logic (move to Ren'Py adapter)
-
-**Example Migration:**
-
-**Before:** `aya23_translator.py`
-```python
-from src.renpy_utils import show_progress  # ❌ Coupled
-
-class Aya23Translator:
-    def translate(self, text: str, speaker: str) -> str:  # ❌ Ren'Py-aware
-        ...
-```
-
-**After:** `aya23_translator.py`
-```python
-from src.interfaces.translator import Translator, TranslationContext
-
-class Aya23Translator(Translator):
-    def translate(self, context: TranslationContext, target_lang: str) -> str:
-        # Generic translation logic
-        ...
-
-    @property
-    def supported_languages(self) -> List[str]:
-        return ["ro", "es", "fr", ...]
-```
-
-#### 3.3 Reorganize Translation Module
-
-**New Structure:**
-```
-src/translators/
-├── __init__.py
-├── base.py                  # Re-export Translator interface
-├── aya23.py                # Aya-23-8B implementation
-├── madlad400.py            # MADLAD-400 implementation
-├── mbart.py                # MBART implementation
-├── helsinki.py             # Helsinki OPUS-MT implementation
-└── seamless.py             # SeamlessM4T implementation
-```
-
----
-
-### Phase 4: Decouple Configuration 📋
-
-**Goal:** Separate concerns in configuration
-
-#### 4.1 Split Configuration Files
-
-**Current:** `models/current_config.json` (monolith)
-
-**New:**
-- `config/game.json` - Game paths, character mappings
-- `config/translation.json` - Target language, glossary paths
-- `config/engines/renpy.json` - Ren'Py SDK paths, extraction settings
-- `config/models.json` - Model metadata (keep as-is)
-
-#### 4.2 Create Config Loader
-
-**New File:** `src/config/loader.py`
-
-```python
-class ConfigLoader:
-    @staticmethod
-    def load_game_config(game_name: str) -> GameConfig:
-        ...
-
-    @staticmethod
-    def load_translation_config() -> TranslationConfig:
-        ...
-
-    @staticmethod
-    def load_engine_config(engine_name: str) -> EngineConfig:
-        ...
-```
-
----
-
-### Phase 5: Decouple Orchestration 🎭
-
-**Goal:** Separate business logic from UI
-
-#### 5.1 Create Workflow Orchestrator
-
-**New File:** `src/workflows/translation_workflow.py`
-
-```python
-class TranslationWorkflow:
-    """High-level workflow orchestrator"""
-
-    def __init__(self, engine_type: str, translator_type: str):
-        self.engine = self._create_engine(engine_type)
-        self.translator = self._create_translator(translator_type)
-
-    def extract(self, game_path: str):
-        """Extract translatable content"""
-        ...
-
-    def translate(self, language: str):
-        """Translate extracted content"""
-        ...
-
-    def correct(self, rules_path: str):
-        """Apply corrections"""
-        ...
-
-    def merge(self, output_path: str):
-        """Merge back to game format"""
-        ...
-
-    def full_pipeline(self, game_path: str, language: str):
-        """Run complete workflow"""
-        self.extract(game_path)
-        self.translate(language)
-        self.correct()
-        self.merge(output_path)
-```
-
-#### 5.2 Refactor PowerShell Launchers
-
-**Update all `.ps1` scripts to use orchestrator:**
-
-**Before:** `2-extract.ps1`
-```powershell
-python src/extract.py --game $gamePath  # ❌ Direct call
-```
-
-**After:** `2-extract.ps1`
-```powershell
-python scripts/run_workflow.py extract --engine renpy --game $gamePath
-```
-
-#### 5.3 Create Unified CLI
-
-**New File:** `scripts/run_workflow.py`
-
-```python
-import click
-from src.workflows.translation_workflow import TranslationWorkflow
-
-@click.group()
-def cli():
-    pass
-
-@cli.command()
-@click.option('--engine', default='renpy')
-@click.option('--game', required=True)
-def extract(engine, game):
-    workflow = TranslationWorkflow(engine_type=engine)
-    workflow.extract(game)
-
-@cli.command()
-@click.option('--translator', default='aya23')
-@click.option('--language', required=True)
-def translate(translator, language):
-    workflow = TranslationWorkflow(translator_type=translator)
-    workflow.translate(language)
-
-# ... more commands
-```
-
----
-
-### Phase 6: Update Tests 🧪
-
-**Goal:** Test decoupled components independently
-
-#### 6.1 Add Interface Tests
-
-**New Files:**
-- `tests/test_interface_game_engine.py` - Test GameEngine contract
-- `tests/test_interface_translator.py` - Test Translator contract
-
-#### 6.2 Add Adapter Tests
-
-**New Files:**
-- `tests/test_renpy_engine.py` - Test Ren'Py adapter
-- `tests/test_translator_aya23.py` - Test Aya23 with generic context
-
-#### 6.3 Update Integration Tests
-
-**Modify existing tests to use new interfaces:**
-- `tests/test_e2e_aya23.py` → Use `TranslationWorkflow`
-- `tests/test_e2e_example_game.py` → Use `RenpyEngine` directly
-
----
-
-## Migration Strategy
-
-### Step-by-Step Implementation
-
-#### Week 1: Foundation
-- [ ] Create `src/interfaces/` with abstract base classes
-- [ ] Create `src/config/` with split configuration
-- [ ] Write interface tests
-- [ ] Update documentation
-
-#### Week 2: Ren'Py Isolation
-- [ ] Create `src/engines/renpy/` module structure
-- [ ] Move `extract.py` → `renpy_engine.py::extract()`
-- [ ] Move `merger.py` → `renpy_engine.py::merge()`
-- [ ] Move `renpy_utils.py` → `renpy/tag_handler.py`
-- [ ] Update tests for Ren'Py adapter
-
-#### Week 3: Translation Refactor
-- [ ] Refactor all translators to implement `Translator` interface
-- [ ] Create `TranslationService`
-- [ ] Remove Ren'Py dependencies from translators
-- [ ] Update translator tests
-
-#### Week 4: Orchestration
-- [ ] Create `TranslationWorkflow`
-- [ ] Create unified CLI (`run_workflow.py`)
-- [ ] Update PowerShell launchers
-- [ ] Run full regression tests
-
-#### Week 5: Polish
-- [ ] Update all documentation
-- [ ] Create migration guide
-- [ ] Add examples for extending with new engines
-- [ ] Performance testing
-
----
-
-## Benefits of Decoupling
-
-### 1. **Reusability**
-- Translation backends can work with Unity, Godot, etc.
-- Ren'Py engine can be used in other translation tools
-- Easy to create standalone CLI tools
-
-### 2. **Maintainability**
-- Changes to Ren'Py parsing don't affect translators
-- Changes to translation logic don't affect extraction/merge
-- Clear separation of concerns
-
-### 3. **Testability**
-- Mock engines for testing translators
-- Mock translators for testing engines
-- Integration tests more focused
-
-### 4. **Extensibility**
-- Add new game engines by implementing `GameEngine`
-- Add new translators by implementing `Translator`
-- Add new workflows without modifying core code
-
-### 5. **Clarity**
-- New contributors understand boundaries
-- Config files have clear purposes
-- Code organization matches mental model
-
----
-
-## Post-Decoupling Architecture
-
-### Final Structure
-
-```
-enro/
-├── src/
-│   ├── interfaces/              # Abstract contracts
-│   │   ├── game_engine.py
-│   │   └── translator.py
-│   ├── engines/                 # Game engine adapters
-│   │   ├── renpy/
-│   │   │   ├── renpy_engine.py
-│   │   │   ├── parser.py
-│   │   │   ├── tag_handler.py
-│   │   │   └── validator.py
-│   │   └── unity/               # Future: Unity adapter
-│   ├── translators/             # Translation backends
-│   │   ├── base.py
-│   │   ├── aya23.py
+local-translator/
+├── pyproject.toml
+├── README.md
+├── LICENSE
+├── local_translator/
+│   ├── __init__.py
+│   ├── translators/
+│   │   ├── __init__.py
+│   │   ├── base.py              # Interface/protocol
+│   │   ├── aya23.py             # From src/translators/aya23_translator.py
 │   │   ├── madlad400.py
-│   │   └── ...
-│   ├── services/                # Business logic
-│   │   └── translation_service.py
-│   ├── workflows/               # Orchestration
-│   │   └── translation_workflow.py
-│   └── config/                  # Configuration management
-│       ├── loader.py
-│       ├── game_config.py
-│       ├── translation_config.py
-│       └── engine_config.py
-├── config/                      # Configuration files
-│   ├── game.json
-│   ├── translation.json
-│   └── engines/
-│       └── renpy.json
-├── scripts/                     # CLI entry points
-│   └── run_workflow.py
-├── tests/
-│   ├── test_interface_*.py
-│   ├── test_engine_*.py
-│   ├── test_translator_*.py
-│   └── test_e2e_*.py
-└── *.ps1                        # PowerShell UI (now thin wrappers)
+│   │   ├── mbart.py
+│   │   ├── helsinki.py
+│   │   └── seamless.py
+│   ├── models.py                # From src/models_generic.py
+│   ├── prompts.py               # From src/prompts.py
+│   ├── batch_translator.py      # From src/batch_translator.py
+│   └── utils/
+│       ├── __init__.py
+│       └── ui.py                # From src/utils/ui.py
+├── config/
+│   └── models.yaml              # From config/models.yaml
+├── data/
+│   ├── prompts/
+│   │   ├── translate.txt
+│   │   └── correct.txt
+│   ├── glossaries/
+│   │   ├── ro.yaml
+│   │   ├── es.yaml
+│   │   └── fr.yaml
+│   └── corrections/
+│       ├── ro.yaml
+│       └── es.yaml
+└── tests/
+    ├── test_translators/
+    │   ├── test_aya23.py
+    │   ├── test_madlad400.py
+    │   └── ...
+    └── test_batch_translator.py
+```
+
+**pyproject.toml:**
+```toml
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "local-translator"
+version = "1.0.0"
+description = "Local AI-powered game translation engine"
+authors = [{name = "Your Name", email = "you@example.com"}]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "pyyaml>=6.0",
+    "llama-cpp-python>=0.2.0",
+    "torch>=2.0.0",
+    "transformers>=4.30.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "black", "mypy"]
+```
+
+**Tasks:**
+- [ ] Create new repo: `local-translator`
+- [ ] Copy files from enro (see structure above)
+- [ ] Rename imports: `src.translators.aya23_translator` → `local_translator.translators.aya23`
+- [ ] Remove all Ren'Py dependencies
+- [ ] Create `pyproject.toml`
+- [ ] Create README.md with usage examples
+- [ ] Test package installation: `pip install -e .`
+- [ ] Run all tests in isolation
+- [ ] Verify no Ren'Py imports remain
+
+---
+
+### Phase 4: Refactor renpy-translator (Week 4)
+
+**Goal:** Use `local-translator` as dependency.
+
+**Structure:**
+```
+renpy-translator/
+├── README.md
+├── requirements.txt
+├── requirements-dev.txt
+├── renpy_translator/
+│   ├── __init__.py
+│   ├── extract.py             # From src/extract.py
+│   ├── merge.py               # From src/merger.py
+│   ├── renpy_utils.py         # From src/renpy_utils.py (cleaned)
+│   ├── models.py              # From src/models.py (Ren'Py-specific)
+│   └── validator.py           # NEW - validation logic
+├── scripts/
+│   ├── config.py
+│   ├── extract.py
+│   ├── translate.py           # Uses local_translator
+│   ├── correct.py
+│   └── merge.py
+├── launchers/                  # PowerShell UI
+│   ├── 0-setup.ps1
+│   ├── 1-config.ps1
+│   ├── 2-extract.ps1
+│   ├── 3-translate.ps1
+│   ├── 4-correct.ps1
+│   ├── 5-merge.ps1
+│   └── 8-test.ps1
+├── renpy_sdk/                  # Ren'Py SDK
+├── config/
+│   └── renpy.yaml             # Ren'Py-specific settings
+├── games/                      # User games (gitignored)
+└── tests/
+    ├── test_extract.py
+    ├── test_merge.py
+    └── test_e2e/
+```
+
+**requirements.txt:**
+```
+local-translator>=1.0.0
+pyyaml>=6.0
+```
+
+**requirements-dev.txt:**
+```
+-e ../local-translator  # Use local version for development
+pyyaml>=6.0
+pytest>=7.0
+```
+
+**Tasks:**
+- [ ] Add `local-translator` to requirements.txt
+- [ ] Install: `pip install -r requirements.txt`
+- [ ] Update imports:
+  - `from src.translators.aya23_translator import Aya23Translator` → `from local_translator.translators.aya23 import Aya23Translator`
+  - `from src.utils.ui import show_progress` → `from local_translator.utils.ui import show_progress`
+  - `from src.models_generic import TranslationBlock` → `from local_translator.models import TranslationBlock`
+- [ ] Remove duplicated files (translators, prompts.py, batch_translator.py, utils/ui.py)
+- [ ] Keep Ren'Py-specific files (extract.py, merge.py, renpy_utils.py, models.py)
+- [ ] Test full pipeline end-to-end
+- [ ] Update PowerShell launchers if needed
+
+---
+
+## What Goes Where?
+
+### ✅ local-translator (Generic Translation Engine)
+
+**From current enro:**
+- `src/translators/*.py` → `local_translator/translators/`
+- `src/prompts.py` → `local_translator/prompts.py`
+- `src/batch_translator.py` → `local_translator/batch_translator.py`
+- `src/models_generic.py` → `local_translator/models.py` (renamed)
+- `src/utils/ui.py` → `local_translator/utils/ui.py`
+- `data/prompts/` → `local_translator/data/prompts/`
+- `data/glossaries/` → `local_translator/data/glossaries/`
+- `data/corrections/` → `local_translator/data/corrections/`
+- `config/models.yaml` → `local_translator/config/models.yaml`
+
+**NOT included:**
+- ❌ Ren'Py-specific logic
+- ❌ Extract/merge code
+- ❌ Tag handling
+- ❌ .rpy parsing
+
+---
+
+### ✅ renpy-translator (Ren'Py Adapter)
+
+**Keep from current enro:**
+- `src/extract.py` → `renpy_translator/extract.py`
+- `src/merger.py` → `renpy_translator/merge.py`
+- `src/renpy_utils.py` → `renpy_translator/renpy_utils.py`
+- `src/models.py` → `renpy_translator/models.py`
+- `scripts/*.py` → `renpy_translator/scripts/`
+- `*.ps1` → `renpy_translator/launchers/`
+- `renpy/` → `renpy_translator/renpy_sdk/`
+- `tests/test_*extract*.py`, `test_*merge*.py` → `renpy_translator/tests/`
+- `config/translation.yaml` → User config
+- `games/` → User games
+
+**Depends on:**
+- ✅ `local-translator` (via pip install)
+
+---
+
+## Publishing to PyPI
+
+### Steps
+
+```bash
+# 1. Create free account at https://pypi.org/account/register/
+# (No verification, instant approval)
+
+# 2. Install tools
+pip install build twine
+
+# 3. Build package (in local-translator/)
+python -m build
+# Creates: dist/local_translator-1.0.0.tar.gz and .whl
+
+# 4. Upload to PyPI
+twine upload dist/*
+# Enter PyPI username/password
+
+# Done! Now anyone can: pip install local-translator
+```
+
+**Alternative (No PyPI):** Use local install
+```bash
+# In renpy-translator/requirements.txt
+-e ../local-translator  # Development mode
 ```
 
 ---
 
-## Risk Mitigation
+## Distribution Strategy
 
-### Backward Compatibility
-- Keep old scripts as deprecated wrappers during transition
-- Provide migration path for existing projects
-- Document breaking changes clearly
-
-### Testing Strategy
-- All existing tests must pass after each phase
-- Add new tests before refactoring
-- Regression testing after each week
-
-### Rollback Plan
-- Git branch for each phase
-- Tagged releases for stable points
-- Keep `main` branch stable
-
----
-
-## Success Metrics
-
-### Technical Metrics
-- [ ] Zero circular dependencies between modules
-- [ ] 100% test coverage on interfaces
-- [ ] All existing functionality preserved
-- [ ] Performance within 10% of current
-
-### Code Quality Metrics
-- [ ] Ren'Py code only in `engines/renpy/`
-- [ ] Translation code has zero Ren'Py imports
-- [ ] Config files < 50 lines each
-- [ ] Clear documentation for all interfaces
-
-### Usability Metrics
-- [ ] PowerShell scripts still work (as thin wrappers)
-- [ ] New CLI provides same functionality
-- [ ] Migration guide tested by 3rd party
-- [ ] Example Unity adapter can be created in < 1 day
-
----
-
-## Conclusion
-
-This decoupling plan transforms **enro** from a Ren'Py-specific tool into a **modular translation framework** where:
-
-- **Ren'Py is just one engine adapter** among many
-- **Translators are engine-agnostic** and reusable
-- **Configuration is split by concern** and easy to understand
-- **Workflows are composable** and testable
-- **Extensions are straightforward** via clear interfaces
-
-**Estimated effort:** 5 weeks for one developer
-**Priority:** Medium (current system works, but extensibility needed)
-**Recommended start:** After implementing QuickMT translator
-
----
-
-## Model Implementation Status
-
-### Working Models (5/6)
-
-| Model | Status | Implementation | Memory | Notes |
-|-------|--------|---------------|--------|-------|
-| **Aya-23-8B** | ✅ Production | `aya23_translator.py` | 5.8GB VRAM | llama-cpp (GGUF), no transformers |
-| **MADLAD-400-3B** | ✅ Working | `madlad400_translator.py` | 4GB VRAM | T5-based, 400+ languages |
-| **SeamlessM4T-v2** | ✅ Working | `seamlessm4t_translator.py` | 5GB+ VRAM | Slow to load (~90s) |
-| **MBART-En-Ro** | ✅ Working | `mbartRo_translator.py` | 2GB VRAM | BART-based, bilingual |
-| **Helsinki-RO** | ✅ Working | `helsinkyRo_translator.py` | 1GB VRAM | OPUS-MT, lightweight |
-| **QuickMT-En-Ro** | ❌ Not Implemented | - | 0.5GB VRAM | Needs implementation |
-
-### Recent Fixes
-- ✅ Removed torchao (was causing triton/torch incompatibility)
-- ✅ All transformers-based models now compatible
-- ✅ Memory optimizations: `device_map="auto"`, `low_cpu_mem_usage=True`, fp16
-
-### Test Results: All Passing ✅
-
+### Option A: Developer Install
+```bash
+git clone https://github.com/user/renpy-translator.git
+cd renpy-translator
+pip install -r requirements.txt  # Gets local-translator from PyPI
 ```
-✅ test_e2e_aya23.py
-✅ test_e2e_example_game.py
-✅ test_e2e_translate_aio.py
-✅ test_u_extract.py
-✅ test_u_merge.py
-✅ test_u_renpy_tags.py
-✅ test_u_translate_modular.py
+
+### Option B: End User (Bundled Release)
 ```
+Download: renpy-translator-v1.0.zip
+Contents:
+  ├── renpy_translator/
+  ├── venv/ (pre-installed with local-translator)
+  └── launchers/*.ps1
+
+Usage: Unzip and run .\launchers\0-setup.ps1
+```
+
+**Recommendation:** Provide both. Developers use A, end users use B.
+
+---
+
+## Migration Checklist
+
+### Week 1A: Config Split
+- [ ] Create `config/` directory
+- [ ] Create `config/translation.yaml`
+- [ ] Create `config/models.yaml`
+- [ ] Create `games/<game>/config.yaml` for each game
+- [ ] Convert JSON → YAML
+- [ ] Update loader functions
+- [ ] Test full pipeline
+
+### Week 1B: renpy_utils.py Split
+- [ ] Create `src/utils/ui.py`
+- [ ] Move `show_progress()` from renpy_utils
+- [ ] Update imports in 7 files
+- [ ] Test all scripts
+
+### Week 1C: models.py Split
+- [ ] Create `src/models_generic.py`
+- [ ] Move generic types
+- [ ] Update imports in 5 files
+- [ ] Test pipeline
+
+### Week 2: Cleanup
+- [ ] Migrate correct.py from core.py
+- [ ] Migrate benchmark.py from core.py
+- [ ] Delete core.py
+- [ ] Delete translation_pipeline.py
+- [ ] Convert remaining JSON → YAML
+- [ ] Test full pipeline
+
+### Week 3: Extract local-translator
+- [ ] Create local-translator repo
+- [ ] Copy files (see Phase 3)
+- [ ] Create pyproject.toml
+- [ ] Test: `pip install -e .`
+- [ ] Run tests in isolation
+
+### Week 4: Integrate
+- [ ] Add local-translator to requirements
+- [ ] Update imports in renpy-translator
+- [ ] Remove duplicated files
+- [ ] Test end-to-end
+- [ ] Create bundled release
+
+### Week 5: Polish
+- [ ] Documentation for both repos
+- [ ] Publish to PyPI (optional)
+- [ ] Create release bundles
+- [ ] Update README files
+
+---
+
+## Key Decisions
+
+### 1. File Formats
+**Decision: Full YAML**
+- All configs: YAML
+- All glossaries/corrections: YAML
+- Extracted translations: YAML (already done)
+- Exception: External JSON from APIs (convert internally)
+
+### 2. Package Distribution
+**Decision: PyPI + Bundled Releases**
+- Publish `local-translator` to PyPI (free, no approval)
+- Distribute `renpy-translator`:
+  - Source on GitHub (developers)
+  - Bundled ZIP with venv (end users)
+
+### 3. Dependency Management
+**Decision: pip with requirements.txt**
+```
+# requirements.txt (PyPI)
+local-translator>=1.0.0
+
+# requirements-dev.txt (local dev)
+-e ../local-translator
+```
+
+---
+
+## Benefits
+
+**For local-translator:**
+- ✅ Reusable in Unity, Godot, web apps
+- ✅ No game engine dependencies
+- ✅ Easy to test in isolation
+- ✅ Can be published to PyPI
+
+**For renpy-translator:**
+- ✅ Focused on Ren'Py logic only
+- ✅ Smaller, cleaner codebase
+- ✅ Easy to maintain
+- ✅ Clear separation of concerns
+
+**For users:**
+- ✅ "Just works" (auto-installs dependencies)
+- ✅ Can use local-translator for other projects
+- ✅ Updates to models don't require renpy-translator changes
