@@ -48,32 +48,56 @@ class ProjectSetup:
         self._print_header()
 
         self._load_configs()
-        self._select_languages()
+
+        # Build all_languages list (needed for later steps)
+        self._build_all_languages_list()
 
         if not self.args.skip_model:
+            # Normal flow: select languages then models
+            self._select_languages()
             self._select_models()
             self._save_config()
         else:
-            print("[1/6] Skipping model selection (--skip-model)")
+            # Skip model flow: load from config or use all languages
+            print()
+            print("=" * 70)
+            print("Skipping Model Selection [1/6]")
+            print("=" * 70)
+            print()
+            if self.args.languages:
+                # If languages specified via parameter, use them
+                self._select_languages()
             self._load_installed_models_from_current_config()
 
         if not self.args.skip_python:
             self._setup_python_env()
         else:
-            print("[2/6] Skipping Python setup (--skip-python)")
+            print()
+            print("=" * 70)
+            print("Skipping Python Setup [2/6]")
+            print("=" * 70)
+            print()
 
         if not self.args.skip_model and self.selected_models:
             self._download_models()
         else:
-            print("[3/6] Skipping model download (--skip-model or no models selected)")
+            print()
+            print("=" * 70)
+            print("Skipping Model Download [3/6]")
+            print("=" * 70)
+            print()
 
         if not self.args.skip_tools:
             self._download_tools()
         else:
-            print("[4/6] Skipping tools download (--skip-tools)")
+            print()
+            print("=" * 70)
+            print("Skipping Tools Download [4/6]")
+            print("=" * 70)
+            print()
 
-        self._verify_installation()
-        self._print_footer()
+        all_good = self._verify_installation()
+        self._print_footer(all_good)
 
     def _set_hf_home(self):
         hf_home = ROOT_DIR / "models"
@@ -99,9 +123,10 @@ class ProjectSetup:
             print(f"Error parsing YAML file: {e}")
             sys.exit(1)
 
-    def _select_languages(self):
+    def _build_all_languages_list(self):
+        """Build the complete list of all available languages."""
         languages_config = self.models_config.get("languages", [])
-        
+
         # Fix for YAML parsing 'no' as False
         for lang_item in languages_config:
             if lang_item.get('code') is False:
@@ -116,8 +141,15 @@ class ProjectSetup:
                 break
         if ro_language:
             sorted_languages.insert(0, ro_language)
-        
+
         self.all_languages = sorted_languages
+
+    def _select_languages(self):
+        print()
+        print("=" * 70)
+        print("Select Languages to Work With [0/6]")
+        print("=" * 70)
+        print()
 
         if self.args.languages:
             if self.args.languages.lower() == 'all':
@@ -134,11 +166,15 @@ class ProjectSetup:
             return f"[{num:2d}] {lang['name']}"
 
         self.selected_languages = select_languages_single_row(
-            "Select Languages", self.all_languages, lang_formatter_func, "language", step_info="[0/6]"
+            "Select Languages", self.all_languages, lang_formatter_func, "language"
         )
 
     def _select_models(self):
-        print("\n[1/6] Select Translation Models to Install")
+        print()
+        print("=" * 70)
+        print("Select Translation Models to Install [1/6]")
+        print("=" * 70)
+        print()
         all_models_dict = self.models_config.get("available_models", {})
         
         selected_lang_codes = {lang['code'] for lang in self.selected_languages}
@@ -177,7 +213,7 @@ class ProjectSetup:
             )
 
         self.selected_models = select_multiple_items(
-            "Select Translation Models", self.available_models, model_formatter_func, "model", step_info="[1/6]"
+            "Select Translation Models", self.available_models, model_formatter_func, "model"
         )
 
     def _save_config(self):
@@ -196,11 +232,25 @@ class ProjectSetup:
     def _load_installed_models_from_current_config(self):
         if not CURRENT_CONFIG_PATH.exists():
             print(f"Warning: {CURRENT_CONFIG_PATH} not found. Cannot determine installed models.")
+            # Use all languages as default when skipping model selection
+            self.selected_languages = self.all_languages
             return
-        
-        with open(CURRENT_CONFIG_PATH, 'r') as f:
+
+        with open(CURRENT_CONFIG_PATH, 'r', encoding='utf-8') as f:
             current_config = yaml.safe_load(f)
-        
+
+        # Load installed languages
+        installed_languages = current_config.get("installed_languages", [])
+        if installed_languages:
+            self.selected_languages = installed_languages
+            print(f"  Loaded configuration from: {CURRENT_CONFIG_PATH}")
+            print(f"    - Languages: {len(self.selected_languages)} configured")
+        else:
+            # Fallback to all languages if not found in config
+            self.selected_languages = self.all_languages
+            print(f"    - Languages: Using all {len(self.all_languages)} supported languages")
+
+        # Load installed models
         installed_keys = current_config.get("installed_models", [])
         all_models_dict = self.models_config.get("available_models", {})
         self.selected_models = []
@@ -210,13 +260,114 @@ class ProjectSetup:
                 model_data['key'] = key
                 self.selected_models.append(model_data)
 
+        print(f"    - Models: {len(self.selected_models)} installed")
+
     def _setup_python_env(self):
-        print("\n[2/6] Setting up Python environment...")
+        print()
+        print("=" * 70)
+        print("Setting up Python Environment [2/6]")
+        print("=" * 70)
+        print()
+
+        # Check Python version
+        version_info = sys.version_info
+        print(f"  Found: Python {version_info.major}.{version_info.minor}.{version_info.micro}")
+        if version_info.major < 3 or (version_info.major == 3 and version_info.minor < 10):
+            print("  WARNING: Python 3.10+ recommended")
+
+        # Create virtual environment
         if not VENV_PATH.exists():
             print("  Creating virtual environment...")
             subprocess.run([sys.executable, "-m", "venv", str(VENV_PATH)], check=True, capture_output=True)
+        elif not self.venv_python.exists():
+            print("  Virtual environment corrupted, recreating...")
+            shutil.rmtree(VENV_PATH)
+            subprocess.run([sys.executable, "-m", "venv", str(VENV_PATH)], check=True, capture_output=True)
+        else:
+            print("  Virtual environment already exists")
+
+        # Upgrade pip
+        print("  Checking pip version... (patience, this one takes about a minute)")
         self._run_venv_pip(["install", "--upgrade", "pip"], quiet=True)
+        print("  pip up to date")
+
+        # Install PyTorch with CUDA support
+        torch_has_cuda = self._check_torch_cuda()
+        if torch_has_cuda:
+            print("  PyTorch already installed with CUDA support")
+        else:
+            if self._check_package_installed("torch"):
+                print("  PyTorch found but without CUDA support, reinstalling with CUDA 12.4...")
+            else:
+                print("  Installing PyTorch with CUDA 12.4 (this may take a few minutes)...")
+            self._run_venv_pip([
+                "install", "torch", "torchvision",
+                "--index-url", "https://download.pytorch.org/whl/cu124",
+                "--force-reinstall"
+            ], quiet=False)
+
+        # Check which packages are needed based on selected models
+        needs_llama_cpp = False
+        needs_transformers = False
+        needs_tiktoken = False
+
+        for model in self.selected_models:
+            model_key = model.get('key', '')
+            if model_key in ['aya23', 'orion-14b']:
+                needs_llama_cpp = True
+            if model_key in ['madlad-400-3b', 'seamlessm4t-v2']:
+                needs_transformers = True
+            if model.get('requires_tiktoken'):
+                needs_tiktoken = True
+
+        # Install llama-cpp-python if needed
+        if needs_llama_cpp:
+            if self._check_package_installed("llama_cpp"):
+                print("  llama-cpp-python already installed")
+            else:
+                print("  Installing llama-cpp-python with CUDA (this may take a few minutes)...")
+                print("  Using prebuilt CUDA 12.4 wheels from abetlen...")
+                try:
+                    self._run_venv_pip([
+                        "install", "llama-cpp-python",
+                        "--extra-index-url", "https://abetlen.github.io/llama-cpp-python/whl/cu124",
+                        "--only-binary", ":all:",
+                        "--force-reinstall",
+                        "--no-cache-dir"
+                    ], quiet=False)
+                    print("  llama-cpp-python installed successfully!")
+                except subprocess.CalledProcessError:
+                    print("  WARNING: CUDA wheel installation failed, trying CPU fallback...")
+                    self._run_venv_pip([
+                        "install", "llama-cpp-python",
+                        "--only-binary", ":all:"
+                    ], quiet=False)
+        else:
+            print("  Skipping llama-cpp-python (not needed for selected models)")
+
+        # Install transformers if needed
+        if needs_transformers:
+            if self._check_package_installed("transformers"):
+                print("  transformers already installed")
+            else:
+                print("  Installing transformers...")
+                self._run_venv_pip(["install", "transformers"], quiet=True)
+
+            # Install tiktoken and protobuf if needed
+            if needs_tiktoken:
+                if not self._check_package_installed("tiktoken"):
+                    print("  Installing tiktoken for SeamlessM4T...")
+                    self._run_venv_pip(["install", "tiktoken"], quiet=True)
+                if not self._check_package_installed("protobuf"):
+                    print("  Installing protobuf for SeamlessM4T...")
+                    self._run_venv_pip(["install", "protobuf"], quiet=True)
+        else:
+            print("  Skipping transformers (not needed for selected models)")
+
+        # Install other requirements
+        print("  Installing other dependencies from requirements.txt...")
         self._run_venv_pip(["install", "-r", str(REQUIREMENTS_PATH)], quiet=True)
+
         print("  Python environment setup complete!")
 
     def _get_venv_python_path(self):
@@ -226,9 +377,39 @@ class ProjectSetup:
         cmd = [str(self.venv_python), "-m", "pip"] + command
         subprocess.run(cmd, check=True, capture_output=quiet, text=True)
 
+    def _check_package_installed(self, package_name):
+        """Check if a Python package is installed in the virtual environment."""
+        try:
+            result = subprocess.run(
+                [str(self.venv_python), "-c", f"import {package_name}"],
+                capture_output=True,
+                text=True
+            )
+            return result.returncode == 0
+        except:
+            return False
+
+    def _check_torch_cuda(self):
+        """Check if PyTorch is installed with CUDA support."""
+        if not self._check_package_installed("torch"):
+            return False
+        try:
+            result = subprocess.run(
+                [str(self.venv_python), "-c", "import torch; print(torch.cuda.is_available())"],
+                capture_output=True,
+                text=True
+            )
+            return result.returncode == 0 and "True" in result.stdout
+        except:
+            return False
+
     def _download_models(self):
         from huggingface_hub import hf_hub_download
-        print("\n[3/6] Downloading selected translation models...")
+        print()
+        print("=" * 70)
+        print("Downloading Selected Translation Models [3/6]")
+        print("=" * 70)
+        print()
         for model in self.selected_models:
             model_config = model
             dest_path = ROOT_DIR / model_config['destination']
@@ -236,25 +417,30 @@ class ProjectSetup:
             if dest_path.exists() and (not dest_path.is_dir() or any(dest_path.iterdir())):
                  print(f"    Model '{model['name']}' already downloaded.")
                  continue
-            
+
             print(f"    Downloading {model['name']}...")
             dest_path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             repo_id = model_config['repo']
             if model_config.get('huggingface_download'):
-                 py_code = f"from transformers import AutoModel; model = AutoModel.from_pretrained('{repo_id}'); model.save_pretrained('{dest_path.as_posix()}')"
+                 # Download both model and tokenizer for transformers models
+                 py_code = f"from transformers import AutoModelForSeq2SeqLM, AutoTokenizer; model = AutoModelForSeq2SeqLM.from_pretrained('{repo_id}'); tokenizer = AutoTokenizer.from_pretrained('{repo_id}'); model.save_pretrained('{dest_path.as_posix()}'); tokenizer.save_pretrained('{dest_path.as_posix()}')"
                  subprocess.run([str(self.venv_python), "-c", py_code], check=True, capture_output=True)
-            else: 
+            else:
                 hf_hub_download(repo_id=repo_id, filename=model_config['file'], local_dir=str(dest_path.parent), local_dir_use_symlinks=False)
                 downloaded_file = dest_path.parent / model_config['file']
                 if downloaded_file.exists() and downloaded_file != dest_path:
                     downloaded_file.rename(dest_path)
 
     def _download_tools(self):
-        print("\n[4/6] Downloading external tools...")
+        print()
+        print("=" * 70)
+        print("Downloading External Tools [4/6]")
+        print("=" * 70)
+        print()
         renpy_config = self.tools_config['tools']['renpy']
         renpy_path = ROOT_DIR / renpy_config['destination']
-        
+
         if renpy_path.exists():
             print("  Ren'Py SDK already exists.")
         else:
@@ -272,17 +458,125 @@ class ProjectSetup:
             finally:
                 if temp_zip.exists(): temp_zip.unlink()
 
-    def _verify_installation(self):
-        print("\n[5/6] Verifying installation...")
-        print("  Verification checks passed (placeholder).")
+        # Check for rpaExtract.exe
+        rpa_extract_path = ROOT_DIR / "renpy" / "rpaExtract.exe"
+        if rpa_extract_path.exists():
+            print("  rpaExtract.exe already in repository")
+        else:
+            print("  WARNING: rpaExtract.exe not found at renpy/rpaExtract.exe")
+            print("  rpaExtract is optional and only needed for extracting RPA archives")
 
-    def _print_footer(self):
+        # Check for UnRen
+        unren_path = ROOT_DIR / "renpy" / "unRen"
+        if unren_path.exists():
+            print("  UnRen already in repository")
+        else:
+            print("  WARNING: UnRen folder not found at renpy/unRen")
+
+    def _verify_installation(self):
+        print()
+        print("=" * 70)
+        print("Verifying Installation [5/6]")
+        print("=" * 70)
+        print()
+
+        all_good = True
+
+        # Check Python packages
+        print("  Checking Python packages...")
+
+        # Check PyTorch
+        if self._check_package_installed("torch"):
+            print("    - PyTorch: installed")
+        else:
+            print("    - PyTorch: NOT INSTALLED")
+            all_good = False
+
+        # Check model-specific packages
+        for model in self.selected_models:
+            model_key = model.get('key', '')
+            if model_key in ['aya23', 'orion-14b']:
+                if self._check_package_installed("llama_cpp"):
+                    print("    - llama-cpp-python: installed")
+                else:
+                    print("    - llama-cpp-python: NOT INSTALLED")
+                    all_good = False
+                break  # Only check once
+
+        for model in self.selected_models:
+            model_key = model.get('key', '')
+            if model_key in ['madlad-400-3b', 'seamlessm4t-v2']:
+                if self._check_package_installed("transformers"):
+                    print("    - transformers: installed")
+                else:
+                    print("    - transformers: NOT INSTALLED")
+                    all_good = False
+
+                # Check tiktoken if needed
+                if model.get('requires_tiktoken'):
+                    if self._check_package_installed("tiktoken"):
+                        print("    - tiktoken: installed")
+                    else:
+                        print("    - tiktoken: NOT INSTALLED")
+                        all_good = False
+                break  # Only check once
+
+        # Check CUDA
+        print("  Checking CUDA support...")
+        if self._check_torch_cuda():
+            print("    - CUDA available")
+        else:
+            print("    - WARNING: CUDA not available (will use CPU)")
+
+        # Check selected models
+        if not self.args.skip_model and self.selected_models:
+            print("  Checking selected models...")
+            for model in self.selected_models:
+                model_config = model
+                dest_path = ROOT_DIR / model_config['destination']
+
+                if dest_path.exists():
+                    if model_config.get('huggingface_download'):
+                        # Directory-based model
+                        if any(dest_path.iterdir()):
+                            print(f"    - {model['name']}: downloaded")
+                        else:
+                            print(f"    - {model['name']}: NOT FOUND")
+                            all_good = False
+                    else:
+                        # GGUF file model
+                        size_gb = dest_path.stat().st_size / (1024**3)
+                        print(f"    - {model['name']}: {size_gb:.2f} GB")
+                else:
+                    print(f"    - {model['name']}: NOT FOUND")
+                    all_good = False
+
+        return all_good
+
+    def _print_footer(self, all_good):
         print("\n" + "=" * 70)
-        print("  SETUP COMPLETE!")
-        print("\n  You're all set! Next steps:")
-        print("  1. Copy your Ren'Py game to the games/ folder")
-        print("  2. Run the translation script: ./3-translate.ps1")
-        print("\n" + "=" * 70)
+        if all_good:
+            print("  SETUP COMPLETE!")
+            print("\n  You're all set! Next steps:")
+            print()
+            print("  1. Copy your Ren'Py game to the games/ folder")
+            print()
+            print("  2. Translate your game using the interactive launcher:")
+            print("     ./3-translate.ps1")
+            print()
+            print("  3. (Optional) Correct grammar with:")
+            print("     ./4-correct.ps1")
+            print()
+            print(f"  The interactive scripts will use your configuration:")
+            print(f"    - Languages: {len(self.selected_languages)} configured during setup")
+            print(f"    - Models: {len(self.selected_models)} installed during setup")
+            print(f"    - Games: auto-scanned from games/ folder")
+            print()
+            print("  For advanced usage, see README.md")
+        else:
+            print("  SETUP COMPLETED WITH WARNINGS")
+            print("  Please review the messages above and install missing components")
+        print("=" * 70)
 
 def main():
     parser = argparse.ArgumentParser(description="Ren'Py Translation System - Setup Script")
