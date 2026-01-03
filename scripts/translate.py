@@ -2,7 +2,7 @@
 Modular Translation Pipeline Script
 
 Translates .parsed.yaml files using batch translation with context awareness.
-Uses configuration from current_config.json and character.json files.
+Uses configuration from current_config.yaml and characters.yaml files.
 Supports glossary and custom prompts with fallback hierarchy.
 
 Usage:
@@ -30,7 +30,7 @@ class ModularBatchTranslator:
     Batch translator for parsed YAML files with custom context logic.
 
     - DIALOGUE blocks: Use context_before + context_after from surrounding blocks
-    - CHOICE blocks: No dialogue context, only character info from characters.json
+    - CHOICE blocks: No dialogue context, only character info from characters.yaml
     """
 
     def __init__(
@@ -46,7 +46,7 @@ class ModularBatchTranslator:
 
         Args:
             translator: Translation backend (Aya23Translator or MADLAD400Translator)
-            characters: Character mapping from characters.json
+            characters: Character mapping from characters.yaml
             target_lang_code: Target language code (e.g., 'ro', 'es')
             context_before: Number of lines of context before current block (for dialogue)
             context_after: Number of lines of context after current block (for dialogue)
@@ -216,7 +216,7 @@ class ModularBatchTranslator:
 
         Context strategy:
         - DIALOGUE blocks: N lines before + M lines after
-        - CHOICE blocks: No dialogue context (only character info from characters.json)
+        - CHOICE blocks: No dialogue context (only character info from characters.yaml)
         """
         contexts: List[Dict] = []
 
@@ -341,16 +341,16 @@ class ModularBatchTranslator:
 
 
 def load_config(project_root: Path, game_name: Optional[str] = None) -> Dict:
-    """Load game configuration from current_config.json."""
-    config_file = project_root / "models" / "current_config.json"
+    """Load game configuration from current_config.yaml."""
+    config_file = project_root / "models" / "current_config.yaml"
 
     if not config_file.exists():
         print(f"ERROR: Configuration not found at {config_file}")
-        print("Please run 1-config.ps1 first to set up your game.")
+        print("Please run x1-config.ps1 first to set up your game.")
         sys.exit(1)
 
-    with open(config_file, 'r', encoding='utf-8-sig') as f:
-        config = json.load(f)
+    with open(config_file, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
 
     # Determine which game to use
     if game_name:
@@ -363,7 +363,7 @@ def load_config(project_root: Path, game_name: Optional[str] = None) -> Dict:
         current_game = config.get('current_game')
         if not current_game:
             print("ERROR: No current_game set in configuration.")
-            print("Please run 1-config.ps1 first.")
+            print("Please run x1-config.ps1 first.")
             sys.exit(1)
         game_config = config['games'][current_game]
 
@@ -440,54 +440,44 @@ def main():
     context_before = game_config.get('context_before', 3)
     context_after = game_config.get('context_after', 1)
 
-    target_language_code = target_language_obj['Code']
-    target_language_name = target_language_obj['Name']
+    # Support both old (Code/Name) and new (code/name) formats
+    target_language_code = target_language_obj.get('code', target_language_obj.get('Code'))
+    target_language_name = target_language_obj.get('name', target_language_obj.get('Name'))
 
     print(f"  Game: {game_name}")
     print(f"  Language: {target_language_name} ({target_language_code})")
     print(f"  Model: {model_name}")
     print(f"  Context: {context_before} before, {context_after} after")
 
-    # Map language name to code
-    lang_code_map = {
-        'romanian': 'ro', 'spanish': 'es', 'french': 'fr',
-        'german': 'de', 'italian': 'it', 'portuguese': 'pt',
-        'russian': 'ru', 'turkish': 'tr', 'czech': 'cs',
-        'polish': 'pl', 'ukrainian': 'uk', 'bulgarian': 'bg',
-        'chinese': 'zh', 'japanese': 'ja', 'korean': 'ko',
-        'vietnamese': 'vi', 'thai': 'th', 'indonesian': 'id',
-        'arabic': 'ar', 'hebrew': 'he', 'hindi': 'hi'
-    }
-    # Use the extracted code directly, no need for lang_code_map.get with .lower()
-    # unless mapping to a *different* code (which is not the case here)
-    target_lang_code = lang_code_map.get(target_language_name.lower(), target_language_code)
+    # Use language code for directory path
+    target_lang_code = target_language_code
 
     # Load resources (glossary, corrections, prompts)
     print("\nLoading resources...")
     glossary, corrections, prompt_template = load_resources(project_root, game_config, target_lang_code)
 
-    # Load characters.json
-    tl_dir = game_path / "game" / "tl" / target_language_name.lower()
-    characters_file = tl_dir / "characters.json"
+    # Load characters.yaml
+    tl_dir = game_path / "game" / "tl" / target_lang_code
+    characters_file = tl_dir / "characters.yaml"
 
     characters = {}
     if characters_file.exists():
-        with open(characters_file, 'r', encoding='utf-8-sig') as f:
-            characters = json.load(f)
-        print(f"[OK] Loaded {len(characters)} characters from characters.json")
+        with open(characters_file, 'r', encoding='utf-8') as f:
+            characters = yaml.safe_load(f)
+        print(f"[OK] Loaded {len(characters)} characters from characters.yaml")
     else:
-        print(f"[WARNING] No characters.json found at {characters_file}")
+        print(f"[WARNING] No characters.yaml found at {characters_file}")
 
     # Determine model path based on model name
-    # Load model configuration from models_config.json
-    models_config_path = project_root / "models" / "models_config.json"
-    with open(models_config_path, 'r', encoding='utf-8-sig') as f:
-        all_models_config = json.load(f)['available_models']
+    # Load model configuration from models_config.yaml
+    models_config_path = project_root / "models" / "models_config.yaml"
+    with open(models_config_path, 'r', encoding='utf-8') as f:
+        all_models_config = yaml.safe_load(f)['available_models']
 
     model_config = all_models_config.get(model_name)
 
     if not model_config:
-        print(f"ERROR: Model '{model_name}' not found in models_config.json")
+        print(f"ERROR: Model '{model_name}' not found in models_config.yaml")
         sys.exit(1)
 
     model_path = project_root / model_config['destination']

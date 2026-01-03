@@ -281,12 +281,14 @@ if __name__ == "__main__":
         python seamlessm4t_translator.py script.rpy --language ro
     """
     import sys
-    import json
     from pathlib import Path
+    from translator_utils import (
+        get_project_root, load_glossary, parse_cli_language_arg,
+        setup_sys_path
+    )
 
     # Add parent directory to path for imports
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-
+    setup_sys_path()
     from translation_pipeline import RenpyTranslationPipeline
 
     if len(sys.argv) < 3:
@@ -296,28 +298,7 @@ if __name__ == "__main__":
 
     # Parse arguments
     input_file = Path(sys.argv[1])
-    target_language = None
-    lang_code = None
-
-    # Check for --language parameter
-    for i, arg in enumerate(sys.argv[2:], start=2):
-        if arg == '--language' and i + 1 < len(sys.argv):
-            lang_code = sys.argv[i + 1]
-            # Map language codes to names
-            lang_map = {
-                'ro': 'Romanian', 'es': 'Spanish', 'fr': 'French',
-                'de': 'German', 'it': 'Italian', 'pt': 'Portuguese',
-                'ru': 'Russian', 'ar': 'Arabic', 'zh': 'Chinese',
-                'ja': 'Japanese', 'ko': 'Korean', 'tr': 'Turkish',
-                'cs': 'Czech', 'pl': 'Polish', 'uk': 'Ukrainian',
-                'bg': 'Bulgarian', 'vi': 'Vietnamese', 'th': 'Thai',
-                'id': 'Indonesian', 'he': 'Hebrew', 'fa': 'Persian',
-                'hi': 'Hindi', 'bn': 'Bengali', 'nl': 'Dutch',
-                'sv': 'Swedish', 'no': 'Norwegian', 'da': 'Danish',
-                'fi': 'Finnish', 'el': 'Greek', 'hu': 'Hungarian'
-            }
-            target_language = lang_map.get(lang_code, lang_code.capitalize())
-            break
+    target_language, lang_code = parse_cli_language_arg()
 
     if not target_language or not lang_code:
         print("Error: --language parameter is required")
@@ -327,16 +308,9 @@ if __name__ == "__main__":
         print(f"Error: Input file not found: {input_file}")
         sys.exit(1)
 
-    # Try to load glossary
-    project_root = Path(__file__).parent.parent.parent
-    glossary = None
-    for glossary_variant in [f"{lang_code}_uncensored_glossary.json", f"{lang_code}_glossary.json"]:
-        glossary_path = project_root / "data" / glossary_variant
-        if glossary_path.exists():
-            with open(glossary_path, 'r', encoding='utf-8') as f:
-                glossary = json.load(f)
-            print(f"[OK] Using glossary: {glossary_variant}")
-            break
+    # Load glossary using shared utility
+    project_root = get_project_root()
+    glossary = load_glossary(lang_code, project_root)
 
     # Initialize translator
     translator = SeamlessM4Tv2Translator(

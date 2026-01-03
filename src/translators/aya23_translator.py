@@ -203,12 +203,14 @@ if __name__ == "__main__":
         python aya23_translator.py script.rpy --language ro
     """
     import sys
-    import json
     from pathlib import Path
+    from translator_utils import (
+        get_project_root, load_glossary, parse_cli_language_arg,
+        load_prompt_template, setup_sys_path
+    )
 
     # Add parent directory to path for imports
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-
+    setup_sys_path()
     from translation_pipeline import RenpyTranslationPipeline
 
     if len(sys.argv) < 3:
@@ -218,21 +220,7 @@ if __name__ == "__main__":
 
     # Parse arguments
     input_file = Path(sys.argv[1])
-    target_language = None
-
-    # Check for --language parameter
-    for i, arg in enumerate(sys.argv[2:], start=2):
-        if arg == '--language' and i + 1 < len(sys.argv):
-            target_language_code = sys.argv[i + 1]
-            # Map language codes to names
-            lang_map = {
-                'ro': 'Romanian', 'es': 'Spanish', 'fr': 'French',
-                'de': 'German', 'it': 'Italian', 'pt': 'Portuguese',
-                'ru': 'Russian', 'ar': 'Arabic', 'zh': 'Chinese',
-                'ja': 'Japanese', 'ko': 'Korean'
-            }
-            target_language = lang_map.get(target_language_code, target_language_code.capitalize())
-            break
+    target_language, target_language_code = parse_cli_language_arg()
 
     if not target_language:
         print("Error: --language parameter is required")
@@ -243,33 +231,18 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # Default paths
-    project_root = Path(__file__).parent.parent.parent
+    project_root = get_project_root()
     model_path = project_root / "models" / "aya-23-8B-GGUF" / "aya-23-8B-Q4_K_M.gguf"
 
     if not model_path.exists():
         print(f"Error: Model file not found: {model_path}")
         sys.exit(1)
 
-    # Try to load glossary
-    glossary = None
-    lang_code = target_language_code
-    for glossary_variant in [f"{lang_code}_uncensored_glossary.json", f"{lang_code}_glossary.json"]:
-        glossary_path = project_root / "data" / glossary_variant
-        if glossary_path.exists():
-            with open(glossary_path, 'r', encoding='utf-8') as f:
-                glossary = json.load(f)
-            print(f"[OK] Using glossary: {glossary_variant}")
-            break
+    # Load glossary using shared utility
+    glossary = load_glossary(target_language_code, project_root)
 
-    # Load prompt template
-    prompt_template = None
-    prompt_template_path = project_root / "data" / "prompts" / "translate_uncensored.txt"
-    if not prompt_template_path.exists():
-        prompt_template_path = project_root / "data" / "prompts" / "translate.txt"
-
-    if prompt_template_path.exists():
-        with open(prompt_template_path, 'r', encoding='utf-8') as f:
-            prompt_template = f.read()
+    # Load prompt template using shared utility
+    prompt_template = load_prompt_template(target_language_code, project_root)
 
     # Initialize translator
     translator = Aya23Translator(

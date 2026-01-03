@@ -142,11 +142,11 @@ if __name__ == "__main__":
         python quickmt_translator.py script.rpy --language ro
     """
     import sys
-    import json
     from pathlib import Path
+    from translator_utils import setup_sys_path
 
     # Add parent directory to path for imports
-    sys.path.insert(0, str(Path(__file__).parent.parent))
+    setup_sys_path()
 
     from translation_pipeline import RenpyTranslationPipeline
 
@@ -172,16 +172,10 @@ if __name__ == "__main__":
         print(f"Error: Input file not found: {input_file}")
         sys.exit(1)
 
-    # Try to load glossary
-    project_root = Path(__file__).parent.parent.parent
-    glossary = None
-    for glossary_variant in ["ro_uncensored_glossary.json", "ro_glossary.json"]:
-        glossary_path = project_root / "data" / glossary_variant
-        if glossary_path.exists():
-            with open(glossary_path, 'r', encoding='utf-8') as f:
-                glossary = json.load(f)
-            print(f"[OK] Using glossary: {glossary_variant}")
-            break
+    # Load glossary using shared utility
+    from translator_utils import get_project_root, load_glossary
+    project_root = get_project_root()
+    glossary = load_glossary("ro", project_root)
 
     # Initialize translator
     translator = QuickMTTranslator(
