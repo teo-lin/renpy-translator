@@ -1,4 +1,4 @@
-# Test script for 9-benchmark.ps1
+# Test script for 8-compare.ps1
 # Validates that the benchmark script works correctly
 
 param(
@@ -98,7 +98,7 @@ Write-Host ""
 Write-Host "   This may take several minutes depending on the number of models..." -ForegroundColor Gray
 Write-Host ""
 
-$benchmarkScript = Join-Path $scriptDir "9-benchmark.ps1"
+$benchmarkScript = Join-Path $scriptDir "8-compare.ps1"
 $benchmarkOutput = & $benchmarkScript -GameName $testGame -Language $testLanguage 2>&1
 $benchmarkExitCode = $LASTEXITCODE
 

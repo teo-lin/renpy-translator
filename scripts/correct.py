@@ -210,7 +210,7 @@ class LLMBasedCorrector:
 
     def __init__(self, model_path: str):
         """Initialize LLM corrector with Aya-23-8B model"""
-        from core import Aya23Translator
+        from translators.aya23_translator import Aya23Translator
         print("Initializing LLM-based correction system...")
         self.translator = Aya23Translator(model_path)
         print("[OK] Ready for LLM corrections\n")

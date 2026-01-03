@@ -54,11 +54,11 @@ def test_models_config_exists(models_config):
 
 def test_benchmark_script_exists(project_root):
     """Test that benchmark scripts exist"""
-    benchmark_ps1 = project_root / "9-benchmark.ps1"
-    benchmark_py = project_root / "scripts" / "benchmark_translate.py"
+    benchmark_ps1 = project_root / "8-compare.ps1"
+    benchmark_py = project_root / "scripts" / "compare.py"
 
-    assert benchmark_ps1.exists(), "9-benchmark.ps1 not found"
-    assert benchmark_py.exists(), "scripts/benchmark_translate.py not found"
+    assert benchmark_ps1.exists(), "8-compare.ps1 not found"
+    assert benchmark_py.exists(), "scripts/compare.py not found"
     print(f"\n[OK] Benchmark scripts found")
 
 

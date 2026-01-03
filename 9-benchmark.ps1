@@ -1,26 +1,58 @@
-# Translation Model Benchmark Script
-# Compares all installed models by translating the same content
-# and saving results under numbered keys (01, 02, 03, etc.) for comparison
+# Translation Quality Benchmark Script
+# Benchmark a single model's translation quality using BLEU scores
+# Compares model output against reference translations
 
 param(
-    [string]$GameName = "Example",
-    [string]$Language = "ro"
+    [int]$Model = 0,       # Model number (1-based), 0 = prompt user
+    [string]$ModelName,    # Model name (e.g., "aya23")
+    [string]$BenchmarkFile = "data/ro_benchmark.json",
+    [string]$GlossaryFile, # Optional glossary file
+    [switch]$Yes,         # Skip confirmation prompt
+    [Parameter(ValueFromRemainingArguments=$true)]
+    [string[]]$Arguments  # Additional arguments to pass to Python script
 )
 
 $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-# Banner
-Write-Host ""
-Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host "                 Translation Model Benchmark                    " -ForegroundColor Cyan
-Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host ""
+# Source the shared user selection module
+. (Join-Path $scriptDir "scripts\select.ps1")
 
-# Step 1: Load models configuration to get all installed models
-Write-Host "[1/5] Loading models configuration..." -ForegroundColor Yellow
+$pythonExe = Join-Path $scriptDir "venv\Scripts\python.exe"
+$benchmarkScript = Join-Path $scriptDir "scripts\benchmark.py"
 $modelsConfigPath = Join-Path $scriptDir "models\models_config.json"
 
+# Add PyTorch lib directory to PATH for CUDA DLLs (needed by llama-cpp-python)
+$torchLibPath = Join-Path $scriptDir "venv\Lib\site-packages\torch\lib"
+if (Test-Path $torchLibPath) {
+    $env:PATH += ";$torchLibPath"
+}
+
+# Set UTF-8 encoding for Python
+$env:PYTHONIOENCODING = "utf-8"
+
+# Check Python exists
+if (-not (Test-Path $pythonExe)) {
+    Write-Host "ERROR: Python executable not found at $pythonExe" -ForegroundColor Red
+    Write-Host "Please run 0-setup.ps1 to install the virtual environment." -ForegroundColor Yellow
+    exit 1
+}
+
+# Check benchmark script exists
+if (-not (Test-Path $benchmarkScript)) {
+    Write-Host "ERROR: Benchmark script not found at $benchmarkScript" -ForegroundColor Red
+    exit 1
+}
+
+# Check benchmark data exists
+$benchmarkPath = Join-Path $scriptDir $BenchmarkFile
+if (-not (Test-Path $benchmarkPath)) {
+    Write-Host "ERROR: Benchmark data not found at $benchmarkPath" -ForegroundColor Red
+    Write-Host "Please create a benchmark file with reference translations." -ForegroundColor Yellow
+    exit 1
+}
+
+# Load models configuration
 if (-not (Test-Path $modelsConfigPath)) {
     Write-Host "ERROR: Models configuration not found at $modelsConfigPath" -ForegroundColor Red
     Write-Host "Please run 0-setup.ps1 first to install models." -ForegroundColor Yellow
@@ -36,192 +68,142 @@ if (-not $installedModels -or $installedModels.Count -eq 0) {
     exit 1
 }
 
-Write-Host "   Found $($installedModels.Count) installed models:" -ForegroundColor Green
+# Create model selection list
+$modelsList = @()
 foreach ($modelKey in $installedModels) {
     $modelInfo = $modelsConfig.available_models.$modelKey
-    Write-Host "      - $($modelInfo.name)" -ForegroundColor Cyan
+    $modelsList += @{
+        Key = $modelKey
+        Name = $modelInfo.name
+        Size = $modelInfo.size
+        Params = $modelInfo.params
+    }
 }
+
+# Banner
+Write-Host ""
+Write-Host "=================================================================" -ForegroundColor Green
+Write-Host "       Translation Quality Benchmark (BLEU Scoring)            " -ForegroundColor Green
+Write-Host "=================================================================" -ForegroundColor Green
+
+# Step 1: Select Model
+if ($ModelName) {
+    $foundModel = $modelsList | Where-Object { $_.Key -eq $ModelName }
+    if ($foundModel) {
+        $Model = ($modelsList.IndexOf($foundModel) + 1)
+        Write-Host ""
+        Write-Host "Auto-selecting model by name '$ModelName'. Resolved to index $Model." -ForegroundColor Cyan
+    } else {
+        Write-Host "ERROR: Invalid model name: $ModelName. Available models: $($modelsList.Key -join ', ')" -ForegroundColor Red
+        exit 1
+    }
+}
+
+if ($Model -gt 0) {
+    if ($Model -le $modelsList.Count) {
+        $selectedModel = $modelsList[$Model - 1]
+        Write-Host ""
+        Write-Host "Auto-selecting model $Model`: $($selectedModel.Name)" -ForegroundColor Cyan
+    } else {
+        Write-Host "ERROR: Invalid model number: $Model. Available models: 1-$($modelsList.Count)" -ForegroundColor Red
+        exit 1
+    }
+} else {
+    try {
+        $selectedModel = Select-Item `
+            -Title "Step 1: Select Model to Benchmark" `
+            -ItemTypeName "model" `
+            -Items $modelsList `
+            -DisplayItem {
+                param($model, $num)
+                Write-Host "  [$num] " -NoNewline -ForegroundColor Yellow
+                Write-Host $model.Name -NoNewline -ForegroundColor Green
+                Write-Host " ($($model.Params), $($model.Size))" -ForegroundColor DarkGray
+            }
+    } catch {
+        Write-Host "Selection cancelled." -ForegroundColor Yellow
+        exit 0
+    }
+}
+
+# Auto-detect glossary if not specified
+if (-not $GlossaryFile) {
+    # Try to find matching glossary from benchmark file name
+    $benchmarkName = [System.IO.Path]::GetFileNameWithoutExtension($BenchmarkFile)
+    $benchmarkDir = [System.IO.Path]::GetDirectoryName($benchmarkPath)
+
+    # Extract language code (e.g., "ro" from "ro_benchmark")
+    if ($benchmarkName -match "^([a-z]{2})_") {
+        $langCode = $Matches[1]
+
+        # Try different glossary naming patterns
+        $glossaryPatterns = @(
+            "$langCode`_uncensored_glossary.json",
+            "$langCode`_glossary.json"
+        )
+
+        foreach ($pattern in $glossaryPatterns) {
+            $testPath = Join-Path $benchmarkDir $pattern
+            if (Test-Path $testPath) {
+                $GlossaryFile = $testPath
+                break
+            }
+        }
+    }
+}
+
+# Summary
+Write-Host ""
+Write-Host "=================================================================" -ForegroundColor Cyan
+Write-Host "       Benchmark Summary                                        " -ForegroundColor Cyan
+Write-Host "=================================================================" -ForegroundColor Cyan
+Write-Host "  Model:      " -NoNewline -ForegroundColor White
+Write-Host "$($selectedModel.Name) ($($selectedModel.Params), $($selectedModel.Size))" -ForegroundColor Green
+Write-Host "  Benchmark:  " -NoNewline -ForegroundColor White
+Write-Host $BenchmarkFile -ForegroundColor Green
+if ($GlossaryFile) {
+    Write-Host "  Glossary:   " -NoNewline -ForegroundColor White
+    Write-Host $GlossaryFile -ForegroundColor Green
+} else {
+    Write-Host "  Glossary:   " -NoNewline -ForegroundColor White
+    Write-Host "None" -ForegroundColor Yellow
+}
+Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Step 2: Configure game with first model (just to set up the structure)
-Write-Host "[2/5] Configuring game: $GameName with language: $Language..." -ForegroundColor Yellow
-$firstModel = $installedModels[0]
-Write-Host "   Using initial model: $firstModel" -ForegroundColor Gray
-
-# Get full game path
-$fullGamePath = Join-Path $scriptDir "games\$GameName"
-if (-not (Test-Path $fullGamePath)) {
-    Write-Host "ERROR: Game directory not found: $fullGamePath" -ForegroundColor Red
-    exit 1
+if (-not $Yes) {
+    $confirm = Read-Host "Proceed with benchmark? (Y/N)"
+    if ($confirm -ne "Y" -and $confirm -ne "y") {
+        Write-Host "Cancelled by user." -ForegroundColor Yellow
+        exit 0
+    }
 }
 
-$configScript = Join-Path $scriptDir "1-config.ps1"
-& $configScript -GamePath $fullGamePath -Language $Language -Model $firstModel
-
-# Note: 1-config.ps1 doesn't always return proper exit code, so we check if config file exists instead
-$currentConfigPath = Join-Path $scriptDir "models\current_config.json"
-if (-not (Test-Path $currentConfigPath)) {
-    Write-Host "ERROR: Configuration failed - config file not created!" -ForegroundColor Red
-    exit 1
+# Build arguments
+$scriptArgs = @($benchmarkPath, "--model", $selectedModel.Key)
+if ($GlossaryFile) {
+    $scriptArgs += @("--glossary", $GlossaryFile)
 }
-Write-Host "   [OK] Configuration successful" -ForegroundColor Green
+if ($Arguments.Count -gt 0) {
+    $scriptArgs += $Arguments
+}
 
+# Run the benchmark script
+Write-Host ""
+Write-Host "Starting benchmark with model: $($selectedModel.Name)..." -ForegroundColor Cyan
 Write-Host ""
 
-# Step 3: Extract translation files
-Write-Host "[3/5] Extracting translation files..." -ForegroundColor Yellow
-$extractScript = Join-Path $scriptDir "2-extract.ps1"
-& $extractScript -GameName $GameName -All
+& $pythonExe $benchmarkScript $scriptArgs
 
+# Check exit code
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "ERROR: Extraction failed!" -ForegroundColor Red
-    exit 1
-}
-
-Write-Host ""
-
-# Step 4: Benchmark each model
-Write-Host "[4/5] Running benchmark translations..." -ForegroundColor Yellow
-Write-Host ""
-
-$pythonExe = Join-Path $scriptDir "venv\Scripts\python.exe"
-$benchmarkScript = Join-Path $scriptDir "scripts\benchmark_translate.py"
-
-# Check Python exists
-if (-not (Test-Path $pythonExe)) {
-    Write-Host "ERROR: Python executable not found at $pythonExe" -ForegroundColor Red
-    exit 1
-}
-
-# Set UTF-8 encoding
-$env:PYTHONIOENCODING = "utf-8"
-
-# Add PyTorch lib directory to PATH for CUDA DLLs
-$torchLibPath = Join-Path $scriptDir "venv\Lib\site-packages\torch\lib"
-if (Test-Path $torchLibPath) {
-    $env:PATH += ";$torchLibPath"
-}
-
-# Track results
-$benchmarkResults = @()
-$benchmarkStartTime = Get-Date
-
-foreach ($modelIdx in 0..($installedModels.Count - 1)) {
-    $modelKey = $installedModels[$modelIdx]
-    $modelInfo = $modelsConfig.available_models.$modelKey
-    $keyNumber = "r$modelIdx"  # Format as r0, r1, r2, etc.
-
     Write-Host ""
-    Write-Host "   [$($modelIdx + 1)/$($installedModels.Count)] Model: $($modelInfo.name) -> Key: $keyNumber" -ForegroundColor Cyan
-    Write-Host "   " + ("=" * 65) -ForegroundColor Gray
-
-    $modelStartTime = Get-Date
-
-    # Run benchmark translation
-    $output = & $pythonExe $benchmarkScript --game $GameName --model $modelKey --key $keyNumber 2>&1
-
-    # Display output
-    $output | ForEach-Object { Write-Host $_ }
-
-    $modelEndTime = Get-Date
-    $modelDuration = ($modelEndTime - $modelStartTime).TotalSeconds
-
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "   [ERROR] Translation failed for model $modelKey!" -ForegroundColor Red
-        $benchmarkResults += @{
-            Model = $modelInfo.name
-            Key = $keyNumber
-            Duration = $modelDuration
-            Status = "FAILED"
-        }
-    }
-    else {
-        # Try to extract duration from output (Python script outputs it)
-        $durationLine = $output | Where-Object { $_ -match "BENCHMARK_DURATION:(\d+\.?\d*)" }
-        if ($durationLine -and $Matches[1]) {
-            $actualDuration = [double]$Matches[1]
-        }
-        else {
-            $actualDuration = $modelDuration
-        }
-
-        Write-Host "   [OK] Completed in $($actualDuration.ToString('F2')) seconds" -ForegroundColor Green
-
-        $benchmarkResults += @{
-            Model = $modelInfo.name
-            Key = $keyNumber
-            Duration = $actualDuration
-            Status = "SUCCESS"
-            Size = $modelInfo.size
-            Params = $modelInfo.params
-        }
-    }
-}
-
-$benchmarkEndTime = Get-Date
-$totalDuration = ($benchmarkEndTime - $benchmarkStartTime).TotalSeconds
-
-Write-Host ""
-Write-Host ""
-
-# Step 5: Display comparison results
-Write-Host "[5/5] Benchmark Results" -ForegroundColor Yellow
-Write-Host ""
-Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host "                   MODEL COMPARISON                              " -ForegroundColor Cyan
-Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host ""
-
-# Sort by duration (fastest first)
-$sortedResults = $benchmarkResults | Sort-Object { $_.Duration }
-
-Write-Host ("   {0,-3} {1,-20} {2,-10} {3,-12} {4,-10}" -f "Key", "Model", "Size", "Duration", "Status") -ForegroundColor Yellow
-Write-Host ("   " + ("-" * 65)) -ForegroundColor Gray
-
-foreach ($result in $sortedResults) {
-    $statusColor = if ($result.Status -eq "SUCCESS") { "Green" } else { "Red" }
-    $durationStr = if ($result.Status -eq "SUCCESS") { "$($result.Duration.ToString('F2'))s" } else { "N/A" }
-
-    Write-Host ("   {0,-3} {1,-20} {2,-10} {3,-12} {4,-10}" -f `
-        $result.Key, `
-        $result.Model, `
-        $result.Size, `
-        $durationStr, `
-        $result.Status) -ForegroundColor $statusColor
+    Write-Host "ERROR: Benchmark failed with exit code $LASTEXITCODE" -ForegroundColor Red
+    exit $LASTEXITCODE
 }
 
 Write-Host ""
-Write-Host "   Total benchmark duration: $($totalDuration.ToString('F2')) seconds" -ForegroundColor Cyan
-Write-Host ""
-
-# Find fastest and slowest
-$successful = $benchmarkResults | Where-Object { $_.Status -eq "SUCCESS" }
-if ($successful.Count -gt 1) {
-    $fastest = $successful | Sort-Object { $_.Duration } | Select-Object -First 1
-    $slowest = $successful | Sort-Object { $_.Duration } -Descending | Select-Object -First 1
-
-    $speedup = $slowest.Duration / $fastest.Duration
-
-    Write-Host "   Fastest: $($fastest.Model) ($($fastest.Duration.ToString('F2'))s)" -ForegroundColor Green
-    Write-Host "   Slowest: $($slowest.Model) ($($slowest.Duration.ToString('F2'))s)" -ForegroundColor Yellow
-    Write-Host "   Speedup: $($speedup.ToString('F2'))x faster" -ForegroundColor Cyan
-    Write-Host ""
-}
-
-Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "   Benchmark complete!" -ForegroundColor Green
-Write-Host ""
-Write-Host "   Translation files saved with numbered keys (r0, r1, r2, etc.)" -ForegroundColor Yellow
-Write-Host "   Review the .parsed.yaml files to compare model outputs." -ForegroundColor Yellow
-Write-Host ""
-Write-Host "   Location: games\$GameName\game\tl\romanian\*.parsed.yaml" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "   Each block now contains:" -ForegroundColor Gray
-Write-Host "      en:  Original English text" -ForegroundColor Gray
-foreach ($result in $benchmarkResults) {
-    Write-Host "      $($result.Key): Translation from $($result.Model)" -ForegroundColor Gray
-}
-Write-Host ""
-Write-Host "=================================================================" -ForegroundColor Cyan
+Write-Host "=================================================================" -ForegroundColor Green
+Write-Host "       Benchmark Completed Successfully!                       " -ForegroundColor Green
+Write-Host "=================================================================" -ForegroundColor Green
 Write-Host ""

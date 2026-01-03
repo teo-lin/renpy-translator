@@ -7,8 +7,8 @@ Unlike normal translation, this:
 - Saves translations under numbered keys (r0, r1, r2, etc.) for comparison
 
 Usage:
-    python benchmark_translate.py --game <game_name> --model <model_key> --key <key_id>
-    Example: python benchmark_translate.py --game Example --model aya23 --key r0
+    python compare.py --game <game_name> --model <model_key> --key <key_id>
+    Example: python compare.py --game Example --model aya23 --key r0
 """
 
 import sys

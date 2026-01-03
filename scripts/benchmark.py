@@ -43,7 +43,11 @@ if sys.platform == "win32":
 
 # Add src directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-from core import Aya23Translator
+from translators.aya23_translator import Aya23Translator
+from translators.helsinkyRo_translator import QuickMTTranslator
+from translators.madlad400_translator import MADLAD400Translator
+from translators.mbartRo_translator import MBARTTranslator
+from translators.seamless96_translator import SeamlessM4Tv2Translator
 
 
 def tokenize(text: str) -> List[str]:
@@ -146,7 +150,7 @@ def detect_language_from_filename(filename: str) -> str:
     return 'Romanian'
 
 
-def run_benchmark(data_path: Path, glossary_path: Path = None) -> Dict:
+def run_benchmark(data_path: Path, glossary_path: Path = None, model_key: str = "aya23") -> Dict:
     """
     Run translation quality benchmark
 
@@ -174,12 +178,36 @@ def run_benchmark(data_path: Path, glossary_path: Path = None) -> Dict:
         glossary = load_glossary(glossary_path)
         print(f"  Loaded {len(glossary)} terms")
 
-    # Initialize translator
+    # Load model configuration
     project_root = Path(__file__).parent.parent
-    model_path = project_root / "models" / "aya-23-8B-GGUF" / "aya-23-8B-Q4_K_M.gguf"
+    models_config_path = project_root / "models" / "models_config.json"
 
-    print(f"\nInitializing translator...")
-    translator = Aya23Translator(str(model_path), target_language=target_language)
+    with open(models_config_path, 'r', encoding='utf-8') as f:
+        models_config = json.load(f)
+
+    model_info = models_config['available_models'].get(model_key)
+    if not model_info:
+        print(f"ERROR: Model '{model_key}' not found in models_config.json")
+        sys.exit(1)
+
+    print(f"\nModel: {model_info['name']}")
+    print(f"Initializing translator...")
+
+    # Create translator based on model type
+    if model_key == "aya23":
+        model_path = project_root / model_info['file']
+        translator = Aya23Translator(str(model_path), target_language=target_language)
+    elif model_key == "helsinkyRo":
+        translator = QuickMTTranslator()
+    elif model_key == "madlad400":
+        translator = MADLAD400Translator()
+    elif model_key == "mbartRo":
+        translator = MBARTTranslator()
+    elif model_key == "seamless96":
+        translator = SeamlessM4Tv2Translator()
+    else:
+        print(f"ERROR: Model '{model_key}' not supported for benchmarking")
+        sys.exit(1)
 
     # Run translations and calculate scores
     print("\n" + "=" * 70)
@@ -276,18 +304,27 @@ def main():
         print(__doc__)
         print("\nExamples:")
         print("  python benchmark.py data/ro_benchmark.json")
-        print("  python benchmark.py data/ro_uncensored_benchmark.json --glossary data/ro_uncensored_glossary.json")
-        print("  python benchmark.py data/de_benchmark.json --glossary data/de_glossary.json")
+        print("  python benchmark.py data/ro_benchmark.json --model aya23")
+        print("  python benchmark.py data/ro_benchmark.json --model madlad400 --glossary data/ro_glossary.json")
         sys.exit(1)
 
     # Parse arguments
     data_path = Path(sys.argv[1])
     glossary_path = None
+    model_key = "aya23"  # Default model
 
-    # Check for --glossary parameter
-    for i, arg in enumerate(sys.argv[2:], start=2):
+    # Check for --glossary and --model parameters
+    i = 2
+    while i < len(sys.argv):
+        arg = sys.argv[i]
         if arg == '--glossary' and i + 1 < len(sys.argv):
             glossary_path = Path(sys.argv[i + 1])
+            i += 2
+        elif arg == '--model' and i + 1 < len(sys.argv):
+            model_key = sys.argv[i + 1]
+            i += 2
+        else:
+            i += 1
 
     if not data_path.exists():
         print(f"ERROR: Benchmark data not found: {data_path}")
@@ -310,7 +347,7 @@ def main():
             print(f"Auto-detected glossary: {glossary_path}")
 
     # Run benchmark
-    run_benchmark(data_path, glossary_path)
+    run_benchmark(data_path, glossary_path, model_key)
 
 
 if __name__ == "__main__":

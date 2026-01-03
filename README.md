@@ -94,13 +94,13 @@ Create `data/<language>_benchmark.json` with reference translations:
 **Usage:**
 ```powershell
 # Run benchmark with auto-detected glossary
-.\9-benchmark.ps1 data\ro_benchmark.json
+.\8-compare.ps1 data\ro_benchmark.json
 
 # Run with explicit glossary
-.\9-benchmark.ps1 data\ro_benchmark.json --glossary data\ro_glossary.json
+.\8-compare.ps1 data\ro_benchmark.json --glossary data\ro_glossary.json
 
 # Run for other languages
-.\9-benchmark.ps1 data\de_benchmark.json
+.\8-compare.ps1 data\de_benchmark.json
 ```
 
 **Template Files:**
@@ -209,7 +209,7 @@ Place in `data\<language>_corrections.json`
 │           └── *.translated.rpy       # Merged output (NEW)
 ├── requirements.txt       # Python dependencies
 ├── 0-setup.ps1            # Automated setup script
-├── 9-benchmark.ps1        # PowerShell launcher for benchmark.py
+├── 8-compare.ps1        # PowerShell launcher for benchmark.py
 ├── 2-test.ps1             # Test runner
 ├── 1-config.ps1           # Character discovery & game setup (NEW)
 ├── 2-extract.ps1          # Extract .rpy → YAML/JSON (NEW)
