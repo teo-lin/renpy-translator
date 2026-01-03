@@ -156,10 +156,12 @@ def test_compare_workflow():
     with open(first_file, 'r', encoding='utf-8') as f:
         content = yaml.safe_load(f)
 
-    # Find first dialogue block
-    dialogue_blocks = [k for k in content.keys() if k.startswith('dialogue-')]
+    # Find any block with 'en' key (dialogue, narrator, or string)
+    # The current block ID creation uses char_name or "block-" prefix, not "dialogue-".
+    # We'll just take the first block that has an 'en' key.
+    dialogue_blocks = [k for k in content.keys() if 'en' in content[k]]
     if not dialogue_blocks:
-        print(f"  [FAIL] No dialogue blocks found in parsed file")
+        print(f"  [FAIL] No translatable blocks (with 'en' key) found in parsed file")
         return False
 
     first_block_id = dialogue_blocks[0]

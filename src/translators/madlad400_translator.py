@@ -131,7 +131,7 @@ class MADLAD400Translator:
                 trust_remote_code=trust_remote_code
             )
         else:
-            self.tokenizer = T5Tokenizer.from_pretrained(model_path)
+            self.tokenizer = T5Tokenizer.from_pretrained(model_path, local_files_only=True)
 
             # Use memory-efficient loading with float16 (like other models)
             # NOTE: We avoid device_map="auto" for MADLAD because the large vocabulary (400 languages)
@@ -140,7 +140,8 @@ class MADLAD400Translator:
                 self.model = T5ForConditionalGeneration.from_pretrained(
                     model_path,
                     trust_remote_code=trust_remote_code,
-                    torch_dtype=torch.float16 if device == "cuda" else torch.float32
+                    torch_dtype=torch.float16 if device == "cuda" else torch.float32,
+                    local_files_only=True
                 )
                 # Manually move to device (more reliable than device_map for this model)
                 self.model = self.model.to(self.device)

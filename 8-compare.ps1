@@ -118,7 +118,21 @@ foreach ($modelIdx in 0..($installedModels.Count - 1)) {
     $modelStartTime = Get-Date
 
     # Run comparison translation
-    $output = & $pythonExe $compareScript --game $GameName --model $modelKey --key $keyNumber 2>&1
+    $argsList = "$compareScript --game $GameName --model $modelKey --key $keyNumber"
+    $outputFile = Join-Path $env:TEMP "compare_stdout_$(Get-Date -Format "yyyyMMdd_HHmmss_ffff").tmp"
+
+    $process = Start-Process -FilePath $pythonExe `
+        -ArgumentList $argsList `
+        -RedirectStandardOutput $outputFile `
+        -NoNewWindow `
+        -Wait `
+        -PassThru
+
+    $output = Get-Content $outputFile -Raw -Encoding utf8
+    Remove-Item $outputFile
+
+    $pythonExitCode = $process.ExitCode
+
 
     # Display output
     $output | ForEach-Object { Write-Host $_ }
@@ -126,7 +140,7 @@ foreach ($modelIdx in 0..($installedModels.Count - 1)) {
     $modelEndTime = Get-Date
     $modelDuration = ($modelEndTime - $modelStartTime).TotalSeconds
 
-    if ($LASTEXITCODE -ne 0) {
+    if ($pythonExitCode -ne 0) {
         Write-Host "   [ERROR] Translation failed for model $modelKey!" -ForegroundColor Red
         $benchmarkResults += @{
             Model = $modelInfo.name

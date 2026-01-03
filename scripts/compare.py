@@ -373,7 +373,7 @@ def initialize_translator(model_key: str, model_path: Path, target_language: str
     elif model_key == 'seamlessm96':
         # SeamlessM4Tv2 uses model directory
         return translator_class(
-            model_path=str(model_path),
+            model_name=str(model_path),
             target_language=target_language,
             glossary=glossary
         )
@@ -429,9 +429,14 @@ def main():
         sys.exit(1)
 
     model_path = project_root / model_config['destination']
-    if not model_path.exists():
-        print(f"ERROR: Model file not found: {model_path}")
-        sys.exit(1)
+    if model_config['file'] is None:  # Directory-based model
+        if not model_path.is_dir():
+            print(f"ERROR: Model directory not found: {model_path}")
+            sys.exit(1)
+    else:  # File-based model
+        if not model_path.is_file():
+            print(f"ERROR: Model file not found: {model_path}")
+            sys.exit(1)
 
     # Load resources
     print("\nLoading resources...")
