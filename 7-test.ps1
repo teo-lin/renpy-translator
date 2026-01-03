@@ -14,7 +14,7 @@ $ErrorActionPreference = "Stop"
 $env:HF_HOME = Join-Path $PSScriptRoot "models"
 
 # Source the shared user selection module
-. (Join-Path $PSScriptRoot "scripts\select.ps1")
+. (Join-Path $PSScriptRoot "scripts\config_selector.ps1")
 
 # Color output helpers
 function Write-Success {

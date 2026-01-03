@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 # Source the shared user selection module
-. (Join-Path $scriptDir "scripts\select.ps1")
+. (Join-Path $scriptDir "scripts\config_selector.ps1")
 
 $pythonExe = Join-Path $scriptDir "venv\Scripts\python.exe"
 $correctScript = Join-Path $scriptDir "scripts\correct.py"

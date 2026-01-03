@@ -182,7 +182,7 @@ Place in `data\<language>_corrections.json`
 │   ├── correct.py       # Aya-23-8B grammar correction engine
 │   ├── benchmark.py       # BLEU benchmark script
 │   ├── common.ps1         # Shared PowerShell functions
-│   └── select.ps1 # Interactive game/language selection
+│   └── config_selector.ps1 # Interactive game/language selection
 ├── tests/                 # Automated tests
 │   ├── test_end_to_end.py           # End-to-end translation tests
 │   ├── test_unit_renpy_tags.py           # Tag preservation tests
