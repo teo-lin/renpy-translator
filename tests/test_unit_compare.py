@@ -103,7 +103,7 @@ def test_benchmark_translator_translates_all_blocks():
         benchmark = BenchmarkTranslator(
             translator=mock_translator,
             characters={},
-            save_key='r0'
+            save_key='ay'
         )
 
         # Run translation
@@ -128,11 +128,11 @@ def test_benchmark_translator_translates_all_blocks():
 
         # Check that ALL blocks have the new key
         for block_id in ['dialogue-1-Amelia', 'dialogue-2-MainCharacter', 'dialogue-3-Amelia']:
-            assert 'r0' in result[block_id], f"Block {block_id} missing 'r0' key"
-            assert result[block_id]['r0'].startswith('[TestModel]'), \
-                f"Block {block_id} has incorrect translation: {result[block_id]['r0']}"
+            assert 'ay' in result[block_id], f"Block {block_id} missing 'ay' key"
+            assert result[block_id]['ay'].startswith('[TestModel]'), \
+                f"Block {block_id} has incorrect translation: {result[block_id]['ay']}"
 
-        print(f"  ✓ All blocks have 'r0' key with translations")
+        print(f"  ✓ All blocks have 'ay' key with translations")
 
         # Check that original translations are preserved
         assert result['dialogue-1-Amelia']['ro'] == 'Salut!', "Original 'ro' translation lost"
@@ -148,7 +148,7 @@ def test_numbered_key_storage():
     """Test that translations are stored under correct numbered keys"""
 
     print("\n" + "=" * 70)
-    print("TEST 2: Numbered key storage (r0, r1, r2)")
+    print("TEST 2: Two-letter key storage (ay, he, ma, etc.)")
     print("=" * 70)
 
     # Create sample data
@@ -183,7 +183,7 @@ def test_numbered_key_storage():
             json.dump(tags_file, f, ensure_ascii=False, indent=2)
 
         # Test different keys
-        test_keys = ['r0', 'r1', 'r2', 'r3']
+        test_keys = ['ay', 'he', 'ma', 'mb'] # Changed from r0, r1, r2, r3
 
         for key in test_keys:
             mock_translator = MockTranslator(model_name=f'Model{key}')
@@ -205,7 +205,7 @@ def test_numbered_key_storage():
 
             print(f"  ✓ Key '{key}' correctly stored with translation")
 
-    print("\n  [PASS] All numbered keys work correctly!")
+    print("\n  [PASS] All two-letter keys work correctly!")
     return True
 
 
@@ -246,7 +246,7 @@ def test_context_extraction():
         benchmark = BenchmarkTranslator(
             translator=mock_translator,
             characters={},
-            save_key='r0',
+            save_key='ay',
             context_before=2,  # 2 lines before
             context_after=1   # 1 line after
         )

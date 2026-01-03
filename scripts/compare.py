@@ -4,11 +4,11 @@ Benchmark Translation Script
 Translates ALL blocks in .parsed.yaml files for benchmarking purposes.
 Unlike normal translation, this:
 - Translates ALL blocks regardless of existing translations
-- Saves translations under numbered keys (r0, r1, r2, etc.) for comparison
+- Saves translations under abbreviated model keys (e.g., ay, he, ma) for comparison
 
 Usage:
     python compare.py --game <game_name> --model <model_key> --key <key_id>
-    Example: python compare.py --game Example --model aya23 --key r0
+    Example: python compare.py --game Example --model aya23 --key ay
 """
 
 import sys

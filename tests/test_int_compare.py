@@ -170,10 +170,10 @@ def test_compare_workflow():
     print(f"    First block: {first_block_id}")
     print(f"    Keys in block: {list(first_block.keys())}")
 
-    # Check for numbered keys (r0, r1, r2, etc.)
+    # Check for new format keys (ay, he, ma, etc.)
     found_keys = []
-    for i in range(expected_model_count):
-        key = f"r{i}"
+    for model_key in installed_models:
+        key = model_key[:2].lower()
         if key in first_block:
             found_keys.append(key)
             print(f"      ✓ Found key '{key}': {first_block[key][:50]}...")
@@ -240,18 +240,24 @@ def test_key_format():
             content = yaml.safe_load(f)
 
         for block_id, block_data in content.items():
-            if block_id.startswith('dialogue-'):
-                # Check for correct format (r0, r1) vs wrong format (01, 02)
+            # Filter out non-dialogue blocks or blocks without 'en' key
+            if 'en' in block_data:
+                # Check for correct format (ay, he, ma, etc.)
                 for key in block_data.keys():
-                    if re.match(r'^r\d+$', key):
+                    if key == 'en': # Skip the English key
+                        continue
+                    if re.match(r'^[a-z]{2}$', key):
                         # Correct format
                         pass
-                    elif re.match(r'^\d{2}$', key):
+                    elif re.match(r'^[a-z]{2}\d+$', key): # Check for old format with number suffix like r0, ay0
                         print(f"  [FAIL] Found old format key '{key}' in {parsed_file.name}")
-                        print(f"         Should be 'r{int(key)}' instead")
+                        print(f"         Should be a two-letter abbreviation (e.g., '{key[:2]}')")
+                        return False
+                    else: # Catch any other unexpected key format
+                        print(f"  [FAIL] Found unexpected key format '{key}' in {parsed_file.name}")
                         return False
 
-    print(f"  ✓ All keys use correct format (r0, r1, r2)")
+    print(f"  ✓ All keys use correct format (e.g., ay, he)")
     return True
 
 

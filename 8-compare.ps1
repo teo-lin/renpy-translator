@@ -109,7 +109,7 @@ $benchmarkStartTime = Get-Date
 foreach ($modelIdx in 0..($installedModels.Count - 1)) {
     $modelKey = $installedModels[$modelIdx]
     $modelInfo = $modelsConfig.available_models.$modelKey
-    $keyNumber = "r$modelIdx"  # Format as r0, r1, r2, etc.
+    $keyNumber = $modelKey.Substring(0, 2).ToLower() # Use first 2 chars of model name, lowercase
 
     Write-Host ""
     Write-Host "   [$($modelIdx + 1)/$($installedModels.Count)] Model: $($modelInfo.name) -> Key: $keyNumber" -ForegroundColor Cyan
