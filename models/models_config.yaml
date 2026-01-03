@@ -1,0 +1,170 @@
+description: Translation models configuration
+version: 1.0.0
+available_models:
+  aya23:
+    name: aya23
+    languages_supported: 23
+    params: 8B
+    format: GGUF
+    repo: bartowski/aya-23-8B-GGUF
+    http_link: https://huggingface.co/bartowski/aya-23-8B-GGUF
+    file: aya-23-8B-Q4_K_M.gguf
+    size: 4.8GB
+    destination: models/aya23/aya-23-8B-Q4_K_M.gguf
+    script: scripts/translate.py
+    description: Multilingual LLM GGUF, 8B params, Flores 34.8, VRAM 5.8GB. Uncensored,
+      GGUF, 23 languages. Slower, larger VRAM.
+    languages:
+    - ro
+    - es
+    - fr
+    - de
+    - it
+    - pt
+    - ru
+    - tr
+    - cs
+    - pl
+    - uk
+    - bg
+    - zh
+    - ja
+    - ko
+    - vi
+    - th
+    - id
+    - ar
+    - he
+    - hi
+    - nl
+    - fi
+  helsinkiRo:
+    name: helsinkiRo
+    params: 0.07B
+    format: safetensors
+    languages_supported: 1
+    repo: Helsinki-NLP/opus-mt-en-ro
+    http_link: https://huggingface.co/Helsinki-NLP/opus-mt-en-ro
+    file: null
+    size: ~0.3GB
+    destination: models/helsinkiRo
+    script: scripts/translate.py
+    description: Ro-Translation safetensors, Marian MT, BLEU 34.0, VRAM 0.3GB. Helsinki-NLP
+      OPUS model, fast and lightweight. Small but accurate.
+    languages:
+    - ro
+    huggingface_download: true
+  madlad400:
+    name: madlad400
+    repo: google/madlad400-3b-mt
+    http_link: https://huggingface.co/google/madlad400-3b-mt
+    file: null
+    size: ~6GB
+    destination: models/madlad400
+    script: scripts/translate.py
+    description: Translations safetensors, 3B params, BLEU ~35.11, Flores 38.4, VRAM
+      4GB. Uncensored, safetensors, 400+ languages. Requires trust_remote_code, lower
+      quality for some languages.
+    languages:
+    - ro
+    - es
+    - fr
+    - de
+    - it
+    - pt
+    - ru
+    - tr
+    - cs
+    - pl
+    - uk
+    - bg
+    - zh
+    - ja
+    - ko
+    - vi
+    - th
+    - id
+    - ar
+    - he
+    - fa
+    - hi
+    - bn
+    - nl
+    - sv
+    - 'no'
+    - da
+    - fi
+    - el
+    - hu
+    huggingface_download: true
+  mbartRo:
+    name: mbartRo
+    params: 0.6B
+    format: safetensors
+    languages_supported: 1
+    repo: facebook/mbart-large-en-ro
+    http_link: https://huggingface.co/facebook/mbart-large-en-ro
+    file: null
+    size: ~2GB
+    destination: models/mbartRo
+    script: scripts/translate.py
+    description: Ro-Translation safetensors, 0.6B params, BLEU 38.0 WMT16, VRAM 2GB.
+      Largest RO-specific, good context. Smaller than multilinguals.
+    languages:
+    - ro
+    huggingface_download: true
+  seamlessm96:
+    name: seamless96
+    params: 2.3B
+    format: safetensors
+    languages_supported: 96
+    repo: facebook/seamless-m4t-v2-large
+    http_link: https://huggingface.co/facebook/seamless-m4t-v2-large
+    file: null
+    size: ~5GB
+    destination: models/seamless96
+    script: scripts/translate.py
+    description: Multimodal safetensors, 2.3B params, Flores 38.8, VRAM 5+ GB. Most
+      recent from Meta, better than NLLB. Includes unneeded speech features.
+    languages:
+    - ro
+    - es
+    - fr
+    - de
+    - it
+    - pt
+    - ru
+    - tr
+    - cs
+    - pl
+    - uk
+    - bg
+    - zh
+    - ja
+    - ko
+    - vi
+    - th
+    - id
+    - ar
+    - he
+    - fa
+    - hi
+    - bn
+    - nl
+    - sv
+    - 'no'
+    - da
+    - fi
+    - el
+    - hu
+    huggingface_download: true
+    requires_tiktoken: true
+installed_models:
+- aya23
+- helsinkiRo
+- madlad400
+- mbartRo
+- seamlessm96
+installed_languages:
+- Code: ro
+  Name: Romanian

@@ -4,20 +4,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
-
-# Virtual Environment
 venv/
-
-# Models (large files)
-models/*
-*.gguf
-*.bin
-*.safetensors
-!models/*.md
-!models/models_config.json
-
-# Data - ignore directory but track specific files
-data/**/*uncensored*
 
 # IDE
 .vscode/
@@ -31,28 +18,23 @@ data/**/*uncensored*
 .DS_Store
 Thumbs.db
 desktop.ini
-
-# Logs
 *.log
 
 # Test outputs
 test_output/
 
-# External Tools
-tools/
-
 # Games - ignore all except Example
-games/
-!games/
 games/*
-!games/Example/
 !games/Example/**
+/games/Example/game/tl/romanian/Cell01_Academy.rpy.backup
+/games/Example/game/tl/romanian/Cell01_Academy.corrections.txt
 
 # Generated translation files
 *.parsed.yaml
-*.parsed.yml
 *.tags.json
+*.tags.yaml
 characters.json
+characters.yaml
 
 # Ren'Py - ignore all except specific files, unRen, and rpaExtract.exe
 renpy/
@@ -60,11 +42,23 @@ renpy/
 renpy/*
 !renpy/RENPY.md
 !renpy/tools_config.json
+!renpy/tools_config.yaml
 !renpy/rpaExtract.exe
 !renpy/unRen/
 !renpy/unRen/**
-/src/PROMO.md
+
+# Models (large files)
+models/*
+*.gguf
+*.bin
+*.safetensors
+!models/*.md
+!models/models_config.json
+!models/models_config.yaml
+
+# Data - ignore directory but track specific files
+data/**/*uncensored*
+
+# Root
 /TROUBLESHOOTING.md
 /STATUS.md
-/games/Example/game/tl/romanian/Cell01_Academy.rpy.backup
-/games/Example/game/tl/romanian/Cell01_Academy.corrections.txt

@@ -25,7 +25,7 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='repla
 
 # Project paths
 project_root = Path(__file__).parent.parent
-compare_script = project_root / "9-compare.ps1"
+compare_script = project_root / "8-compare.ps1"
 models_config_path = project_root / "models" / "models_config.json"
 test_game = "Example"
 test_language = "ro"
@@ -38,7 +38,7 @@ def load_models_config():
         print(f"ERROR: Models configuration not found at {models_config_path}")
         return None
 
-    with open(models_config_path, 'r', encoding='utf-8') as f:
+    with open(models_config_path, 'r', encoding='utf-8-sig') as f:
         config = json.load(f)
 
     return config

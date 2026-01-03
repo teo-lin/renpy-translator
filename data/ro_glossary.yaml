@@ -1,0 +1,39 @@
+_comment: Romanian glossary for SFW Ren'Py visual novel translation
+_comment_usage: Ensures consistent translation of game-specific terms and character
+  names
+_comment_game_ui: Common UI elements in visual novels
+Main Menu: Meniul Principal
+Start: "\xCEncepe"
+Load: "\xCEncarc\u0103"
+Save: "Salveaz\u0103"
+Preferences: "Preferin\u021Be"
+Quit: "Ie\u0219ire"
+History: Istoric
+Skip: Sari peste
+Auto: Auto
+_comment_stats: Character stats and game mechanics
+health: "s\u0103n\u0103tate"
+stamina: "rezisten\u021B\u0103"
+intelligence: "inteligen\u021B\u0103"
+strength: "for\u021B\u0103"
+inventory: inventar
+quest log: jurnal de misiuni
+_comment_character_names: Example character names (customize for your game)
+Alice: Alice
+Bob: Bob
+the protagonist: protagonistul
+the protagonist (fem): protagonista
+_comment_relationships: Relationship and romance terms
+friend: prieten
+girlfriend: "prieten\u0103"
+boyfriend: prieten
+relationship: "rela\u021Bie"
+dating: "\xEEnt\xE2lniri romantice"
+love: dragoste
+affection: "afec\u021Biune"
+_comment_common_actions: Common verbs in visual novels
+to talk: a vorbi
+to meet: "a \xEEnt\xE2lni"
+to help: a ajuta
+to explore: a explora
+to choose: a alege

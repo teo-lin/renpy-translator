@@ -1,0 +1,149 @@
+description: External tools and models configuration
+version: 1.0.0
+models:
+  aya23:
+    name: aya23
+    repo: bartowski/aya-23-8B-GGUF
+    file: aya-23-8B-Q4_K_M.gguf
+    size: 4.8GB
+    destination: models/aya23/aya-23-8B-Q4_K_M.gguf
+    script: scripts/translate.py
+    description: Higher quality for 23 European and major Asian languages
+    languages:
+    - ro
+    - es
+    - fr
+    - de
+    - it
+    - pt
+    - ru
+    - tr
+    - cs
+    - pl
+    - uk
+    - bg
+    - zh
+    - ja
+    - ko
+    - vi
+    - th
+    - id
+    - ar
+    - he
+    - hi
+    - nl
+    - fi
+  madlad400:
+    name: Mmadlad400
+    repo: google/madlad400-3b-mt
+    file: null
+    size: ~6GB
+    destination: models/madlad400
+    script: scripts/translate.py
+    description: Supports 400+ languages (30 pre-configured with language codes)
+    languages:
+    - ro
+    - es
+    - fr
+    - de
+    - it
+    - pt
+    - ru
+    - tr
+    - cs
+    - pl
+    - uk
+    - bg
+    - zh
+    - ja
+    - ko
+    - vi
+    - th
+    - id
+    - ar
+    - he
+    - fa
+    - hi
+    - bn
+    - nl
+    - sv
+    - 'no'
+    - da
+    - fi
+    - el
+    - hu
+    huggingface_download: true
+  seamless96:
+    name: seamless96
+    repo: facebook/seamless-m4t-v2-large
+    file: null
+    size: ~5GB
+    destination: models/seamless96
+    script: scripts/translate.py
+    description: Meta's latest multimodal translation model (nearly 100 languages)
+    languages:
+    - ro
+    - es
+    - fr
+    - de
+    - it
+    - pt
+    - ru
+    - tr
+    - cs
+    - pl
+    - uk
+    - bg
+    - zh
+    - ja
+    - ko
+    - vi
+    - th
+    - id
+    - ar
+    - he
+    - fa
+    - hi
+    - bn
+    - nl
+    - sv
+    - 'no'
+    - da
+    - fi
+    - el
+    - hu
+    huggingface_download: true
+    requires_tiktoken: true
+  mbartRo:
+    name: mbartRo
+    repo: facebook/mbart-large-en-ro
+    file: null
+    size: ~2GB
+    destination: models/mbartRo
+    script: scripts/translate.py
+    description: Ro-Translation safetensors, 0.6B params, BLEU 38.0 WMT16, VRAM 2GB.
+      Largest RO-specific, good context. Smaller than multilinguals.
+    languages:
+    - ro
+    huggingface_download: true
+  helsinkyRo:
+    name: helsinkyRo
+    repo: Helsinki-NLP/opus-mt-en-ro
+    file: null
+    size: ~1.5GB
+    destination: models/helsinkyRo
+    script: scripts/translate.py
+    description: Ro-Translation safetensors, Marian MT, BLEU 34.0, VRAM 0.3GB. Helsinki-NLP
+      OPUS model, fast and lightweight. Small but accurate.
+    languages:
+    - ro
+    huggingface_download: true
+tools:
+  renpy:
+    version: 8.2.0
+    url: https://www.renpy.org/dl/8.2.0/renpy-8.2.0-sdk.zip
+    destination: renpy/
+    description: Ren'Py SDK for generate-translations command
+  rpaextract:
+    destination: renpy/rpaExtract.exe
+    description: Extract RPA archives from Ren'Py games (included in repository)
