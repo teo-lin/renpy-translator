@@ -273,10 +273,22 @@ class BenchmarkTranslator:
             "\n"
         )
 
+        # Remove ALL 'ro' keys from all blocks (only for compare.py flow)
+        # In benchmark mode, we only want model comparison keys (ay, he, ma, mb, se)
+        cleaned_blocks = {}
+        for block_id, block_data in parsed_blocks.items():
+            cleaned_block = {}
+            for key, value in block_data.items():
+                # Skip all 'ro' keys in compare flow
+                if key == 'ro':
+                    continue
+                cleaned_block[key] = value
+            cleaned_blocks[block_id] = cleaned_block
+
         # Write to file
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(header)
-            yaml.dump(parsed_blocks, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+            yaml.dump(cleaned_blocks, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
             f.flush()
 
         # Verify file was created and has content

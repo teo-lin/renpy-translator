@@ -208,7 +208,7 @@ class MADLAD400Translator:
 
         return translation
 
-    def translate(self, text: str, max_length: int = 128, num_beams: int = 1,
+    def translate(self, text: str, max_length: int = 256, num_beams: int = 4,
                   temperature: float = 1.0, context: list = None,
                   speaker: str = None) -> str:
         """
@@ -245,9 +245,16 @@ class MADLAD400Translator:
 
         # Generate translation
         with torch.no_grad():
-            # Use simple generation (following HuggingFace docs pattern)
-            # NOTE: MADLAD works best with minimal generation parameters
-            outputs = self.model.generate(input_ids=inputs['input_ids'])
+            # Generate with proper parameters
+            # NOTE: MADLAD requires explicit max_new_tokens and beam search for quality
+            outputs = self.model.generate(
+                input_ids=inputs['input_ids'],
+                max_new_tokens=max_length,
+                num_beams=max(1, num_beams),
+                early_stopping=True,
+                no_repeat_ngram_size=3,  # Prevent repetition issues
+                repetition_penalty=1.1  # Light penalty to prevent repetitions
+            )
 
         if os.getenv('DEBUG_MADLAD'):
             print(f"[DEBUG] Output tokens shape: {outputs.shape}")

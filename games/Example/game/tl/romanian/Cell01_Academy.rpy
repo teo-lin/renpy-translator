@@ -3,25 +3,31 @@
 # game/script.rpy:5
 translate romanian start_intro:
 
-    # narrator "Welcome to our visual novel!"
-    narrator "Bine ai venit la romanul nostru vizual!"
+    # narrator "Welcome to our translation test!"
+    narrator "Bine ai venit la testul nostru de traducere!"
+
+    # narrator "The first 3 lines are pretranspaled, to make sure parsing skips them."
+    narrator "Primele 3 linii sunt pre-traduse, pentru a ne asigura că parserul le sare."
+
+    # narrator "The lines contain variables and tags that need to be parsed out into a *.tags.yaml file, and merged back post transtation."
+    narrator "Liniile conțin variabile și etichete care trebuie extrase într-un fișier *.tags.yaml și reintroduse după traducere."
 
 # game/script.rpy:7
 translate romanian start_greeting:
 
     # mc "Hi, my name is [player_name]."
-    mc "Salut, mă numesc [player_name]."
+    mc ""
 
 # game/script.rpy:9
 translate romanian start_location:
 
     # narrator "{size=18}{color=#808080}Academy - Main Hall{/color}{/size}"
-    narrator "{size=18}{color=#808080}Academia - Sala Principală{/color}{/size}"
+    narrator "{size=18}{color=#808080}{/color}{/size}"
 
 # game/script.rpy:12
 translate romanian meet_sarah_1:
 
-    # sarah "Oh, hello! Are you the new student?"
+    # sarah "Oh, hello! Are you the new student, ''Johnny''?"
     sarah ""
 
 # game/script.rpy:14
@@ -45,13 +51,13 @@ translate romanian meet_sarah_4:
 # game/script.rpy:21
 translate romanian tour_library:
 
-    # sarah "This is the library. You'll spend a lot of time here studying."
+    # sarah "This is the library. You'll spend a lot of time here studying, seeing how you look like a nerdy one."
     sarah ""
 
 # game/script.rpy:23
 translate romanian tour_question:
 
-    # mc "Do they have good books on history?"
+    # mc "Do they have good books on history? I used to love reading them."
     mc ""
 
 # game/script.rpy:25
@@ -69,50 +75,38 @@ translate romanian cafeteria_scene:
 # game/script.rpy:30
 translate romanian cafeteria_intro:
 
-    # sarah "Let's grab some lunch. I'm starving!"
+    # sarah "Let's grab some lunch. I'm starving! They should have finished renovating the cafeteria by now."
     sarah ""
 
 # game/script.rpy:32
 translate romanian cafeteria_food:
 
-    # mc "The food here looks amazing. What do you recommend?"
+    # mc "The food here looks amazing. have you been coming here long?"
     mc ""
 
 # game/script.rpy:34
 translate romanian cafeteria_recommendation:
 
-    # sarah "Try the pasta! It's the chef's specialty."
+    # sarah "Try the pasta! It's the chef's bestest! We're besties, after all."
     sarah ""
 
 # game/script.rpy:37
 translate romanian friend_arrives:
 
-    # alex "Hey Sarah! Is this the new student?"
+    # alex "Hey Sarah! Is tis te nwe studnet? Sorry, my cherecter donsnnt spik correctly..."
     alex ""
 
 # game/script.rpy:39
 translate romanian friend_introduction:
 
-    # sarah "Yes! [player_name], this is Alex, my best friend."
+    # sarah "Yes! [player_name], this is Alex, we used to running into him."
     sarah ""
-
-# game/script.rpy:41
-translate romanian alex_greeting:
-
-    # alex "Welcome to the academy! Hope you like it here."
-    alex ""
 
 # game/script.rpy:43
 translate romanian mc_thanks:
 
     # mc "Thanks! Everyone has been so {b}kind{/b} and welcoming."
     mc ""
-
-# game/script.rpy:46
-translate romanian day_end:
-
-    # narrator "And so begins your adventure at the academy..."
-    narrator ""
 
 # game/script.rpy:48
 translate romanian chapter_complete:

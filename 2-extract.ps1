@@ -130,7 +130,7 @@ if ($All) {
         Extract-File `
             -FilePath $file.FullName `
             -GamePath $gameConfig.path `
-            -Language $gameConfig.target_language `
+            -Language $gameConfig.target_language.Name.ToLower() `
             -PythonCmd $pythonCmd
         Write-Host ""
     }
@@ -165,7 +165,7 @@ if ($All) {
                 Extract-File `
                     -FilePath $file.FullName `
                     -GamePath $gameConfig.path `
-                    -Language $gameConfig.target_language `
+                    -Language $gameConfig.target_language.Name.ToLower() `
                     -PythonCmd $pythonCmd
                 Write-Host ""
             }
@@ -203,7 +203,7 @@ if ($All) {
                 Extract-File `
                     -FilePath $selectedFile.FullName `
                     -GamePath $gameConfig.path `
-                    -Language $gameConfig.target_language `
+                    -Language $gameConfig.target_language.Name.ToLower() `
                     -PythonCmd $pythonCmd
             } catch {
                 Write-Host "Invalid input!" -ForegroundColor Red
@@ -226,7 +226,7 @@ if ($All) {
         Extract-File `
             -FilePath $fullPath `
             -GamePath $gameConfig.path `
-            -Language $gameConfig.target_language `
+            -Language $gameConfig.target_language.Name.ToLower() `
             -PythonCmd $pythonCmd
     }
 }
