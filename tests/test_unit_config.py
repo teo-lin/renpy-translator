@@ -1,12 +1,12 @@
 """
 Test script for character extraction from Example game
-Verifies that 1-config.ps1 properly generates characters.json with:
+Verifies that scripts/config.py properly generates characters.yaml with:
 - Correct character variables discovered from .rpy files
 - Character names extracted from script.rpy definitions
 - Auto-generated descriptions based on file appearances
 """
 
-import json
+import yaml
 import os
 import sys
 import shutil
@@ -14,13 +14,13 @@ import subprocess
 from pathlib import Path
 
 def test_unit_config():
-    """Test that 1-config.ps1 creates characters.json correctly"""
+    """Test that scripts/config.py creates characters.yaml correctly"""
 
     # Paths
     project_root = Path(__file__).parent.parent
-    characters_file = project_root / "games" / "Example" / "game" / "tl" / "romanian" / "characters.json"
-    backup_file = characters_file.with_suffix(".json.backup")
-    stage_script = project_root / "1-config.ps1"
+    characters_file = project_root / "games" / "Example" / "game" / "tl" / "ro" / "characters.yaml"
+    backup_file = characters_file.with_suffix(".yaml.backup")
+    config_script = project_root / "scripts" / "config.py"
 
     print("=" * 70)
     print("TEST: Character Discovery & Generation")
@@ -28,7 +28,7 @@ def test_unit_config():
     print()
 
     # Step 1: Backup existing file if it exists
-    print("[1/5] Backing up existing characters.json (if exists)...")
+    print("[1/5] Backing up existing characters.yaml (if exists)...")
     if characters_file.exists():
         shutil.copy2(characters_file, backup_file)
         print(f"   [OK] Backed up to: {backup_file.name}")
@@ -38,17 +38,23 @@ def test_unit_config():
         print("   [OK] No existing file to backup")
     print()
 
-    # Step 2: Run 1-config.ps1 to generate characters.json
-    print("[2/5] Running 1-config.ps1 to generate characters.json...")
+    # Step 2: Run scripts/config.py to generate characters.yaml
+    print("[2/5] Running scripts/config.py to generate characters.yaml...")
     try:
+        # Get the virtual environment Python path
+        venv_python = project_root / "venv" / "Scripts" / "python.exe"
+        if not venv_python.exists():
+            print(f"   [FAIL] Virtual environment not found at {venv_python}")
+            print("   Please run x0-setup.ps1 first to create the virtual environment")
+            return False
+
         result = subprocess.run(
             [
-                "powershell",
-                "-ExecutionPolicy", "Bypass",
-                "-File", str(stage_script),
-                "-GamePath", str(project_root / "games" / "Example"),
-                "-Language", "ro",
-                "-Model", "aya23"
+                str(venv_python),
+                str(config_script),
+                "--game-path", str(project_root / "games" / "Example"),
+                "--language", "ro",
+                "--model", "aya23"
             ],
             capture_output=True,
             text=True,
@@ -61,14 +67,14 @@ def test_unit_config():
             print(f"   STDOUT: {result.stdout}")
             return False
 
-        print("   [OK] 1-config.ps1 executed successfully")
+        print("   [OK] scripts/config.py executed successfully")
     except Exception as e:
-        print(f"   [FAIL] Error running 1-config.ps1: {e}")
+        print(f"   [FAIL] Error running scripts/config.py: {e}")
         return False
     print()
 
     # Step 3: Verify file was created
-    print("[3/5] Verifying characters.json was created...")
+    print("[3/5] Verifying characters.yaml was created...")
     if not characters_file.exists():
         print(f"   [FAIL] File was not created: {characters_file}")
         return False
@@ -76,15 +82,15 @@ def test_unit_config():
     print()
 
     # Step 4: Load and validate content
-    print("[4/5] Validating characters.json content...")
+    print("[4/5] Validating characters.yaml content...")
     try:
-        with open(characters_file, 'r', encoding='utf-8-sig') as f:
-            characters = json.load(f)
+        with open(characters_file, 'r', encoding='utf-8') as f:
+            characters = yaml.safe_load(f)
     except Exception as e:
-        print(f"   [FAIL] Error loading JSON: {e}")
+        print(f"   [FAIL] Error loading YAML: {e}")
         return False
 
-    print(f"   [OK] Found {len(characters)} characters in characters.json")
+    print(f"   [OK] Found {len(characters)} characters in characters.yaml")
     print()
 
     # Expected characters from Example game
@@ -114,7 +120,7 @@ def test_unit_config():
 
     for char_var, expected_data in expected.items():
         if char_var not in characters:
-            print(f"   [FAIL] Character '{char_var}' not found in characters.json")
+            print(f"   [FAIL] Character '{char_var}' not found in characters.yaml")
             failed += 1
             continue
 
@@ -145,8 +151,8 @@ def test_unit_config():
 
     print()
 
-    # Cleanup: Remove characters.json (restore backup if it existed)
-    print("[Cleanup] Cleaning up characters.json...")
+    # Cleanup: Remove characters.yaml (restore backup if it existed)
+    print("[Cleanup] Cleaning up characters.yaml...")
     if backup_file.exists():
         # Restore original file
         shutil.copy2(backup_file, characters_file)
@@ -170,8 +176,8 @@ def test_unit_config():
         print()
         print("\033[92m[SUCCESS] All tests passed!\033[0m")
         print()
-        print("1-config.ps1 successfully:")
-        print("  - Generated characters.json from scratch")
+        print("scripts/config.py successfully:")
+        print("  - Generated characters.yaml from scratch")
         print("  - Discovered all character variables from .rpy files")
         print("  - Extracted character names from script.rpy")
         print("  - Set correct character types")

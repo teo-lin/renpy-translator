@@ -227,5 +227,5 @@ installed_models:
 - mbartRo
 - seamlessm96
 installed_languages:
-- Code: ro
-  Name: Romanian
+- code: ro
+  name: Romanian

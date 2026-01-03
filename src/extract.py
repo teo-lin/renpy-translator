@@ -411,3 +411,251 @@ class RenpyExtractor:
 
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(tags_file, f, indent=2, ensure_ascii=False)
+
+
+# ============================================================================
+# CLI INTERFACE
+# ============================================================================
+
+def show_banner():
+    """Display the extraction banner"""
+    print()
+    print("=" * 70)
+    print("               Translation File Extraction                 ")
+    print("=" * 70)
+    print()
+
+
+def load_game_config(game_name: str) -> Dict[str, any]:
+    """Load game configuration from current_config.yaml"""
+    project_root = Path(__file__).parent.parent
+    config_path = project_root / "models" / "current_config.yaml"
+
+    if not config_path.exists():
+        print(f"Error: Configuration file not found at {config_path}")
+        print("Please run x1-config.ps1 first to configure a game.")
+        exit(1)
+
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
+
+    # Get the game configuration
+    games = config.get('games', {})
+    if game_name not in games:
+        print(f"Error: Game '{game_name}' not found in configuration.")
+        print(f"Available games: {', '.join(games.keys())}")
+        exit(1)
+
+    return games[game_name]
+
+
+def load_character_map(game_path: Path, language_code: str) -> Dict[str, str]:
+    """Load character map from characters.yaml"""
+    characters_path = game_path / "game" / "tl" / language_code / "characters.yaml"
+
+    if not characters_path.exists():
+        print(f"Warning: characters.yaml not found at {characters_path}")
+        return {}
+
+    with open(characters_path, 'r', encoding='utf-8') as f:
+        chars = yaml.safe_load(f)
+
+    # Convert to simple char_var -> name mapping
+    return {k: v.get('name', k.upper()) for k, v in chars.items()}
+
+
+def extract_single_file(
+    file_path: Path,
+    game_path: Path,
+    language_code: str,
+    character_map: Dict[str, str]
+):
+    """Extract a single .rpy file"""
+    print(f"\nExtracting: {file_path.name}")
+
+    # Prepare output paths
+    base_name = file_path.stem
+    output_dir = file_path.parent
+    yaml_path = output_dir / f"{base_name}.parsed.yaml"
+    json_path = output_dir / f"{base_name}.tags.json"
+
+    # Extract
+    extractor = RenpyExtractor(character_map)
+    parsed_blocks, tags_file = extractor.extract_file(
+        file_path,
+        target_language=language_code,
+        source_language='english'
+    )
+
+    # Save files
+    extractor.save_parsed_yaml(parsed_blocks, yaml_path)
+    extractor.save_tags_json(tags_file, json_path)
+
+    print(f"\nExtraction complete!")
+    print(f"  YAML: {yaml_path}")
+    print(f"  JSON: {json_path}")
+
+
+def find_rpy_files(tl_path: Path) -> List[Path]:
+    """Find all .rpy files excluding parsed and tags files"""
+    all_files = list(tl_path.rglob("*.rpy"))
+    return [
+        f for f in all_files
+        if not f.name.endswith('.parsed.rpy') and not f.name.endswith('.tags.rpy')
+    ]
+
+
+def main():
+    """Main CLI entry point"""
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Extract translation blocks from Ren\'Py files')
+    parser.add_argument('--game-name', type=str, default='', help='Game name from configuration')
+    parser.add_argument('--source', type=str, default='', help='Specific .rpy file to extract')
+    parser.add_argument('--all', action='store_true', help='Extract all .rpy files')
+
+    args = parser.parse_args()
+
+    show_banner()
+
+    # Load configuration
+    project_root = Path(__file__).parent.parent
+    config_path = project_root / "models" / "current_config.yaml"
+
+    if not config_path.exists():
+        print("Error: Configuration file not found.")
+        print("Please run x1-config.ps1 first to configure a game.")
+        exit(1)
+
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
+
+    # Determine which game to use
+    if args.game_name:
+        game_name = args.game_name
+    else:
+        game_name = config.get('current_game')
+        if not game_name:
+            print("Error: No game configured.")
+            print("Please run x1-config.ps1 first.")
+            exit(1)
+
+    # Get game config
+    game_config = load_game_config(game_name)
+    game_path = Path(game_config['path'])
+    language_info = game_config['target_language']
+    language_code = language_info.get('code', language_info.get('name', 'unknown').lower())
+
+    print(f"Game: {game_config['name']}")
+    print(f"Language: {language_info['name']} ({language_code})")
+    print(f"Path: {game_path}")
+    print()
+
+    # Load character map
+    character_map = load_character_map(game_path, language_code)
+
+    # Get translation directory
+    tl_path = game_path / "game" / "tl" / language_code
+
+    if not tl_path.exists():
+        print(f"Error: Translation directory not found: {tl_path}")
+        exit(1)
+
+    # Determine what to extract
+    if args.all:
+        # Extract all files
+        print("Finding all .rpy files...")
+        rpy_files = find_rpy_files(tl_path)
+
+        if not rpy_files:
+            print("No .rpy files found!")
+            exit(1)
+
+        print(f"Found {len(rpy_files)} files\n")
+
+        for file_path in rpy_files:
+            extract_single_file(file_path, game_path, language_code, character_map)
+            print()
+
+    elif args.source:
+        # Extract specific file
+        if args.source.endswith('.rpy'):
+            file_path = tl_path / args.source
+        else:
+            file_path = tl_path / f"{args.source}.rpy"
+
+        if not file_path.exists():
+            print(f"Error: File not found: {file_path}")
+            exit(1)
+
+        extract_single_file(file_path, game_path, language_code, character_map)
+
+    else:
+        # Interactive mode - ask user
+        print("Extract Options:")
+        print("  [1] Extract all .rpy files")
+        print("  [2] Extract specific file")
+        print()
+
+        choice = input("Select option (1-2): ").strip()
+
+        if choice == "1":
+            # Extract all
+            print("\nFinding all .rpy files...")
+            rpy_files = find_rpy_files(tl_path)
+
+            if not rpy_files:
+                print("No .rpy files found!")
+                exit(1)
+
+            print(f"Found {len(rpy_files)} files\n")
+
+            for file_path in rpy_files:
+                extract_single_file(file_path, game_path, language_code, character_map)
+                print()
+
+        elif choice == "2":
+            # List and select file
+            print("\nAvailable .rpy files:")
+            print()
+
+            rpy_files = find_rpy_files(tl_path)
+
+            if not rpy_files:
+                print("No .rpy files found!")
+                exit(1)
+
+            for i, file_path in enumerate(rpy_files, 1):
+                print(f"  [{i}] {file_path.name}")
+
+            print()
+            selection = input(f"Select file (1-{len(rpy_files)}): ").strip()
+
+            try:
+                index = int(selection) - 1
+                if 0 <= index < len(rpy_files):
+                    selected_file = rpy_files[index]
+                    print()
+                    extract_single_file(selected_file, game_path, language_code, character_map)
+                else:
+                    print("Invalid selection!")
+                    exit(1)
+            except ValueError:
+                print("Invalid input!")
+                exit(1)
+
+        else:
+            print("Invalid option!")
+            exit(1)
+
+    print()
+    print("Extraction complete!")
+    print()
+    print("Next steps:")
+    print("  1. Review the .parsed.yaml files for any issues")
+    print("  2. Run 'x3-translate.ps1' to translate untranslated blocks")
+    print()
+
+
+if __name__ == "__main__":
+    main()

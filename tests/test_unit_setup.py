@@ -333,8 +333,9 @@ class TestProjectSetup:
     @staticmethod
     @patch('setup.subprocess.run')
     @patch('setup.ProjectSetup._check_package_installed')
+    @patch('setup.ProjectSetup._check_package_in_pip')
     @patch('setup.ProjectSetup._check_torch_cuda')
-    def test_verify_installation(mock_cuda, mock_pkg, mock_subprocess):
+    def test_verify_installation(mock_cuda, mock_pip, mock_pkg, mock_subprocess):
         """Test installation verification"""
         print("\n[TEST] _verify_installation")
 
@@ -351,6 +352,7 @@ class TestProjectSetup:
 
         # Mock all checks pass
         mock_pkg.return_value = True
+        mock_pip.return_value = True
         mock_cuda.return_value = True
 
         # Create a temporary model file
@@ -369,8 +371,9 @@ class TestProjectSetup:
     @staticmethod
     @patch('setup.subprocess.run')
     @patch('setup.ProjectSetup._check_package_installed')
+    @patch('setup.ProjectSetup._check_package_in_pip')
     @patch('setup.ProjectSetup._check_torch_cuda')
-    def test_verify_installation_missing_model(mock_cuda, mock_pkg, mock_subprocess):
+    def test_verify_installation_missing_model(mock_cuda, mock_pip, mock_pkg, mock_subprocess):
         """Test verification fails when model is missing"""
         print("\n[TEST] _verify_installation - missing model")
 
@@ -386,6 +389,7 @@ class TestProjectSetup:
         ]
 
         mock_pkg.return_value = True
+        mock_pip.return_value = True
         mock_cuda.return_value = True
 
         with tempfile.TemporaryDirectory() as tmpdir:

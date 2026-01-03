@@ -145,13 +145,12 @@ class ProjectSetup:
         self.all_languages = sorted_languages
 
     def _select_languages(self):
-        print()
-        print("=" * 70)
-        print("Select Languages to Work With [0/6]")
-        print("=" * 70)
-        print()
-
         if self.args.languages:
+            print()
+            print("=" * 70)
+            print("Select Languages to Work With [0/6]")
+            print("=" * 70)
+            print()
             if self.args.languages.lower() == 'all':
                 self.selected_languages = self.all_languages
                 print("  Auto-selected: All languages")
@@ -166,17 +165,12 @@ class ProjectSetup:
             return f"[{num:2d}] {lang['name']}"
 
         self.selected_languages = select_languages_single_row(
-            "Select Languages", self.all_languages, lang_formatter_func, "language"
+            "Select Languages to Work With", self.all_languages, lang_formatter_func, "language", step_info="[0/6]"
         )
 
     def _select_models(self):
-        print()
-        print("=" * 70)
-        print("Select Translation Models to Install [1/6]")
-        print("=" * 70)
-        print()
         all_models_dict = self.models_config.get("available_models", {})
-        
+
         selected_lang_codes = {lang['code'] for lang in self.selected_languages}
         self.available_models = []
         for key, value in all_models_dict.items():
@@ -184,12 +178,17 @@ class ProjectSetup:
             if model_langs.intersection(selected_lang_codes):
                  value['key'] = key
                  self.available_models.append(value)
-        
+
         if not self.available_models:
             print("\nError: No available models support the selected languages.")
             sys.exit(1)
 
         if self.args.models:
+            print()
+            print("=" * 70)
+            print("Select Translation Models to Install [1/6]")
+            print("=" * 70)
+            print()
             if self.args.models.lower() == 'all':
                 self.selected_models = self.available_models
                 print("  Auto-selected: All available models")
@@ -213,7 +212,7 @@ class ProjectSetup:
             )
 
         self.selected_models = select_multiple_items(
-            "Select Translation Models", self.available_models, model_formatter_func, "model"
+            "Select Translation Models to Install", self.available_models, model_formatter_func, "model", step_info="[1/6]"
         )
 
     def _save_config(self):
@@ -322,7 +321,8 @@ class ProjectSetup:
 
         # Install llama-cpp-python if needed
         if needs_llama_cpp:
-            if self._check_package_installed("llama_cpp"):
+            # Use pip check instead of import check since import can fail due to CUDA issues
+            if self._check_package_in_pip("llama-cpp-python"):
                 print("  llama-cpp-python already installed")
             else:
                 print("  Installing llama-cpp-python with CUDA (this may take a few minutes)...")
@@ -331,9 +331,7 @@ class ProjectSetup:
                     self._run_venv_pip([
                         "install", "llama-cpp-python",
                         "--extra-index-url", "https://abetlen.github.io/llama-cpp-python/whl/cu124",
-                        "--only-binary", ":all:",
-                        "--force-reinstall",
-                        "--no-cache-dir"
+                        "--only-binary", ":all:"
                     ], quiet=False)
                     print("  llama-cpp-python installed successfully!")
                 except subprocess.CalledProcessError:
@@ -382,6 +380,18 @@ class ProjectSetup:
         try:
             result = subprocess.run(
                 [str(self.venv_python), "-c", f"import {package_name}"],
+                capture_output=True,
+                text=True
+            )
+            return result.returncode == 0
+        except:
+            return False
+
+    def _check_package_in_pip(self, package_name):
+        """Check if a package is listed in pip (doesn't verify it can be imported)."""
+        try:
+            result = subprocess.run(
+                [str(self.venv_python), "-m", "pip", "show", package_name],
                 capture_output=True,
                 text=True
             )
@@ -496,8 +506,14 @@ class ProjectSetup:
         for model in self.selected_models:
             model_key = model.get('key', '')
             if model_key in ['aya23', 'orion-14b']:
-                if self._check_package_installed("llama_cpp"):
-                    print("    - llama-cpp-python: installed")
+                # Use pip check instead of import check for llama-cpp-python
+                # because import can fail due to CUDA/DLL issues even when installed
+                if self._check_package_in_pip("llama-cpp-python"):
+                    # Double-check if it can be imported
+                    if self._check_package_installed("llama_cpp"):
+                        print("    - llama-cpp-python: installed")
+                    else:
+                        print("    - llama-cpp-python: installed (warning: import test failed, may have runtime issues)")
                 else:
                     print("    - llama-cpp-python: NOT INSTALLED")
                     all_good = False
