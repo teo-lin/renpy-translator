@@ -419,3 +419,507 @@ def safe_init_translator(translator_class: Type, translator_name: str,
                 sys.stderr.write(captured_stderr)
                 sys.stderr.write("----------------------------------------------\n")
             raise e
+
+
+# --- Test Runner for Automated Testing ---
+
+import subprocess
+import json
+import yaml
+from dataclasses import dataclass
+from datetime import timedelta
+from typing import List, Optional, Dict, Set
+
+
+@dataclass
+class TestResult:
+    """Represents the result of a single test execution."""
+    name: str
+    passed: bool
+    duration: timedelta
+    exit_code: int
+    device: Optional[str] = None
+
+
+class TestRunner:
+    """
+    Automated test runner for the translation system.
+    Handles test discovery, filtering, execution, and reporting.
+    """
+
+    def __init__(self, project_root: Path):
+        """
+        Initialize test runner.
+
+        Args:
+            project_root: Path to project root directory
+        """
+        self.project_root = project_root
+        self.test_dir = project_root / "tests"
+        self.python_exe = project_root / "venv" / "Scripts" / "python.exe"
+        self.results: List[TestResult] = []
+
+        # Model-specific E2E tests mapping
+        self.model_specific_tests = {
+            "test_e2e_aya23.py": "aya23",
+            "test_e2e_madlad400.py": "madlad400",
+            "test_e2e_mbartRo.py": "mbartRo",
+            "test_e2e_helsinkyRo.py": "helsinkiRo",
+            "test_e2e_seamlessm96.py": "seamlessm96",
+        }
+
+        # Deprecated tests (incompatible with current architecture)
+        self.deprecated_tests: Set[str] = set()
+
+        # Tests that need model script arguments
+        self.tests_needing_model_script = {
+            "test_e2e_translate_aio.py",
+            "test_e2e_translate_aio_uncensored.py"
+        }
+
+    def setup_environment(self):
+        """Set up environment variables for test execution."""
+        import os
+
+        # Set HuggingFace home to local models directory
+        os.environ['HF_HOME'] = str(self.project_root / "models")
+
+        # Add PyTorch lib directory to PATH for CUDA DLLs
+        torch_lib_path = self.project_root / "venv" / "Lib" / "site-packages" / "torch" / "lib"
+        if torch_lib_path.exists():
+            os.environ['PATH'] = f"{torch_lib_path};{os.environ.get('PATH', '')}"
+
+        # Set UTF-8 encoding for Python
+        os.environ['PYTHONIOENCODING'] = 'utf-8'
+
+    def check_python_exe(self) -> bool:
+        """
+        Check if venv Python executable exists.
+
+        Returns:
+            True if Python exists, False otherwise
+        """
+        return self.python_exe.exists()
+
+    def detect_test_device(self) -> str:
+        """
+        Detect available device for integration/e2e tests.
+
+        Returns:
+            'cuda' if GPU available, otherwise 'cpu'
+        """
+        try:
+            script = "import torch; print('cuda' if torch.cuda.is_available() else 'cpu', end='')"
+            result = subprocess.run(
+                [str(self.python_exe), "-c", script],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode == 0:
+                return result.stdout.strip()
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+        return "cpu"
+
+    def load_configurations(self) -> tuple:
+        """
+        Load models and current configurations from YAML files.
+
+        Returns:
+            Tuple of (models_config, current_config)
+
+        Raises:
+            FileNotFoundError: If configuration files don't exist
+            ValueError: If required configuration values are missing
+        """
+        models_config_file = self.project_root / "models" / "models_config.yaml"
+        current_config_file = self.project_root / "models" / "current_config.yaml"
+
+        if not models_config_file.exists():
+            raise FileNotFoundError(
+                f"Models configuration not found at: {models_config_file}. "
+                "Please run 0-setup.ps1."
+            )
+
+        if not current_config_file.exists():
+            raise FileNotFoundError(
+                f"Current configuration not found at: {current_config_file}. "
+                "Please run 1-config.ps1."
+            )
+
+        with open(models_config_file, 'r', encoding='utf-8') as f:
+            models_config = yaml.safe_load(f)
+
+        with open(current_config_file, 'r', encoding='utf-8') as f:
+            current_config = yaml.safe_load(f)
+
+        return models_config, current_config
+
+    def get_installed_models(self, models_config: dict) -> List[dict]:
+        """
+        Get list of installed models.
+
+        Args:
+            models_config: Models configuration dictionary
+
+        Returns:
+            List of installed model dictionaries
+        """
+        installed_models = []
+
+        for model_key, model_config in models_config.get('available_models', {}).items():
+            model_path = self.project_root / model_config['destination']
+            if model_path.exists():
+                installed_models.append({
+                    'key': model_key,
+                    'name': model_config['name'],
+                    'description': model_config.get('description', ''),
+                    'size': model_config.get('size', ''),
+                    'config': model_config
+                })
+
+        return installed_models
+
+    def select_model(self, target_model_name: str, installed_models: List[dict]) -> Optional[dict]:
+        """
+        Select model based on target model name.
+
+        Args:
+            target_model_name: Name or key of target model
+            installed_models: List of installed models
+
+        Returns:
+            Selected model dictionary or None if not found
+        """
+        # Try exact name match
+        for model in installed_models:
+            if model['name'] == target_model_name:
+                return model
+
+        # Try key match
+        for model in installed_models:
+            if model['key'] == target_model_name:
+                return model
+
+        # Try case-insensitive name match
+        for model in installed_models:
+            if model['name'].lower() == target_model_name.lower():
+                return model
+
+        # Try fuzzy match
+        normalized_target = ''.join(c for c in target_model_name if c.isalnum()).lower()
+        for model in installed_models:
+            normalized_key = ''.join(c for c in model['key'] if c.isalnum()).lower()
+            normalized_name = ''.join(c for c in model['name'] if c.isalnum()).lower()
+
+            if (normalized_target.startswith(normalized_key) or
+                normalized_target in normalized_key or
+                normalized_key.startswith(normalized_target) or
+                normalized_key in normalized_target):
+                return model
+
+        return None
+
+    def discover_tests(self, category: Optional[str] = None) -> List[Path]:
+        """
+        Discover test files based on category.
+
+        Args:
+            category: Test category ('unit', 'int', 'e2e', or None for all)
+
+        Returns:
+            List of test file paths
+        """
+        all_test_files = sorted(self.test_dir.glob("test_*.py"))
+
+        if category == 'unit':
+            return [f for f in all_test_files if f.name.startswith("test_unit_")]
+        elif category == 'int':
+            return [f for f in all_test_files if f.name.startswith("test_int_")]
+        elif category == 'e2e':
+            return [f for f in all_test_files if f.name.startswith("test_e2e_")]
+        else:
+            return all_test_files
+
+    def filter_tests(self, test_files: List[Path], installed_models: List[dict]) -> List[Path]:
+        """
+        Filter out deprecated tests and model-specific tests for uninstalled models.
+
+        Args:
+            test_files: List of test file paths
+            installed_models: List of installed models
+
+        Returns:
+            Filtered list of test file paths
+        """
+        filtered = []
+        installed_keys = {m['key'] for m in installed_models}
+
+        for test_file in test_files:
+            # Skip deprecated tests
+            if test_file.name in self.deprecated_tests:
+                print(f"Skipping deprecated test {test_file.name} - incompatible with current architecture")
+                continue
+
+            # Check model-specific tests
+            if test_file.name in self.model_specific_tests:
+                required_model_key = self.model_specific_tests[test_file.name]
+                if required_model_key in installed_keys:
+                    filtered.append(test_file)
+                else:
+                    print(f"Skipping test {test_file.name} - associated model '{required_model_key}' is not installed.")
+            else:
+                filtered.append(test_file)
+
+        return filtered
+
+    def run_test(self, test_file: Path, selected_model: Optional[dict],
+                 language_code: str, test_device: str) -> TestResult:
+        """
+        Run a single test file.
+
+        Args:
+            test_file: Path to test file
+            selected_model: Selected model dictionary (if applicable)
+            language_code: Target language code
+            test_device: Device to use for testing ('cuda' or 'cpu')
+
+        Returns:
+            TestResult object
+        """
+        import time
+
+        start_time = time.time()
+
+        # Build command
+        cmd = [str(self.python_exe), str(test_file)]
+
+        # Add arguments for tests that need them
+        if test_file.name in self.tests_needing_model_script and selected_model:
+            script_path = self.project_root / selected_model['config']['script'].replace('/', '\\')
+            cmd.extend([
+                "--model_script", str(script_path),
+                "--language", language_code,
+                "--model_key", selected_model['key']
+            ])
+
+        # Run test
+        try:
+            result = subprocess.run(cmd, capture_output=False)
+            exit_code = result.returncode
+        except Exception as e:
+            print(f"Error running test: {e}")
+            exit_code = 1
+
+        duration = timedelta(seconds=time.time() - start_time)
+
+        # Determine if this test needs device info
+        needs_device = test_file.name.startswith("test_int_") or test_file.name.startswith("test_e2e_")
+
+        return TestResult(
+            name=test_file.name,
+            passed=(exit_code == 0),
+            duration=duration,
+            exit_code=exit_code,
+            device=test_device if needs_device else None
+        )
+
+    def print_summary(self):
+        """Print test execution summary."""
+        print("\n" + "=" * 70)
+        print("TEST SUMMARY")
+        print("=" * 70)
+
+        passed_count = sum(1 for r in self.results if r.passed)
+        failed_count = sum(1 for r in self.results if not r.passed)
+        total_duration = sum((r.duration for r in self.results), timedelta())
+
+        # Print individual results
+        print()
+        max_name_length = max(len(r.name) for r in self.results) if self.results else 0
+
+        for result in self.results:
+            status = "PASS" if result.passed else "FAIL"
+            color_code = "\033[92m" if result.passed else "\033[91m"  # Green or Red
+            reset_code = "\033[0m"
+
+            # Format duration
+            total_seconds = result.duration.total_seconds()
+            if total_seconds < 60:
+                duration_str = f"{total_seconds:6.2f}s"
+            else:
+                minutes = int(total_seconds // 60)
+                seconds = total_seconds % 60
+                duration_str = f"{minutes}m {seconds:.0f}s"
+
+            # Pad name for alignment
+            padded_name = result.name.ljust(max_name_length)
+
+            # Print result line
+            print(f"  [{color_code}{status}{reset_code}] {padded_name} took \033[96m{duration_str}\033[0m", end="")
+
+            # Show device for integration/e2e tests
+            if result.device:
+                device_color = "\033[93m" if result.device == "cuda" else "\033[90m"  # Yellow or Gray
+                print(f" on {device_color}{result.device.upper()}{reset_code}")
+            else:
+                print()
+
+        # Print summary stats
+        print()
+        print("=" * 70)
+
+        # Format total duration
+        total_seconds = total_duration.total_seconds()
+        if total_seconds < 60:
+            total_duration_str = f"{total_seconds:.2f}s"
+        elif total_seconds < 3600:
+            minutes = int(total_seconds // 60)
+            seconds = total_seconds % 60
+            total_duration_str = f"{minutes}m {seconds:.0f}s"
+        else:
+            hours = int(total_seconds // 3600)
+            remaining = total_seconds % 3600
+            minutes = int(remaining // 60)
+            seconds = remaining % 60
+            total_duration_str = f"{hours}h {minutes}m {seconds:.0f}s"
+
+        print(f"Total: {len(self.results)} tests | ", end="")
+        print(f"\033[92mPassed: {passed_count}\033[0m | ", end="")
+
+        if failed_count > 0:
+            print(f"\033[91mFailed: {failed_count}\033[0m | ", end="")
+        else:
+            print(f"Failed: {failed_count} | ", end="")
+
+        print(f"Total Time: \033[96m{total_duration_str}\033[0m")
+        print("=" * 70)
+
+        return failed_count
+
+    def run(self, category: Optional[str] = None) -> int:
+        """
+        Run all tests.
+
+        Args:
+            category: Test category to run ('unit', 'int', 'e2e', or None for all)
+
+        Returns:
+            Exit code (0 for success, 1 for failure)
+        """
+        print("\n" + "=" * 70)
+        print("RUNNING ALL STANDALONE TESTS")
+        print("=" * 70)
+
+        # Setup environment
+        self.setup_environment()
+
+        # Check Python
+        if not self.check_python_exe():
+            print(f"\033[91mVirtual environment not found at: {self.python_exe}\033[0m")
+            print("\033[91mPlease run setup first or ensure venv is created.\033[0m")
+            return 1
+
+        # Detect device
+        test_device = self.detect_test_device()
+
+        # Load configurations
+        try:
+            models_config, current_config = self.load_configurations()
+        except (FileNotFoundError, ValueError) as e:
+            print(f"\033[91m{e}\033[0m")
+            return 1
+
+        # Get current game configuration
+        current_game_name = current_config.get('current_game')
+        if not current_game_name:
+            print("\033[91mNo 'current_game' set in current_config.yaml. Please run 1-config.ps1.\033[0m")
+            return 1
+
+        current_game_config = current_config.get('games', {}).get(current_game_name)
+        if not current_game_config:
+            print(f"\033[91mConfiguration for current game '{current_game_name}' not found.\033[0m")
+            return 1
+
+        target_language_code = current_game_config.get('target_language')
+        target_model_name = current_game_config.get('model')
+
+        if not target_language_code or not target_model_name:
+            print("\033[91mNo 'target_language' or 'model' set for current game. Please run 1-config.ps1.\033[0m")
+            return 1
+
+        # Get installed models
+        installed_models = self.get_installed_models(models_config)
+        if not installed_models:
+            print("\033[91mERROR: No downloaded models found. Please run 0-setup.ps1.\033[0m")
+            return 1
+
+        # Select model
+        selected_model = self.select_model(target_model_name, installed_models)
+        if not selected_model:
+            print(f"\033[91mThe configured model '{target_model_name}' is not installed.\033[0m")
+            print("\033[96mAvailable installed models:\033[0m")
+            for model in installed_models:
+                print(f"  - Key: {model['key']}, Name: {model['name']}")
+            return 1
+
+        print(f"\033[96mUsing configured model: {selected_model['name']}\033[0m")
+        print(f"\033[96mTest Language: {target_language_code}\033[0m")
+
+        if test_device == "cuda":
+            print("\033[96mTest Device: CUDA (GPU acceleration enabled)\033[0m")
+        else:
+            print("\033[96mTest Device: CPU\033[0m")
+
+        # Discover tests
+        test_files = self.discover_tests(category)
+        if not test_files:
+            print(f"\033[91mNo test files found matching category: {category or 'all'}\033[0m")
+            return 1
+
+        category_name = {
+            'unit': 'Unit Tests',
+            'int': 'Integration Tests',
+            'e2e': 'End-to-End Tests',
+            None: 'All Tests'
+        }.get(category, 'All Tests')
+
+        print()
+        print(f"\033[96mRunning: {category_name}\033[0m")
+        print(f"\033[96mFound {len(test_files)} test file(s):\033[0m")
+        print()
+        for file in test_files:
+            print(f"  - {file.name}")
+
+        # Filter tests
+        test_files = self.filter_tests(test_files, installed_models)
+
+        # Run tests
+        for i, test_file in enumerate(test_files, 1):
+            print("\n" + "=" * 70)
+            print(f"Running test {i} of {len(test_files)}: {test_file.name}")
+            print("=" * 70)
+
+            result = self.run_test(test_file, selected_model, target_language_code, test_device)
+            self.results.append(result)
+
+            # Print immediate result
+            print()
+            if result.passed:
+                print(f"\033[92mPASSED: {test_file.name} (took {result.duration.total_seconds():.2f}s)\033[0m")
+            else:
+                print(f"\033[91mFAILED: {test_file.name} (exit code: {result.exit_code}, "
+                      f"took {result.duration.total_seconds():.2f}s)\033[0m")
+
+        # Print summary
+        failed_count = self.print_summary()
+
+        # Final message
+        print()
+        if failed_count > 0:
+            print("\033[91mSome tests failed!\033[0m")
+            return 1
+        else:
+            print("\033[92mAll tests passed!\033[0m")
+            return 0

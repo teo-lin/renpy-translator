@@ -1,14 +1,15 @@
 """
-Test the src/merge.py Python module in isolation.
+Test the src/merger.py Python module in isolation.
 
 This test validates that the RenpyMerger class correctly:
-1. Reads a .parsed.yaml (with translations) and a .tags.yaml file.
+1. Reads a .parsed.yaml (with translations) and a .tags.json file.
 2. Reconstructs a .rpy file from these inputs.
 3. Correctly restores text, character variables, and tags.
 4. Matches an expected "golden" output file.
 """
 
 import sys
+import json
 import yaml
 from pathlib import Path
 import tempfile
@@ -18,7 +19,7 @@ import shutil
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
-from merge import RenpyMerger
+from merger import RenpyMerger
 
 # --- Test Data ---
 
@@ -34,73 +35,73 @@ strings-1:
   ro: 'Capitolul 1'
 """
 
-# Handcrafted YAML file with metadata and tags
-TAGS_YAML_CONTENT = """
-metadata:
-  source_file: test.rpy
-  target_language: romanian
-  source_language: english
-  extracted_at: '2025-12-28T12:00:00Z'
-  file_structure_type: dialogue_and_strings
-  has_separator_lines: true
-  total_blocks: 3
-  untranslated_blocks: 0
-structure:
-  block_order:
-  - dialogue-1
-  - separator-1
-  - strings-1
-  string_section_start: 2
-  string_section_header: 'translate romanian strings:'
-blocks:
-  dialogue-1:
-    type: dialogue
-    label: start_dialogue
-    location: 'game/script.rpy:10'
-    char_var: s
-    char_name: Sylvie
-    tags:
-    - pos: 6
-      tag: ' [name]'
-      type: variable
-    template: |-
-      # {location}
-      translate {language} {label}:
-
-          # {char_var} "{original}"
-          {char_var} "{translation}"
-    separator_content: null
-  separator-1:
-    type: separator
-    label: null
-    location: null
-    char_var: null
-    char_name: null
-    tags: []
-    template: ''
-    separator_content: '# ----------------------------------------'
-  strings-1:
-    type: string
-    label: strings
-    location: 'game/script.rpy:20'
-    char_var: null
-    char_name: null
-    tags:
-    - pos: 0
-      tag: '{b}'
-      type: other
-    - pos: 9
-      tag: '{/b}'
-      type: close
-    template: "    # {location}\\n    old \\"{original}\\"\\n    new \\"{translation}\\""
-    separator_content: null
-character_map:
-  s: Sylvie
+# Handcrafted JSON file with metadata and tags
+TAGS_JSON_CONTENT = """
+{
+  "metadata": {
+    "source_file": "test.rpy",
+    "target_language": "romanian",
+    "source_language": "english",
+    "extracted_at": "2025-12-28T12:00:00Z",
+    "file_structure_type": "dialogue_and_strings",
+    "has_separator_lines": true,
+    "total_blocks": 3,
+    "untranslated_blocks": 0
+  },
+  "structure": {
+    "block_order": [
+      "dialogue-1",
+      "separator-1",
+      "strings-1"
+    ],
+    "string_section_start": 2,
+    "string_section_header": "translate romanian strings:"
+  },
+  "blocks": {
+    "dialogue-1": {
+      "type": "dialogue",
+      "label": "start_dialogue",
+      "location": "game/script.rpy:10",
+      "char_var": "s",
+      "char_name": "Sylvie",
+      "tags": [
+        {"pos": 6, "tag": " [name]", "type": "variable"}
+      ],
+      "template": "# {location}\\ntranslate {language} {label}:\\n\\n    # {char_var} \\"{original}\\"\\n    {char_var} \\"{translation}\\"",
+      "separator_content": null
+    },
+    "separator-1": {
+      "type": "separator",
+      "label": null,
+      "location": null,
+      "char_var": null,
+      "char_name": null,
+      "tags": [],
+      "template": "",
+      "separator_content": "# ----------------------------------------"
+    },
+    "strings-1": {
+      "type": "string",
+      "label": "strings",
+      "location": "game/script.rpy:20",
+      "char_var": null,
+      "char_name": null,
+      "tags": [
+        {"pos": 0, "tag": "{b}", "type": "other"},
+        {"pos": 9, "tag": "{/b}", "type": "close"}
+      ],
+      "template": "    # {location}\\n    old \\"{original}\\"\\n    new \\"{translation}\\"",
+      "separator_content": null
+    }
+  },
+  "character_map": {
+    "s": "Sylvie"
+  }
+}
 """
 
 # Expected output .rpy file content
-EXPECTED_RPY_CONTENT = """
-# TODO: Translation updated at 2025-12-28
+EXPECTED_RPY_CONTENT = """# TODO: Translation updated at 2025-12-28
 
 # game/script.rpy:10
 translate romanian start_dialogue:
@@ -125,7 +126,7 @@ def test_merge_in_isolation():
     Tests the RenpyMerger class with handcrafted input files.
     """
     print("\n" + "=" * 70)
-    print("TEST: RenpyMerger in Isolation (YAML tags)")
+    print("TEST: RenpyMerger in Isolation")
     print("=" * 70)
 
     # Create a temporary directory for test files
@@ -135,23 +136,23 @@ def test_merge_in_isolation():
     try:
         # 1. Create handcrafted input files
         parsed_yaml_path = temp_dir / "test.parsed.yaml"
-        tags_yaml_path = temp_dir / "test.tags.yaml"
+        tags_json_path = temp_dir / "test.tags.json"
         output_rpy_path = temp_dir / "test.output.rpy"
 
         with open(parsed_yaml_path, 'w', encoding='utf-8') as f:
             f.write(PARSED_YAML_CONTENT)
         print(f"[SETUP] Created: {parsed_yaml_path.name}")
 
-        with open(tags_yaml_path, 'w', encoding='utf-8') as f:
-            f.write(TAGS_YAML_CONTENT)
-        print(f"[SETUP] Created: {tags_yaml_path.name}")
+        with open(tags_json_path, 'w', encoding='utf-8') as f:
+            f.write(TAGS_JSON_CONTENT)
+        print(f"[SETUP] Created: {tags_json_path.name}")
 
         # 2. Instantiate and run the merger
         print("\n[RUN] Instantiating and running RenpyMerger...")
         merger = RenpyMerger()
         success = merger.merge_file(
             parsed_yaml_path=parsed_yaml_path,
-            tags_yaml_path=tags_yaml_path,
+            tags_json_path=tags_json_path,
             output_rpy_path=output_rpy_path,
             validate=True
         )
@@ -197,17 +198,19 @@ def test_merge_in_isolation():
             print(f"\n[CLEANUP] Removed temporary directory: {temp_dir}")
 
 def main():
+    """Run the test suite."""
     success = test_merge_in_isolation()
     if success:
-        print("\n" + "=" * 70)
+        print("\n" + "="*70)
         print("[Success] ALL MERGE TESTS PASSED")
-        print("=" * 70)
+        print("="*70)
         return 0
     else:
-        print("\n" + "=" * 70)
+        print("\n" + "="*70)
         print("[Failed] MERGE TESTS FAILED")
-        print("=" * 70)
+        print("="*70)
         return 1
 
 if __name__ == "__main__":
     sys.exit(main())
+
