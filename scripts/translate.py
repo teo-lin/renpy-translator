@@ -457,7 +457,7 @@ def main():
     glossary, corrections, prompt_template = load_resources(project_root, game_config, target_lang_code)
 
     # Load characters.yaml
-    tl_dir = game_path / "game" / "tl" / target_lang_code
+    tl_dir = game_path / "game" / "tl" / target_language_name.lower()
     characters_file = tl_dir / "characters.yaml"
 
     characters = {}

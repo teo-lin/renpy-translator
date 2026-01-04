@@ -3,19 +3,19 @@ _comment_usage: Ensures consistent translation of game-specific terms and charac
   names
 _comment_game_ui: Common UI elements in visual novels
 Main Menu: Meniul Principal
-Start: "\xCEncepe"
-Load: "\xCEncarc\u0103"
-Save: "Salveaz\u0103"
-Preferences: "Preferin\u021Be"
-Quit: "Ie\u0219ire"
+Start: "Începe"
+Load: "Încarcă"
+Save: "Salvează"
+Preferences: "Preferințe"
+Quit: "Ieșire"
 History: Istoric
 Skip: Sari peste
 Auto: Auto
 _comment_stats: Character stats and game mechanics
-health: "s\u0103n\u0103tate"
-stamina: "rezisten\u021B\u0103"
-intelligence: "inteligen\u021B\u0103"
-strength: "for\u021B\u0103"
+health: "sănătate"
+stamina: "rezistență"
+intelligence: "inteligență"
+strength: "forță"
 inventory: inventar
 quest log: jurnal de misiuni
 _comment_character_names: Example character names (customize for your game)
@@ -25,15 +25,15 @@ the protagonist: protagonistul
 the protagonist (fem): protagonista
 _comment_relationships: Relationship and romance terms
 friend: prieten
-girlfriend: "prieten\u0103"
+girlfriend: "prietenă"
 boyfriend: prieten
-relationship: "rela\u021Bie"
-dating: "\xEEnt\xE2lniri romantice"
+relationship: "relație"
+dating: "întâlniri romantice"
 love: dragoste
-affection: "afec\u021Biune"
+affection: "afecțiune"
 _comment_common_actions: Common verbs in visual novels
 to talk: a vorbi
-to meet: "a \xEEnt\xE2lni"
+to meet: "a întâlni"
 to help: a ajuta
 to explore: a explora
 to choose: a alege

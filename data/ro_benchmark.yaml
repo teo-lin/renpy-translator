@@ -1,11 +1,11 @@
 - source: Good morning! How are you today?
-  target: "Bun\u0103 diminea\u021Ba! Ce mai faci azi?"
+  target: "Bună dimineața! Ce mai faci azi?"
   context: null
 - source: I've been waiting for you.
-  target: "Te-am a\u0219teptat."
+  target: "Te-am așteptat."
   context: Good morning! How are you today?
 - source: Let's go to the park together.
-  target: "Hai s\u0103 mergem \xEEmpreun\u0103 la parc."
+  target: "Hai să mergem împreună la parc."
   context: I've been waiting for you.
 - source: Would you like some coffee?
   target: Vrei o cafea?
@@ -14,11 +14,11 @@
   target: Am ceva important de spus.
   context: Would you like some coffee?
 - source: Thank you for being here.
-  target: "Mul\u021Bumesc c\u0103 e\u0219ti aici."
+  target: "Mulțumesc că ești aici."
   context: I have something important to tell you.
 - source: What do you think about this?
-  target: "Ce p\u0103rere ai despre asta?"
+  target: "Ce părere ai despre asta?"
   context: null
 - source: I really appreciate your help.
-  target: "\xCE\u021Bi mul\u021Bumesc foarte mult pentru ajutor."
+  target: "Îți mulțumesc foarte mult pentru ajutor."
   context: What do you think about this?

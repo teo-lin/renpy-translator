@@ -555,7 +555,7 @@ def main():
     character_map = load_character_map(game_path, language_code)
 
     # Get translation directory
-    tl_path = game_path / "game" / "tl" / language_code
+    tl_path = game_path / "game" / "tl" / language_info['name'].lower()
 
     if not tl_path.exists():
         print(f"Error: Translation directory not found: {tl_path}")

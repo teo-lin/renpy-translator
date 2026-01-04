@@ -12,18 +12,76 @@ function Get-PythonCommand {
     }
 }
 
+function ConvertFrom-Yaml {
+    param(
+        [string]$YamlContent,
+        [string]$YamlFilePath
+    )
+    $pythonCmd = Get-PythonCommand
+    $tempYamlFile = Join-Path $env:TEMP ([System.Guid]::NewGuid().ToString() + ".yaml")
+    $tempJsonFile = Join-Path $env:TEMP ([System.Guid]::NewGuid().ToString() + ".json")
+
+    try {
+        if ($YamlContent) {
+            Set-Content -Path $tempYamlFile -Value $YamlContent -Encoding UTF8
+        } elseif ($YamlFilePath) {
+            # If path provided, use it directly
+            $tempYamlFile = $YamlFilePath
+        } else {
+            Write-Host "Error: Either YamlContent or YamlFilePath must be provided." -ForegroundColor Red
+            exit 1
+        }
+
+        & $pythonCmd (Join-Path $PSScriptRoot "scripts\convert_yaml_to_json.py") $tempYamlFile $tempJsonFile
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Error converting YAML to JSON. Python script failed." -ForegroundColor Red
+            exit $LASTEXITCODE
+        }
+
+        $jsonOutput = Get-Content -Path $tempJsonFile -Raw -Encoding UTF8
+        return ($jsonOutput | ConvertFrom-Json)
+    } finally {
+        if ($YamlContent) { Remove-Item $tempYamlFile -ErrorAction SilentlyContinue }
+        Remove-Item $tempJsonFile -ErrorAction SilentlyContinue
+    }
+}
+
+function ConvertTo-Yaml {
+    param(
+        [Parameter(ValueFromPipeline=$true)]
+        [psobject]$InputObject,
+        [string]$YamlFilePath
+    )
+    $pythonCmd = Get-PythonCommand
+    $tempJsonFile = Join-Path $env:TEMP ([System.Guid]::NewGuid().ToString() + ".json")
+
+    try {
+        # Convert input object to JSON string
+        $jsonContent = $InputObject | ConvertTo-Json -Depth 10
+
+        # Write JSON content to a temporary file
+        Set-Content -Path $tempJsonFile -Value $jsonContent -Encoding UTF8
+
+        # Call Python script to convert JSON to YAML
+        & $pythonCmd (Join-Path $PSScriptRoot "scripts\convert_json_to_yaml.py") $tempJsonFile $YamlFilePath
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Error converting JSON to YAML. Python script failed." -ForegroundColor Red
+            exit $LASTEXITCODE
+        }
+    } finally {
+        Remove-Item $tempJsonFile -ErrorAction SilentlyContinue
+    }
+}
+
 function Get-GameConfig {
     param([string]$GameName)
 
-    $configPath = Join-Path $PSScriptRoot "..\models\current_config.json"
+    $configPath = Join-Path $PSScriptRoot "..\models\current_config.yaml"
 
     if (-not (Test-Path $configPath)) {
-        Write-Host " Configuration file not found!" -ForegroundColor Red
-        Write-Host "   Please run 1-config.ps1 first to configure your game" -ForegroundColor Yellow
-        exit 1
-    }
-
-    $config = Get-Content $configPath -Raw | ConvertFrom-Json
+    $config = ConvertFrom-Yaml -YamlFilePath $configPath
 
     if ($GameName) {
         if ($config.games.PSObject.Properties.Name -contains $GameName) {
@@ -46,15 +104,13 @@ function Get-GameConfig {
 }
 
 function Select-ConfiguredGame {
-    $configPath = Join-Path $PSScriptRoot "..\models\current_config.json"
+    $configPath = Join-Path $PSScriptRoot "..\models\current_config.yaml"
 
     if (-not (Test-Path $configPath)) {
         Write-Host " No games configured!" -ForegroundColor Red
         Write-Host "   Please run 1-config.ps1 first" -ForegroundColor Yellow
         exit 1
-    }
-
-    $config = Get-Content $configPath -Raw | ConvertFrom-Json
+    $config = ConvertFrom-Yaml -YamlFilePath $configPath
     $gameNames = @($config.games.PSObject.Properties.Name)
 
     if ($gameNames.Count -eq 0) {
@@ -101,10 +157,10 @@ function Select-ConfiguredGame {
 function Update-CurrentGame {
     param([string]$GameName)
 
-    $configPath = Join-Path $PSScriptRoot "..\models\current_config.json"
-    $config = Get-Content $configPath -Raw | ConvertFrom-Json
+    $configPath = Join-Path $PSScriptRoot "..\models\current_config.yaml"
+    $config = Get-Content $configPath -Raw | ConvertFrom-Yaml
     $config.current_game = $GameName
-    $config | ConvertTo-Json -Depth 10 | Set-Content $configPath -Encoding UTF8
+    $config | ConvertTo-Yaml -Depth 10 | Set-Content $configPath -Encoding UTF8
 }
 
 function Show-GameInfo {
