@@ -7,11 +7,13 @@ param(
     [string]$Model = ""
 )
 
-# Import common functions
-. "$PSScriptRoot\scripts\common.ps1"
-
-# Activate virtual environment
-Activate-VirtualEnvironment
+# Get Python executable from virtual environment
+$venvPython = Join-Path $PSScriptRoot "venv\Scripts\python.exe"
+if (-not (Test-Path $venvPython)) {
+    Write-Host "ERROR: Virtual environment not found at $venvPython" -ForegroundColor Red
+    Write-Host "Please run 0-setup.ps1 first" -ForegroundColor Yellow
+    exit 1
+}
 
 # Build arguments for Python script
 $pythonArgs = @()
@@ -30,9 +32,7 @@ if ($Model -ne "") {
 
 # Run the Python script
 $configScript = Join-Path $PSScriptRoot "scripts\config.py"
-& python $configScript @pythonArgs
+& $venvPython $configScript @pythonArgs
 
-# Check exit code
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
-}
+# Exit with same code
+exit $LASTEXITCODE

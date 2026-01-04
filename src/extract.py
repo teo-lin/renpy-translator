@@ -4,11 +4,10 @@ Ren'Py Translation File Extractor
 Extracts translation blocks from .rpy files and separates clean text from tags.
 Outputs two files:
 - .parsed.yaml: Human-readable clean text for translation
-- .tags.json: Machine-readable metadata and tags for reconstruction
+- .tags.yaml: Machine-readable metadata and tags for reconstruction
 """
 
 import re
-import json
 import yaml
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
@@ -126,7 +125,7 @@ class RenpyExtractor:
         Returns:
             Tuple of (parsed_blocks, tags_file_content)
             - parsed_blocks: Dict[block_id, ParsedBlock] for YAML output
-            - tags_file_content: Complete tags.json structure
+            - tags_file_content: Complete tags.yaml structure
         """
         print(f"Reading file: {rpy_file_path}")
 
@@ -166,7 +165,7 @@ class RenpyExtractor:
                 # Separator block - add to tags_file but NOT to parsed_blocks (YAML)
                 block_id = f"separator-{idx}"
                 tagged_blocks[block_id] = {
-                    "type": BlockType.SEPARATOR,
+                    "type": BlockType.SEPARATOR.value,
                     "label": None,
                     "location": None,
                     "char_var": None,
@@ -215,9 +214,9 @@ class RenpyExtractor:
             # Build reconstruction template
             template = self._build_template(block)
 
-            # Add to tagged blocks (JSON)
+            # Add to tagged blocks (YAML)
             tagged_blocks[block_id] = {
-                "type": BlockType(block_type),
+                "type": BlockType(block_type).value,
                 "label": block.get('label'),
                 "location": block.get('location'),
                 "char_var": char_var,
@@ -405,12 +404,12 @@ class RenpyExtractor:
             f.write(header)
             yaml.dump(parsed_blocks, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
-    def save_tags_json(self, tags_file: TagsFileContent, output_path: Path):
-        """Save tags file to JSON."""
-        print(f"Saving tags JSON to: {output_path}")
+    def save_tags_yaml(self, tags_file: TagsFileContent, output_path: Path):
+        """Save tags file to YAML."""
+        print(f"Saving tags YAML to: {output_path}")
 
         with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(tags_file, f, indent=2, ensure_ascii=False)
+            yaml.dump(tags_file, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
 
 # ============================================================================
@@ -477,7 +476,7 @@ def extract_single_file(
     base_name = file_path.stem
     output_dir = file_path.parent
     yaml_path = output_dir / f"{base_name}.parsed.yaml"
-    json_path = output_dir / f"{base_name}.tags.json"
+    tags_yaml_path = output_dir / f"{base_name}.tags.yaml"
 
     # Extract
     extractor = RenpyExtractor(character_map)
@@ -489,11 +488,11 @@ def extract_single_file(
 
     # Save files
     extractor.save_parsed_yaml(parsed_blocks, yaml_path)
-    extractor.save_tags_json(tags_file, json_path)
+    extractor.save_tags_yaml(tags_file, tags_yaml_path)
 
     print(f"\nExtraction complete!")
-    print(f"  YAML: {yaml_path}")
-    print(f"  JSON: {json_path}")
+    print(f"  Parsed YAML: {yaml_path}")
+    print(f"  Tags YAML: {tags_yaml_path}")
 
 
 def find_rpy_files(tl_path: Path) -> List[Path]:

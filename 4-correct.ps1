@@ -16,8 +16,36 @@ param(
 $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-# Source the shared user selection module
-. (Join-Path $scriptDir "scripts\config_selector.ps1")
+# Simple selection function for interactive mode
+function Select-Item {
+    param(
+        [string]$Title,
+        [string]$ItemTypeName,
+        [array]$Items,
+        [scriptblock]$DisplayItem
+    )
+
+    Write-Host ""
+    Write-Host $Title -ForegroundColor Cyan
+    Write-Host ""
+
+    for ($i = 0; $i -lt $Items.Count; $i++) {
+        & $DisplayItem $Items[$i] ($i + 1)
+    }
+
+    Write-Host ""
+    $selection = Read-Host "Select $ItemTypeName (1-$($Items.Count))"
+
+    try {
+        $index = [int]$selection - 1
+        if ($index -lt 0 -or $index -ge $Items.Count) {
+            throw "Invalid selection"
+        }
+        return $Items[$index]
+    } catch {
+        throw "Invalid input"
+    }
+}
 
 $pythonExe = Join-Path $scriptDir "venv\Scripts\python.exe"
 $correctScript = Join-Path $scriptDir "scripts\correct.py"

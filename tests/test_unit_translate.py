@@ -2,7 +2,7 @@
 Test the modular translation pipeline
 
 Tests the new 3-translate.ps1 workflow:
-- Loading .parsed.yaml and .tags.json files
+- Loading .parsed.yaml and .tags.yaml files
 - Using YAML configuration (current_config.yaml, characters.yaml)
 - Context extraction (DIALOGUE: 3 before + 1 after, CHOICE: no context)
 - Translation with glossary and prompt fallback
@@ -12,7 +12,6 @@ This test uses a mock translator to avoid requiring a full model.
 """
 
 import sys
-import json
 import yaml
 from pathlib import Path
 import tempfile
@@ -155,7 +154,7 @@ def test_context_extraction():
 
 
 def test_translation_workflow():
-    """Test full translation workflow with .parsed.yaml and .tags.json files"""
+    """Test full translation workflow with .parsed.yaml and .tags.yaml files"""
 
     print("\n" + "=" * 70)
     print("TEST 2: Translation Workflow")
@@ -228,14 +227,14 @@ def test_translation_workflow():
         yaml.dump(parsed_blocks, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
         temp_yaml = Path(f.name)
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.tags.json', delete=False, encoding='utf-8') as f:
-        json.dump(tags_file, f, indent=2, ensure_ascii=False)
-        temp_json = Path(f.name)
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.tags.yaml', delete=False, encoding='utf-8') as f:
+        yaml.dump(tags_file, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        temp_yaml = Path(f.name)
 
     try:
         print(f"\n[Created] Test files:")
         print(f"    YAML: {temp_yaml.name}")
-        print(f"    JSON: {temp_json.name}")
+        print(f"    JSON: {temp_yaml.name}")
 
         # Create mock translator with glossary
         glossary = {
@@ -262,7 +261,7 @@ def test_translation_workflow():
         print("\n[Running] Translation...")
         stats = batch_translator.translate_file(
             parsed_yaml_path=temp_yaml,
-            tags_json_path=temp_json,
+            tags_yaml_path=temp_yaml,
             output_yaml_path=None  # Overwrite in place
         )
 
@@ -340,7 +339,7 @@ def test_translation_workflow():
     finally:
         # Cleanup
         temp_yaml.unlink(missing_ok=True)
-        temp_json.unlink(missing_ok=True)
+        temp_yaml.unlink(missing_ok=True)
 
 
 def test_untranslated_identification():
@@ -432,9 +431,9 @@ def test_language_agnostic():
         yaml.dump(parsed_blocks, f, allow_unicode=True)
         temp_yaml = Path(f.name)
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.tags.json', delete=False, encoding='utf-8') as f:
-        json.dump(tags_file, f, indent=2)
-        temp_json = Path(f.name)
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.tags.yaml', delete=False, encoding='utf-8') as f:
+        yaml.dump(tags_file, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        temp_yaml = Path(f.name)
 
     try:
         print(f"\n[Testing] Spanish translation...")
@@ -454,7 +453,7 @@ def test_language_agnostic():
         # Translate
         stats = batch_translator.translate_file(
             parsed_yaml_path=temp_yaml,
-            tags_json_path=temp_json,
+            tags_yaml_path=temp_yaml,
             output_yaml_path=None
         )
 
@@ -478,7 +477,7 @@ def test_language_agnostic():
 
     finally:
         temp_yaml.unlink(missing_ok=True)
-        temp_json.unlink(missing_ok=True)
+        temp_yaml.unlink(missing_ok=True)
 
 
 def main():

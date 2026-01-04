@@ -8,7 +8,6 @@ This test uses a mock translator to avoid requiring real models.
 """
 
 import sys
-import json
 import yaml
 from pathlib import Path
 import tempfile
@@ -89,14 +88,14 @@ def test_benchmark_translator_translates_all_blocks():
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir_path = Path(tmpdir)
         parsed_yaml = tmpdir_path / "test.parsed.yaml"
-        tags_json = tmpdir_path / "test.tags.json"
+        tags_yaml = tmpdir_path / "test.tags.json"
 
         # Write test files
         with open(parsed_yaml, 'w', encoding='utf-8') as f:
             yaml.dump(parsed_blocks, f, allow_unicode=True)
 
-        with open(tags_json, 'w', encoding='utf-8') as f:
-            json.dump(tags_file, f, ensure_ascii=False, indent=2)
+        with open(tags_yaml, 'w', encoding='utf-8') as f:
+            yaml.dump(tags_file, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
         # Create BenchmarkTranslator with mock translator
         mock_translator = MockTranslator(model_name='TestModel')
@@ -107,7 +106,7 @@ def test_benchmark_translator_translates_all_blocks():
         )
 
         # Run translation
-        stats = benchmark.translate_file(parsed_yaml, tags_json)
+        stats = benchmark.translate_file(parsed_yaml, tags_yaml)
 
         # Verify stats
         assert stats['total'] == 3, f"Expected 3 total blocks, got {stats['total']}"
@@ -169,14 +168,14 @@ def test_numbered_key_storage():
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir_path = Path(tmpdir)
         parsed_yaml = tmpdir_path / "test.parsed.yaml"
-        tags_json = tmpdir_path / "test.tags.json"
+        tags_yaml = tmpdir_path / "test.tags.json"
 
         # Write test files
         with open(parsed_yaml, 'w', encoding='utf-8') as f:
             yaml.dump(parsed_blocks, f, allow_unicode=True)
 
-        with open(tags_json, 'w', encoding='utf-8') as f:
-            json.dump(tags_file, f, ensure_ascii=False, indent=2)
+        with open(tags_yaml, 'w', encoding='utf-8') as f:
+            yaml.dump(tags_file, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
         # Test different keys
         test_keys = ['ay', 'he', 'ma', 'mb'] # Changed from r0, r1, r2, r3
@@ -189,7 +188,7 @@ def test_numbered_key_storage():
                 save_key=key
             )
 
-            benchmark.translate_file(parsed_yaml, tags_json)
+            benchmark.translate_file(parsed_yaml, tags_yaml)
 
             # Check the key was added
             with open(parsed_yaml, 'r', encoding='utf-8') as f:
@@ -230,13 +229,13 @@ def test_context_extraction():
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir_path = Path(tmpdir)
         parsed_yaml = tmpdir_path / "test.parsed.yaml"
-        tags_json = tmpdir_path / "test.tags.json"
+        tags_yaml = tmpdir_path / "test.tags.json"
 
         with open(parsed_yaml, 'w', encoding='utf-8') as f:
             yaml.dump(parsed_blocks, f, allow_unicode=True)
 
-        with open(tags_json, 'w', encoding='utf-8') as f:
-            json.dump(tags_file, f, ensure_ascii=False, indent=2)
+        with open(tags_yaml, 'w', encoding='utf-8') as f:
+            yaml.dump(tags_file, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
         mock_translator = MockTranslator()
         benchmark = BenchmarkTranslator(
@@ -247,7 +246,7 @@ def test_context_extraction():
             context_after=1   # 1 line after
         )
 
-        benchmark.translate_file(parsed_yaml, tags_json)
+        benchmark.translate_file(parsed_yaml, tags_yaml)
 
         # Find the call for 'Line 3' (dialogue-3-Alice)
         line3_call = None

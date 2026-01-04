@@ -85,12 +85,7 @@ class PatternBasedCorrector:
         file_path = Path(corrections_file)
 
         with open(corrections_file, 'r', encoding='utf-8') as f:
-            if file_path.suffix == '.yaml' or file_path.suffix == '.yml':
-                self.corrections = yaml.safe_load(f)
-            else:
-                # Backwards compatibility with JSON
-                import json
-                self.corrections = json.load(f)
+            self.corrections = yaml.safe_load(f)
 
         self.protected_words = set(self.corrections.get('protected_words', []))
         print(f"[OK] Loaded pattern-based corrections")
@@ -841,7 +836,7 @@ def main():
     model_config = all_models_config.get(model_name)
 
     if not model_config:
-        print(f"ERROR: Model '{model_name}' not found in models_config.json")
+        print(f"ERROR: Model '{model_name}' not found in models_config.yaml")
         sys.exit(1)
 
     model_path = project_root / model_config['destination']
@@ -850,9 +845,7 @@ def main():
     corrections_file = None
     for corrections_variant in [
         f"{lang_code}_uncensored_corrections.yaml",
-        f"{lang_code}_corrections.yaml",
-        f"{lang_code}_uncensored_corrections.json",
-        f"{lang_code}_corrections.json"
+        f"{lang_code}_corrections.yaml"
     ]:
         candidate = project_root / "data" / corrections_variant
         if candidate.exists():

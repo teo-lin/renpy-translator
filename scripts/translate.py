@@ -11,7 +11,6 @@ Usage:
 """
 
 import sys
-import json
 import yaml
 import time
 from pathlib import Path
@@ -60,7 +59,7 @@ class ModularBatchTranslator:
     def translate_file(
         self,
         parsed_yaml_path: Path,
-        tags_json_path: Path,
+        tags_yaml_path: Path,
         output_yaml_path: Optional[Path] = None
     ) -> Dict[str, int]:
         """
@@ -68,7 +67,7 @@ class ModularBatchTranslator:
 
         Args:
             parsed_yaml_path: Path to .parsed.yaml file
-            tags_json_path: Path to .tags.json file
+            tags_yaml_path: Path to .tags.yaml file
             output_yaml_path: Path to output YAML (default: overwrite input)
 
         Returns:
@@ -83,8 +82,8 @@ class ModularBatchTranslator:
         with open(parsed_yaml_path, 'r', encoding='utf-8') as f:
             parsed_blocks: Dict[str, ParsedBlock] = yaml.safe_load(f)
 
-        with open(tags_json_path, 'r', encoding='utf-8-sig') as f:
-            tags_file = json.load(f)
+        with open(tags_yaml_path, 'r', encoding='utf-8-sig') as f:
+            tags_file = yaml.safe_load(f)
 
         metadata = tags_file['metadata']
         structure = tags_file['structure']
@@ -376,26 +375,26 @@ def load_resources(project_root: Path, game_config: Dict, target_lang_code: str)
 
     Returns: (glossary, corrections, prompt_template)
     """
-    # Load glossary with fallback
+    # Load glossary with fallback (YAML-only)
     glossary = None
-    for glossary_variant in [f"{target_lang_code}_uncensored_glossary.json", f"{target_lang_code}_glossary.json"]:
+    for glossary_variant in [f"{target_lang_code}_uncensored_glossary.yaml", f"{target_lang_code}_glossary.yaml"]:
         glossary_path = project_root / "data" / glossary_variant
         if glossary_path.exists():
             with open(glossary_path, 'r', encoding='utf-8-sig') as f:
-                glossary = json.load(f)
+                glossary = yaml.safe_load(f)
             print(f"[OK] Using glossary: {glossary_variant}")
             break
 
     if not glossary:
         print(f"[WARNING] No glossary found for language code '{target_lang_code}'")
 
-    # Load corrections with fallback (for future use)
+    # Load corrections with fallback (YAML-only, for future use)
     corrections = None
-    for corrections_variant in [f"{target_lang_code}_uncensored_corrections.json", f"{target_lang_code}_corrections.json"]:
+    for corrections_variant in [f"{target_lang_code}_uncensored_corrections.yaml", f"{target_lang_code}_corrections.yaml"]:
         corrections_path = project_root / "data" / corrections_variant
         if corrections_path.exists():
             with open(corrections_path, 'r', encoding='utf-8-sig') as f:
-                corrections = json.load(f)
+                corrections = yaml.safe_load(f)
             print(f"[OK] Using corrections: {corrections_variant}")
             break
 
@@ -543,19 +542,19 @@ def main():
             show_progress(file_idx - 1, len(parsed_files), overall_start, prefix="Overall: ")
             print(f"\n[File {file_idx}/{len(parsed_files)}]")
 
-        # Find corresponding tags.json file
-        # Remove .parsed.yaml and replace with .tags.json
+        # Find corresponding tags.yaml file
+        # Remove .parsed.yaml and replace with .tags.yaml
         base_name = parsed_file.name.removesuffix('.parsed.yaml')
-        tags_file = parsed_file.parent / f"{base_name}.tags.json"
+        tags_file = parsed_file.parent / f"{base_name}.tags.yaml"
         if not tags_file.exists():
-            print(f"\n  [WARNING] Skipping {parsed_file.name} - no matching .tags.json file")
+            print(f"\n  [WARNING] Skipping {parsed_file.name} - no matching .tags.yaml file")
             print(f"             Expected: {tags_file.name}")
             continue
 
         # Translate file
         stats = batch_translator.translate_file(
             parsed_yaml_path=parsed_file,
-            tags_json_path=tags_file,
+            tags_yaml_path=tags_file,
             output_yaml_path=None  # Overwrite in place
         )
 

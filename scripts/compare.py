@@ -320,18 +320,13 @@ def load_config(project_root: Path, game_name: str) -> Dict:
 
 def load_resources(project_root: Path, target_lang_code: str):
     """Load glossary and prompt template."""
-    # Load glossary with fallback (try YAML first, then JSON for backwards compatibility)
+    # Load glossary with fallback (YAML-only)
     glossary = None
-    for glossary_variant in [f"{target_lang_code}_uncensored_glossary.yaml", f"{target_lang_code}_glossary.yaml",
-                            f"{target_lang_code}_uncensored_glossary.json", f"{target_lang_code}_glossary.json"]:
+    for glossary_variant in [f"{target_lang_code}_uncensored_glossary.yaml", f"{target_lang_code}_glossary.yaml"]:
         glossary_path = project_root / "data" / glossary_variant
         if glossary_path.exists():
             with open(glossary_path, 'r', encoding='utf-8') as f:
-                if glossary_variant.endswith('.yaml'):
-                    glossary = yaml.safe_load(f)
-                else:
-                    import json
-                    glossary = json.load(f)
+                glossary = yaml.safe_load(f)
             print(f"[OK] Using glossary: {glossary_variant}")
             break
 
@@ -442,7 +437,7 @@ def main():
 
     model_config = all_models_config.get(args.model)
     if not model_config:
-        print(f"ERROR: Model '{args.model}' not found in models_config.json")
+        print(f"ERROR: Model '{args.model}' not found in models_config.yaml")
         sys.exit(1)
 
     model_path = project_root / model_config['destination']

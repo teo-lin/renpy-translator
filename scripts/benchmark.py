@@ -4,23 +4,20 @@ Translation Quality Benchmark using BLEU Scores
 Benchmarks translation quality by comparing model outputs to reference translations
 using BLEU (Bilingual Evaluation Understudy) scores.
 
-Benchmark data format (JSON):
-[
-    {
-        "source": "English text to translate",
-        "target": "Reference translation",
-        "context": "Optional previous dialogue for context"
-    },
-    ...
-]
+Benchmark data format (YAML):
+- source: English text to translate
+  target: Reference translation
+  context: Optional previous dialogue for context
+- source: Another text...
+  target: Another translation...
 
 Usage:
-    python benchmark.py data/ro_benchmark.json [--glossary data/ro_glossary.json]
-    python benchmark.py data/de_benchmark.json --glossary data/de_glossary.json
+    python benchmark.py data/ro_benchmark.yaml [--glossary data/ro_glossary.yaml]
+    python benchmark.py data/de_benchmark.yaml --glossary data/de_glossary.yaml
 """
 
 import sys
-import json
+import yaml
 from pathlib import Path
 from typing import List, Dict, Tuple
 import re
@@ -86,7 +83,7 @@ def calculate_bleu(reference: str, hypothesis: str) -> float:
 def load_benchmark_data(data_path: Path) -> List[Dict]:
     """Load benchmark data from JSON file"""
     with open(data_path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+        data = yaml.safe_load(f)
 
     if not isinstance(data, list):
         raise ValueError("Benchmark data must be a JSON array")
@@ -105,7 +102,7 @@ def load_glossary(glossary_path: Path) -> Dict:
         return {}
 
     with open(glossary_path, 'r', encoding='utf-8') as f:
-        glossary = json.load(f)
+        glossary = yaml.safe_load(f)
 
     # Filter out comment entries (starting with _)
     return {k: v for k, v in glossary.items() if not k.startswith('_')}
@@ -113,7 +110,7 @@ def load_glossary(glossary_path: Path) -> Dict:
 
 def detect_language_from_filename(filename: str) -> str:
     """
-    Detect language from filename (e.g., 'ro_benchmark.json' → 'Romanian')
+    Detect language from filename (e.g., 'ro_benchmark.yaml' → 'Romanian')
     """
     lang_map = {
         'ro': 'Romanian',
@@ -180,14 +177,14 @@ def run_benchmark(data_path: Path, glossary_path: Path = None, model_key: str = 
 
     # Load model configuration
     project_root = Path(__file__).parent.parent
-    models_config_path = project_root / "models" / "models_config.json"
+    models_config_path = project_root / "models" / "models_config.yaml"
 
     with open(models_config_path, 'r', encoding='utf-8') as f:
-        models_config = json.load(f)
+        models_config = yaml.safe_load(f)
 
     model_info = models_config['available_models'].get(model_key)
     if not model_info:
-        print(f"ERROR: Model '{model_key}' not found in models_config.json")
+        print(f"ERROR: Model '{model_key}' not found in models_config.yaml")
         sys.exit(1)
 
     print(f"\nModel: {model_info['name']}")
@@ -303,9 +300,9 @@ def main():
     if len(sys.argv) < 2:
         print(__doc__)
         print("\nExamples:")
-        print("  python benchmark.py data/ro_benchmark.json")
-        print("  python benchmark.py data/ro_benchmark.json --model aya23")
-        print("  python benchmark.py data/ro_benchmark.json --model madlad400 --glossary data/ro_glossary.json")
+        print("  python benchmark.py data/ro_benchmark.yaml")
+        print("  python benchmark.py data/ro_benchmark.yaml --model aya23")
+        print("  python benchmark.py data/ro_benchmark.yaml --model madlad400 --glossary data/ro_glossary.yaml")
         sys.exit(1)
 
     # Parse arguments
@@ -332,12 +329,12 @@ def main():
 
     # Auto-detect glossary if not specified
     if glossary_path is None:
-        # Try to find matching glossary (e.g., ro_benchmark.json → ro_glossary.json)
+        # Try to find matching glossary (e.g., ro_benchmark.yaml → ro_glossary.yaml)
         lang_code = data_path.stem.split('_')[0]  # Extract 'ro' from 'ro_benchmark'
 
         # Try uncensored first, then regular
-        uncensored_glossary = data_path.parent / f"{lang_code}_uncensored_glossary.json"
-        regular_glossary = data_path.parent / f"{lang_code}_glossary.json"
+        uncensored_glossary = data_path.parent / f"{lang_code}_uncensored_glossary.yaml"
+        regular_glossary = data_path.parent / f"{lang_code}_glossary.yaml"
 
         if uncensored_glossary.exists():
             glossary_path = uncensored_glossary

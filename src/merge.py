@@ -6,7 +6,6 @@ Performs integrity validation to ensure syntax correctness.
 """
 
 import re
-import json
 import yaml
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
@@ -322,3 +321,239 @@ class RenpyMerger:
                 report.append(f"  ... and {len(errors) - 5} more")
 
         return '\n'.join(report)
+
+
+# ============================================================================
+# CLI INTERFACE
+# ============================================================================
+
+def show_banner():
+    """Display the merge banner"""
+    print()
+    print("=" * 70)
+    print("               Translation File Merge                      ")
+    print("=" * 70)
+    print()
+
+
+def load_game_config(game_name: str) -> Dict:
+    """Load game configuration from current_config.yaml"""
+    project_root = Path(__file__).parent.parent
+    config_path = project_root / "models" / "current_config.yaml"
+
+    if not config_path.exists():
+        print(f"Error: Configuration file not found at {config_path}")
+        print("Please run 1-config.ps1 first to configure a game.")
+        exit(1)
+
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
+
+    # Get the game configuration
+    games = config.get('games', {})
+    if game_name not in games:
+        print(f"Error: Game '{game_name}' not found in configuration.")
+        print(f"Available games: {', '.join(games.keys())}")
+        exit(1)
+
+    return games[game_name]
+
+
+def merge_single_file(
+    file_path: Path,
+    skip_validation: bool = False
+):
+    """Merge a single .parsed.yaml file"""
+    print(f"\nMerging: {file_path.name}")
+
+    # Prepare paths
+    base_name = file_path.stem.replace('.parsed', '')
+    output_dir = file_path.parent
+    tags_yaml_path = output_dir / f"{base_name}.tags.yaml"
+    output_rpy_path = output_dir / f"{base_name}.translated.rpy"
+
+    # Check if tags file exists
+    if not tags_yaml_path.exists():
+        print(f"Error: Tags YAML file not found: {tags_yaml_path}")
+        exit(1)
+
+    # Merge
+    merger = RenpyMerger()
+    success = merger.merge_file(
+        parsed_yaml_path=file_path,
+        tags_yaml_path=tags_yaml_path,
+        output_rpy_path=output_rpy_path,
+        validate=not skip_validation
+    )
+
+    if not success:
+        print('\nValidation found issues. Please review the output file.')
+        print(merger.get_validation_report())
+
+    print(f'\nMerge complete!')
+    print(f'  Output: {output_rpy_path}')
+
+
+def find_parsed_yaml_files(tl_path: Path) -> List[Path]:
+    """Find all .parsed.yaml files"""
+    return list(tl_path.rglob("*.parsed.yaml"))
+
+
+def main():
+    """Main CLI entry point"""
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Merge translated YAML files back into .rpy format')
+    parser.add_argument('--game-name', type=str, default='', help='Game name from configuration')
+    parser.add_argument('--source', type=str, default='', help='Specific .parsed.yaml file to merge')
+    parser.add_argument('--all', action='store_true', help='Merge all .parsed.yaml files')
+    parser.add_argument('--skip-validation', action='store_true', help='Skip integrity validation')
+
+    args = parser.parse_args()
+
+    show_banner()
+
+    # Load configuration
+    project_root = Path(__file__).parent.parent
+    config_path = project_root / "models" / "current_config.yaml"
+
+    if not config_path.exists():
+        print("Error: Configuration file not found.")
+        print("Please run 1-config.ps1 first to configure a game.")
+        exit(1)
+
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
+
+    # Determine which game to use
+    if args.game_name:
+        game_name = args.game_name
+    else:
+        game_name = config.get('current_game')
+        if not game_name:
+            print("Error: No game configured.")
+            print("Please run 1-config.ps1 first.")
+            exit(1)
+
+    # Get game config
+    game_config = load_game_config(game_name)
+    game_path = Path(game_config['path'])
+    language_info = game_config['target_language']
+    language_dir = language_info['name'].lower()
+
+    print(f"Game: {game_config['name']}")
+    print(f"Language: {language_info['name']}")
+    print(f"Path: {game_path}")
+    print()
+
+    # Get translation directory
+    tl_path = game_path / "game" / "tl" / language_dir
+
+    if not tl_path.exists():
+        print(f"Error: Translation directory not found: {tl_path}")
+        exit(1)
+
+    # Determine what to merge
+    if args.all:
+        # Merge all files
+        print("Finding all .parsed.yaml files...")
+        parsed_files = find_parsed_yaml_files(tl_path)
+
+        if not parsed_files:
+            print("No .parsed.yaml files found!")
+            print("Please run 2-extract.ps1 first.")
+            exit(1)
+
+        print(f"Found {len(parsed_files)} files\n")
+
+        for file_path in parsed_files:
+            merge_single_file(file_path, args.skip_validation)
+            print()
+
+    elif args.source:
+        # Merge specific file
+        if args.source.endswith('.parsed.yaml'):
+            file_path = tl_path / args.source
+        elif args.source.endswith('.yaml'):
+            file_path = tl_path / args.source
+        else:
+            file_path = tl_path / f"{args.source}.parsed.yaml"
+
+        if not file_path.exists():
+            print(f"Error: File not found: {file_path}")
+            exit(1)
+
+        merge_single_file(file_path, args.skip_validation)
+
+    else:
+        # Interactive mode
+        print("Merge Options:")
+        print("  [1] Merge all .parsed.yaml files")
+        print("  [2] Merge specific file")
+        print()
+
+        choice = input("Select option (1-2): ").strip()
+
+        if choice == "1":
+            # Merge all
+            print("\nFinding all .parsed.yaml files...")
+            parsed_files = find_parsed_yaml_files(tl_path)
+
+            if not parsed_files:
+                print("No .parsed.yaml files found!")
+                print("Please run 2-extract.ps1 first.")
+                exit(1)
+
+            print(f"Found {len(parsed_files)} files\n")
+
+            for file_path in parsed_files:
+                merge_single_file(file_path, args.skip_validation)
+                print()
+
+        elif choice == "2":
+            # List and select file
+            print("\nAvailable .parsed.yaml files:")
+            print()
+
+            parsed_files = find_parsed_yaml_files(tl_path)
+
+            if not parsed_files:
+                print("No .parsed.yaml files found!")
+                print("Please run 2-extract.ps1 first.")
+                exit(1)
+
+            for i, file_path in enumerate(parsed_files, 1):
+                print(f"  [{i}] {file_path.name}")
+
+            print()
+            selection = input(f"Select file (1-{len(parsed_files)}): ").strip()
+
+            try:
+                index = int(selection) - 1
+                if 0 <= index < len(parsed_files):
+                    selected_file = parsed_files[index]
+                    print()
+                    merge_single_file(selected_file, args.skip_validation)
+                else:
+                    print("Invalid selection!")
+                    exit(1)
+            except ValueError:
+                print("Invalid input!")
+                exit(1)
+
+        else:
+            print("Invalid option!")
+            exit(1)
+
+    print()
+    print("Merge complete!")
+    print()
+    print("Next steps:")
+    print("  1. Review the .translated.rpy files")
+    print("  2. Test the translations in the game")
+    print("  3. Replace the original .rpy files if satisfied")
+    print()
+
+
+if __name__ == "__main__":
+    main()

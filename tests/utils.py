@@ -424,7 +424,6 @@ def safe_init_translator(translator_class: Type, translator_name: str,
 # --- Test Runner for Automated Testing ---
 
 import subprocess
-import json
 import yaml
 from dataclasses import dataclass
 from datetime import timedelta

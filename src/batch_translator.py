@@ -6,7 +6,6 @@ Supports context extraction and intelligent untranslated block identification.
 """
 
 import yaml
-import json
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
@@ -57,7 +56,7 @@ class BatchTranslator:
     def translate_file(
         self,
         parsed_yaml_path: Path,
-        tags_json_path: Path,
+        tags_yaml_path: Path,
         output_yaml_path: Optional[Path] = None
     ) -> Dict[str, int]:
         """
@@ -65,7 +64,7 @@ class BatchTranslator:
 
         Args:
             parsed_yaml_path: Path to .parsed.yaml file
-            tags_json_path: Path to .tags.json file
+            tags_yaml_path: Path to .tags.yaml file
             output_yaml_path: Path to output YAML (default: overwrite input)
 
         Returns:
@@ -80,8 +79,8 @@ class BatchTranslator:
         with open(parsed_yaml_path, 'r', encoding='utf-8') as f:
             parsed_blocks: Dict[str, ParsedBlock] = yaml.safe_load(f)
 
-        with open(tags_json_path, 'r', encoding='utf-8') as f:
-            tags_file: TagsFileContent = json.load(f)
+        with open(tags_yaml_path, 'r', encoding='utf-8') as f:
+            tags_file: TagsFileContent = yaml.safe_load(f)
 
         metadata = tags_file['metadata']
         structure = tags_file['structure']

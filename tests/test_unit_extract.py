@@ -5,12 +5,11 @@ This test validates that the new extraction flow correctly:
 1. Loads game configuration from current_config.yaml
 2. Loads character map from characters.yaml
 3. Extracts translation blocks via CLI interface
-4. Generates properly structured .parsed.yaml and .tags.json files
+4. Generates properly structured .parsed.yaml and .tags.yaml files
 5. Handles command-line arguments (--source, --all, --game-name)
 """
 
 import sys
-import json
 import yaml
 import subprocess
 import shutil
@@ -167,14 +166,14 @@ def test_cli_extraction_single_file():
 
         # 4. Verify output files exist
         parsed_yaml = test_tl_dir / "test_script.parsed.yaml"
-        tags_json = test_tl_dir / "test_script.tags.json"
+        tags_yaml = test_tl_dir / "test_script.tags.yaml"
 
         print(f"\n[VERIFY] Checking output files...")
         assert parsed_yaml.exists(), f"Parsed YAML not found: {parsed_yaml}"
         print(f"[OK] Found {parsed_yaml.name}")
 
-        assert tags_json.exists(), f"Tags JSON not found: {tags_json}"
-        print(f"[OK] Found {tags_json.name}")
+        assert tags_yaml.exists(), f"Tags YAML not found: {tags_yaml}"
+        print(f"[OK] Found {tags_yaml.name}")
 
         # 5. Validate parsed YAML content
         print(f"\n[VERIFY] Validating parsed YAML content...")
@@ -205,10 +204,10 @@ def test_cli_extraction_single_file():
         assert parsed_blocks[string_block_id]['ro'] == "Capitolul Unu"
         print(f"[OK] String block '{string_block_id}' validated (tags removed)")
 
-        # 6. Validate tags JSON content
-        print(f"\n[VERIFY] Validating tags JSON content...")
-        with open(tags_json, 'r', encoding='utf-8') as f:
-            tags_file = json.load(f)
+        # 6. Validate tags YAML content
+        print(f"\n[VERIFY] Validating tags YAML content...")
+        with open(tags_yaml, 'r', encoding='utf-8') as f:
+            tags_file = yaml.safe_load(f)
 
         assert 'metadata' in tags_file
         assert 'structure' in tags_file
@@ -354,7 +353,7 @@ def main():
         print("  - Loads configuration from current_config.yaml")
         print("  - Loads character map from characters.yaml")
         print("  - Extracts via CLI with proper argument handling")
-        print("  - Generates valid .parsed.yaml and .tags.json files")
+        print("  - Generates valid .parsed.yaml and .tags.yaml files")
         return 0
     else:
         print(f"\n\033[91m[FAILURE] {total - passed} test(s) failed.\033[0m")

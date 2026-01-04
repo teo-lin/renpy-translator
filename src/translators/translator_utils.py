@@ -5,7 +5,6 @@ Common functionality used across Aya23, MADLAD400, Seamless96, Helsinki, mBART t
 to reduce code duplication and maintain consistency.
 """
 
-import json
 import yaml
 from pathlib import Path
 from typing import Dict, Optional, Tuple
@@ -26,8 +25,8 @@ def load_glossary(lang_code: str, project_root: Optional[Path] = None) -> Option
     Load glossary for a language with fallback hierarchy.
 
     Tries to load in this order:
-    1. {lang_code}_uncensored_glossary.json
-    2. {lang_code}_glossary.json
+    1. {lang_code}_uncensored_glossary.yaml
+    2. {lang_code}_glossary.yaml
 
     Args:
         lang_code: Language code (e.g., 'ro', 'es', 'fr')
@@ -40,15 +39,15 @@ def load_glossary(lang_code: str, project_root: Optional[Path] = None) -> Option
         project_root = get_project_root()
 
     glossary_variants = [
-        f"{lang_code}_uncensored_glossary.json",
-        f"{lang_code}_glossary.json"
+        f"{lang_code}_uncensored_glossary.yaml",
+        f"{lang_code}_glossary.yaml"
     ]
 
     for glossary_variant in glossary_variants:
         glossary_path = project_root / "data" / glossary_variant
         if glossary_path.exists():
             with open(glossary_path, 'r', encoding='utf-8') as f:
-                glossary = json.load(f)
+                glossary = yaml.safe_load(f)
             print(f"[OK] Using glossary: {glossary_variant}")
             return glossary
 
