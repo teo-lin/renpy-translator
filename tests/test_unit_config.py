@@ -45,7 +45,7 @@ def test_unit_config():
         venv_python = project_root / "venv" / "Scripts" / "python.exe"
         if not venv_python.exists():
             print(f"   [FAIL] Virtual environment not found at {venv_python}")
-            print("   Please run x0-setup.ps1 first to create the virtual environment")
+            print("   Please run 0-setup.ps1 first to create the virtual environment")
             return False
 
         result = subprocess.run(

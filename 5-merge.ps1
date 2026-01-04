@@ -1,5 +1,5 @@
 # Merge Script
-# Merges translated YAML + tags JSON back into .rpy files
+# Merges translated YAML + tags YAML back into .rpy files
 
 param(
     [string]$Source = "",
@@ -32,12 +32,12 @@ function Merge-File {
     # Prepare paths
     $baseName = $fileName -replace '\.parsed\.yaml$', ''
     $outputDir = Split-Path $YamlPath -Parent
-    $jsonPath = Join-Path $outputDir "$baseName.tags.json"
+    $tagsYamlPath = Join-Path $outputDir "$baseName.tags.yaml"
     $outputPath = Join-Path $outputDir "$baseName.translated.rpy"
 
     # Check if tags file exists
-    if (-not (Test-Path $jsonPath)) {
-        Write-Host " Tags file not found: $jsonPath" -ForegroundColor Red
+    if (-not (Test-Path $tagsYamlPath)) {
+        Write-Host " Tags YAML file not found: $tagsYamlPath" -ForegroundColor Red
         return
     }
 
@@ -51,13 +51,13 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, r'$PSScriptRoot\src')
 
-from merger import RenpyMerger
+from merge import RenpyMerger
 
 # Merge
 merger = RenpyMerger()
 success = merger.merge_file(
     parsed_yaml_path=Path(r'$YamlPath'),
-    tags_json_path=Path(r'$jsonPath'),
+    tags_yaml_path=Path(r'$tagsYamlPath'),
     output_rpy_path=Path(r'$outputPath'),
     validate=$validateFlag
 )
@@ -151,9 +151,9 @@ if ($All) {
         -Validate $validate
 }
 
-Write-Host ""
+Write-Host "" 
 Write-Host " Merge complete!" -ForegroundColor Green
-Write-Host ""
+Write-Host "" 
 Write-Host " Next steps:" -ForegroundColor Yellow
 Write-Host "   1. Review the .translated.rpy files" -ForegroundColor Gray
 Write-Host "   2. Test the translations in the game" -ForegroundColor Gray

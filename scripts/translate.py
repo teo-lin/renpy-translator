@@ -346,7 +346,7 @@ def load_config(project_root: Path, game_name: Optional[str] = None) -> Dict:
 
     if not config_file.exists():
         print(f"ERROR: Configuration not found at {config_file}")
-        print("Please run x1-config.ps1 first to set up your game.")
+        print("Please run 1-config.ps1 first to set up your game.")
         sys.exit(1)
 
     with open(config_file, 'r', encoding='utf-8') as f:
@@ -363,7 +363,7 @@ def load_config(project_root: Path, game_name: Optional[str] = None) -> Dict:
         current_game = config.get('current_game')
         if not current_game:
             print("ERROR: No current_game set in configuration.")
-            print("Please run x1-config.ps1 first.")
+            print("Please run 1-config.ps1 first.")
             sys.exit(1)
         game_config = config['games'][current_game]
 

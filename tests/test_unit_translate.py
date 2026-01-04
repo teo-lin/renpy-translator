@@ -1,7 +1,7 @@
 """
 Test the modular translation pipeline
 
-Tests the new x3-translate.ps1 workflow:
+Tests the new 3-translate.ps1 workflow:
 - Loading .parsed.yaml and .tags.json files
 - Using YAML configuration (current_config.yaml, characters.yaml)
 - Context extraction (DIALOGUE: 3 before + 1 after, CHOICE: no context)

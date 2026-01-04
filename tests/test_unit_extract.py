@@ -142,7 +142,7 @@ def test_cli_extraction_single_file():
         venv_python = project_root / "venv" / "Scripts" / "python.exe"
         if not venv_python.exists():
             print(f"[FAIL] Virtual environment not found at {venv_python}")
-            print("       Please run x0-setup.ps1 first")
+            print("       Please run 0-setup.ps1 first")
             return False
 
         # 3. Run extraction via CLI

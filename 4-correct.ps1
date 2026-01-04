@@ -22,7 +22,7 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pythonExe = Join-Path $scriptDir "venv\Scripts\python.exe"
 $correctScript = Join-Path $scriptDir "scripts\correct.py"
 $gamesFolder = Join-Path $scriptDir "games"
-$configFile = Join-Path $scriptDir "models\current_config.json"
+$configFile = Join-Path $scriptDir "models\current_config.yaml"
 
 # Add PyTorch lib directory to PATH for CUDA DLLs (needed by llama-cpp-python)
 $torchLibPath = Join-Path $scriptDir "venv\Lib\site-packages\torch\lib"
@@ -52,13 +52,13 @@ $modes = @(
         Name = "Both (Patterns + LLM)"
         Description = "Apply pattern corrections, then LLM corrections (recommended)"
         Flag = $null
-        Details = "Speed: Slow (~2-3s/sentence) | Quality: Best | Uses: Aya-23-8B + JSON rules"
+        Details = "Speed: Slow (~2-3s/sentence) | Quality: Best | Uses: Aya-23-8B + YAML rules"
     },
     @{
         Name = "Patterns Only"
-        Description = "Fast pattern-based corrections using JSON rules"
+        Description = "Fast pattern-based corrections using YAML rules"
         Flag = "--patterns-only"
-        Details = "Speed: Very fast (<1s/file) | Quality: Good | Uses: JSON correction rules"
+        Details = "Speed: Very fast (<1s/file) | Quality: Good | Uses: YAML correction rules"
     },
     @{
         Name = "LLM Only"
@@ -68,13 +68,24 @@ $modes = @(
     }
 )
 
-# Load available languages from models_config.json
-$modelsConfigPath = Join-Path $scriptDir "models\models_config.json"
+# Load available languages from models_config.yaml
+$modelsConfigPath = Join-Path $scriptDir "models\models_config.yaml"
 if (Test-Path $modelsConfigPath) {
-    $modelsConfig = Get-Content $modelsConfigPath -Raw | ConvertFrom-Json
-    $languages = $modelsConfig.installed_languages
+    $modelsConfigYaml = Get-Content $modelsConfigPath -Raw
+    # Simple YAML parsing for installed_languages
+    $languagesSection = ($modelsConfigYaml -split "installed_languages:")[1] -split "installed_models:"|Select-Object -First 1
+    $languages = @()
+
+    # Parse each language entry
+    $languageMatches = [regex]::Matches($languagesSection, "(?m)^\s*-\s*code:\s*(\w+)\s*\n\s*name:\s*(.+?)$")
+    foreach ($match in $languageMatches) {
+        $languages += @{
+            Code = $match.Groups[1].Value
+            Name = $match.Groups[2].Value
+        }
+    }
 } else {
-    Write-Host "ERROR: models_config.json not found at $modelsConfigPath" -ForegroundColor Red
+    Write-Host "ERROR: models_config.yaml not found at $modelsConfigPath" -ForegroundColor Red
     exit 1
 }
 

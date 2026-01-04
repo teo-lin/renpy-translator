@@ -622,7 +622,7 @@ def run_full_comparison(game_name: str, language: str) -> int:
         print(f"ERROR: Game directory not found: {full_game_path}")
         return 1
 
-    config_script = project_root / "x1-config.ps1"
+    config_script = project_root / "1-config.ps1"
     result = subprocess.run(
         ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File",
          str(config_script), "-GamePath", str(full_game_path),
@@ -641,7 +641,7 @@ def run_full_comparison(game_name: str, language: str) -> int:
 
     # Step 3: Extract translation files
     print("[3/5] Extracting translation files...")
-    extract_script = project_root / "x2-extract.ps1"
+    extract_script = project_root / "2-extract.ps1"
     result = subprocess.run(
         ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File",
          str(extract_script), "-GameName", game_name, "-All"],

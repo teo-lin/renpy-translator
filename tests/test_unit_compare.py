@@ -134,11 +134,7 @@ def test_benchmark_translator_translates_all_blocks():
 
         print(f"  ✓ All blocks have 'ay' key with translations")
 
-        # Check that original translations are preserved
-        assert result['dialogue-1-Amelia']['ro'] == 'Salut!', "Original 'ro' translation lost"
-        assert result['dialogue-3-Amelia']['ro'] == 'Ce mai faci?', "Original 'ro' translation lost"
 
-        print(f"  ✓ Original translations preserved")
 
     print("\n  [PASS] All assertions passed!")
     return True

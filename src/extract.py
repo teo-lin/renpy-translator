@@ -433,7 +433,7 @@ def load_game_config(game_name: str) -> Dict[str, any]:
 
     if not config_path.exists():
         print(f"Error: Configuration file not found at {config_path}")
-        print("Please run x1-config.ps1 first to configure a game.")
+        print("Please run 1-config.ps1 first to configure a game.")
         exit(1)
 
     with open(config_path, 'r', encoding='utf-8') as f:
@@ -524,7 +524,7 @@ def main():
 
     if not config_path.exists():
         print("Error: Configuration file not found.")
-        print("Please run x1-config.ps1 first to configure a game.")
+        print("Please run 1-config.ps1 first to configure a game.")
         exit(1)
 
     with open(config_path, 'r', encoding='utf-8') as f:
@@ -537,7 +537,7 @@ def main():
         game_name = config.get('current_game')
         if not game_name:
             print("Error: No game configured.")
-            print("Please run x1-config.ps1 first.")
+            print("Please run 1-config.ps1 first.")
             exit(1)
 
     # Get game config
@@ -653,7 +653,7 @@ def main():
     print()
     print("Next steps:")
     print("  1. Review the .parsed.yaml files for any issues")
-    print("  2. Run 'x3-translate.ps1' to translate untranslated blocks")
+    print("  2. Run '3-translate.ps1' to translate untranslated blocks")
     print()
 
 
