@@ -9,6 +9,7 @@ Provides reusable functions for:
 - Integration test helpers
 """
 
+import cmd
 import re
 import shutil
 import sys
@@ -705,7 +706,10 @@ class TestRunner:
 
         # Run test
         try:
+            print(f"[DEBUG] Launching test process: {test_file}", flush=True)
+            print(f"[DEBUG] Command: {' '.join(cmd)}", flush=True)  
             result = subprocess.run(cmd, capture_output=False)
+            print(f"[DEBUG] Test process exited with code {result.returncode}", flush=True)
             exit_code = result.returncode
         except Exception as e:
             print(f"Error running test: {e}")

@@ -16,9 +16,9 @@ import subprocess
 from pathlib import Path
 
 # Set UTF-8 encoding for console output on Windows
-import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+# import io
+# sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+# sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # Add paths for imports
 project_root = Path(__file__).parent.parent
@@ -36,11 +36,13 @@ example_dir = game_path / "game" / "tl" / "romanian"
 model_path = project_root / "models" / "aya23" / "aya-23-8B-Q4_K_M.gguf"
 
 # Define target language and model key
-target_language = "ro"
+target_language_code = "ro"
+target_language_name = "Romanian"
+target_language_folder = "romanian"
 model_key = "aya23"
 
 
-def run_powershell_script(script_name: str, args: list = None, timeout: int = 300) -> tuple[bool, str, str]:
+def run_powershell_script_2(script_name: str, args: list = None, timeout: int = 300) -> tuple[bool, str, str]:
     """
     Run a PowerShell script with arguments and return success status, stdout, stderr.
 
@@ -60,20 +62,18 @@ def run_powershell_script(script_name: str, args: list = None, timeout: int = 30
     try:
         command = ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", str(script_path)] + args
         result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            cwd=str(project_root)
+        command,
+        cwd=str(project_root),
+        text=True
         )
+        success = result.returncode == 0
+        return success, None, None  # stdout/stderr already shown live
 
-        return (result.returncode == 0, result.stdout, result.stderr)
 
     except subprocess.TimeoutExpired:
         return (False, "", f"Timeout after {timeout}s")
     except Exception as e:
         return (False, "", str(e))
-
 
 def test_e2e_example_game_translation() -> bool:
     """
@@ -129,7 +129,7 @@ def test_e2e_example_game_translation() -> bool:
         print("=" * 70)
         config_args = [
             "-GamePath", str(game_path),
-            "-Language", target_language,
+            "-Language", target_language_code,
             "-Model", model_key
         ]
         success, stdout, stderr = run_powershell_script("1-config.ps1", args=config_args, timeout=60)
@@ -185,7 +185,7 @@ def test_e2e_example_game_translation() -> bool:
         print("=" * 70)
         correct_args = [
             "-GameName", game_name,
-            "-LanguageName", target_language,
+            "-LanguageName", target_language_code,
             "-ModeName", "Both (Patterns + LLM)", # Assuming this is the desired mode
             "-Yes" # Auto-accept confirmation
         ]

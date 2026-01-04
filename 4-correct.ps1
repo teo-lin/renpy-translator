@@ -70,7 +70,8 @@ if ($Arguments.Count -gt 0) {
 # Call correct_utils.py to get the actual script arguments
 # It will print each argument on a new line
 Write-Host "DEBUG: About to call Python script correct_utils.py" -ForegroundColor DarkYellow
-$pythonOutput = & $pythonExe $correctUtilsScript @correctUtilsArgs 2>&1 | Out-String
+Write-Host "DEBUG: Calling correct_utils.py with args: $correctUtilsArgs"
+$pythonOutput = & $pythonExe -u $correctUtilsScript @correctUtilsArgs 2>&1 | Out-String
 Write-Host "DEBUG: Returned from Python script correct_utils.py. LastExitCode: $LASTEXITCODE" -ForegroundColor DarkYellow
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: Failed to prepare arguments using correct_utils.py. Output: $pythonOutput" -ForegroundColor Red

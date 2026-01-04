@@ -98,6 +98,7 @@ def get_correction_arguments(args_from_ps: Dict[str, Any]) -> None:
     Main function to get arguments for correct.py, handling interactive selection or parameter-based auto-selection.
     Prints the arguments, one per line, to stdout for PowerShell to parse.
     """
+    print("DEBUG: args_from_ps:", args_from_ps)
     display_banner()
 
     models_config = load_models_config()
