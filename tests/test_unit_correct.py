@@ -7,7 +7,7 @@ without requiring a live model.
 """
 
 import sys
-import json
+import yaml
 from pathlib import Path
 import tempfile
 import shutil
@@ -89,12 +89,12 @@ def test_pattern_correction_flow():
 
     try:
         # 1. Create handcrafted input files
-        corrections_json_path = temp_dir / "test_corrections.json"
+        corrections_yaml_path = temp_dir / "test_corrections.yaml"
         test_rpy_path = temp_dir / "test_script.rpy"
 
-        with open(corrections_json_path, 'w', encoding='utf-8') as f:
-            json.dump(TEST_CORRECTIONS_CONTENT, f, indent=2)
-        print(f"[SETUP] Created: {corrections_json_path.name}")
+        with open(corrections_yaml_path, 'w', encoding='utf-8') as f:
+            yaml.dump(TEST_CORRECTIONS_CONTENT, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        print(f"[SETUP] Created: {corrections_yaml_path.name}")
 
         with open(test_rpy_path, 'w', encoding='utf-8') as f:
             f.write(TEST_RPY_CONTENT)
@@ -102,7 +102,7 @@ def test_pattern_correction_flow():
 
         # 2. Instantiate correctors
         print("\n[RUN] Instantiating and running correctors...")
-        pattern_corrector = PatternBasedCorrector(str(corrections_json_path))
+        pattern_corrector = PatternBasedCorrector(str(corrections_yaml_path))
         # We only need the pattern corrector for this test
         combined_corrector = CombinedCorrector(patterns_corrector=pattern_corrector, llm_corrector=None)
         file_corrector = RenpyFileCorrector(corrector=combined_corrector, dry_run=False)
@@ -150,12 +150,12 @@ def main():
     success = test_pattern_correction_flow()
     if success:
         print("\n" + "="*70)
-        print("✅ ALL CORRECTION TESTS PASSED")
+        print("[OK] ALL CORRECTION TESTS PASSED")
         print("="*70)
         return 0
     else:
         print("\n" + "="*70)
-        print("❌ CORRECTION TESTS FAILED")
+        print("[FAIL] CORRECTION TESTS FAILED")
         print("="*70)
         return 1
 

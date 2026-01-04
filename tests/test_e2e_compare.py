@@ -12,7 +12,6 @@ This is a full end-to-end test that requires all installed models.
 """
 
 import sys
-import json
 import yaml
 import subprocess
 from pathlib import Path
@@ -26,7 +25,7 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='repla
 # Project paths
 project_root = Path(__file__).parent.parent
 compare_script = project_root / "8-compare.ps1"
-models_config_path = project_root / "models" / "models_config.json"
+models_config_path = project_root / "models" / "models_config.yaml"
 test_game = "Example"
 test_language = "ro"
 test_dir = project_root / "games" / test_game / "game" / "tl" / "romanian"
@@ -38,8 +37,8 @@ def load_models_config():
         print(f"ERROR: Models configuration not found at {models_config_path}")
         return None
 
-    with open(models_config_path, 'r', encoding='utf-8-sig') as f:
-        config = json.load(f)
+    with open(models_config_path, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
 
     return config
 

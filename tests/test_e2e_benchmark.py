@@ -2,7 +2,6 @@
 Test for the benchmark translation functionality
 """
 import sys
-import json
 import yaml
 from pathlib import Path
 import pytest
@@ -22,21 +21,21 @@ def project_root():
 @pytest.fixture
 def models_config(project_root):
     """Load models configuration"""
-    config_path = project_root / "models" / "models_config.json"
-    assert config_path.exists(), "models_config.json not found"
+    config_path = project_root / "models" / "models_config.yaml"
+    assert config_path.exists(), "models_config.yaml not found"
 
-    with open(config_path, 'r', encoding='utf-8-sig') as f:
-        return json.load(f)
+    with open(config_path, 'r', encoding='utf-8') as f:
+        return yaml.safe_load(f)
 
 
 @pytest.fixture
 def game_config(project_root):
     """Load current game configuration"""
-    config_path = project_root / "models" / "current_config.json"
-    assert config_path.exists(), "current_config.json not found"
+    config_path = project_root / "models" / "current_config.yaml"
+    assert config_path.exists(), "current_config.yaml not found"
 
-    with open(config_path, 'r', encoding='utf-8-sig') as f:
-        config = json.load(f)
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
 
     # Get current game
     current_game = config.get('current_game')
@@ -69,7 +68,7 @@ def test_parsed_files_have_numbered_keys(project_root, game_config, models_confi
     """
     # Get target language directory
     game_path = Path(game_config['path'])
-    target_language = game_config['target_language']['Name'].lower()
+    target_language = game_config['target_language']['name'].lower()
     tl_dir = game_path / "game" / "tl" / target_language
 
     # Find parsed files
@@ -128,7 +127,7 @@ def test_benchmark_translation_structure(project_root, game_config, models_confi
     """
     # Get target language directory
     game_path = Path(game_config['path'])
-    target_language = game_config['target_language']['Name'].lower()
+    target_language = game_config['target_language']['name'].lower()
     tl_dir = game_path / "game" / "tl" / target_language
 
     # Find parsed files

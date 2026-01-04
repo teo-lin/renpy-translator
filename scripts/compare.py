@@ -12,11 +12,11 @@ Usage:
 """
 
 import sys
-import json
 import yaml
 import time
+import subprocess
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 # Add src directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -52,7 +52,7 @@ class BenchmarkTranslator:
     def translate_file(
         self,
         parsed_yaml_path: Path,
-        tags_json_path: Path,
+        tags_yaml_path: Path,
         output_yaml_path: Optional[Path] = None
     ) -> Dict[str, int]:
         """
@@ -60,7 +60,7 @@ class BenchmarkTranslator:
 
         Args:
             parsed_yaml_path: Path to .parsed.yaml file
-            tags_json_path: Path to .tags.json file
+            tags_yaml_path: Path to .tags.yaml file
             output_yaml_path: Path to output YAML (default: overwrite input)
 
         Returns:
@@ -75,8 +75,8 @@ class BenchmarkTranslator:
         with open(parsed_yaml_path, 'r', encoding='utf-8') as f:
             parsed_blocks: Dict[str, ParsedBlock] = yaml.safe_load(f)
 
-        with open(tags_json_path, 'r', encoding='utf-8-sig') as f:
-            tags_file = json.load(f)
+        with open(tags_yaml_path, 'r', encoding='utf-8') as f:
+            tags_file = yaml.safe_load(f)
 
         metadata = tags_file['metadata']
         structure = tags_file['structure']
@@ -301,15 +301,15 @@ class BenchmarkTranslator:
 
 
 def load_config(project_root: Path, game_name: str) -> Dict:
-    """Load game configuration from current_config.json."""
-    config_file = project_root / "models" / "current_config.json"
+    """Load game configuration from current_config.yaml."""
+    config_file = project_root / "models" / "current_config.yaml"
 
     if not config_file.exists():
         print(f"ERROR: Configuration not found at {config_file}")
         sys.exit(1)
 
-    with open(config_file, 'r', encoding='utf-8-sig') as f:
-        config = json.load(f)
+    with open(config_file, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
 
     if game_name not in config.get('games', {}):
         print(f"ERROR: Game '{game_name}' not found in configuration.")
@@ -320,13 +320,18 @@ def load_config(project_root: Path, game_name: str) -> Dict:
 
 def load_resources(project_root: Path, target_lang_code: str):
     """Load glossary and prompt template."""
-    # Load glossary with fallback
+    # Load glossary with fallback (try YAML first, then JSON for backwards compatibility)
     glossary = None
-    for glossary_variant in [f"{target_lang_code}_uncensored_glossary.json", f"{target_lang_code}_glossary.json"]:
+    for glossary_variant in [f"{target_lang_code}_uncensored_glossary.yaml", f"{target_lang_code}_glossary.yaml",
+                            f"{target_lang_code}_uncensored_glossary.json", f"{target_lang_code}_glossary.json"]:
         glossary_path = project_root / "data" / glossary_variant
         if glossary_path.exists():
-            with open(glossary_path, 'r', encoding='utf-8-sig') as f:
-                glossary = json.load(f)
+            with open(glossary_path, 'r', encoding='utf-8') as f:
+                if glossary_variant.endswith('.yaml'):
+                    glossary = yaml.safe_load(f)
+                else:
+                    import json
+                    glossary = json.load(f)
             print(f"[OK] Using glossary: {glossary_variant}")
             break
 
@@ -422,8 +427,8 @@ def main():
     context_before = game_config.get('context_before', 3)
     context_after = game_config.get('context_after', 1)
 
-    target_language_code = target_language_obj['Code']
-    target_language_name = target_language_obj['Name']
+    target_language_code = target_language_obj.get('code', target_language_obj.get('Code'))
+    target_language_name = target_language_obj.get('name', target_language_obj.get('Name'))
 
     print(f"  Game: {game_name}")
     print(f"  Language: {target_language_name} ({target_language_code})")
@@ -431,9 +436,9 @@ def main():
     print(f"  Save key: {args.key}")
 
     # Load model configuration
-    models_config_path = project_root / "models" / "models_config.json"
-    with open(models_config_path, 'r', encoding='utf-8-sig') as f:
-        all_models_config = json.load(f)['available_models']
+    models_config_path = project_root / "models" / "models_config.yaml"
+    with open(models_config_path, 'r', encoding='utf-8') as f:
+        all_models_config = yaml.safe_load(f)['available_models']
 
     model_config = all_models_config.get(args.model)
     if not model_config:
@@ -454,14 +459,14 @@ def main():
     print("\nLoading resources...")
     glossary, prompt_template = load_resources(project_root, target_language_code)
 
-    # Load characters.json
+    # Load characters.yaml
     tl_dir = game_path / "game" / "tl" / target_language_name.lower()
-    characters_file = tl_dir / "characters.json"
+    characters_file = tl_dir / "characters.yaml"
 
     characters = {}
     if characters_file.exists():
-        with open(characters_file, 'r', encoding='utf-8-sig') as f:
-            characters = json.load(f)
+        with open(characters_file, 'r', encoding='utf-8') as f:
+            characters = yaml.safe_load(f)
         print(f"[OK] Loaded {len(characters)} characters")
 
     # Initialize translator
@@ -520,17 +525,17 @@ def main():
             show_progress(file_idx - 1, len(parsed_files), overall_start, prefix="Overall: ")
             print(f"\n[File {file_idx}/{len(parsed_files)}]")
 
-        # Find corresponding tags.json file
+        # Find corresponding tags.yaml file
         base_name = parsed_file.name.removesuffix('.parsed.yaml')
-        tags_file = parsed_file.parent / f"{base_name}.tags.json"
+        tags_file = parsed_file.parent / f"{base_name}.tags.yaml"
         if not tags_file.exists():
-            print(f"\n  [WARNING] Skipping {parsed_file.name} - no matching .tags.json file")
+            print(f"\n  [WARNING] Skipping {parsed_file.name} - no matching .tags.yaml file")
             continue
 
         # Translate file
         stats = benchmark_translator.translate_file(
             parsed_yaml_path=parsed_file,
-            tags_json_path=tags_file,
+            tags_yaml_path=tags_file,
             output_yaml_path=None
         )
 
@@ -559,5 +564,253 @@ def main():
     print(f"\nBENCHMARK_DURATION:{total_duration:.2f}")
 
 
+def run_full_comparison(game_name: str, language: str) -> int:
+    """
+    Run the full model comparison workflow.
+
+    Args:
+        game_name: Name of the game to compare
+        language: Target language code (e.g., 'ro')
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
+    import os
+    from datetime import datetime
+
+    project_root = Path(__file__).parent.parent
+
+    print()
+    print("=" * 70)
+    print("                 Translation Model Comparison")
+    print("=" * 70)
+    print()
+
+    # Step 1: Load models configuration
+    print("[1/5] Loading models configuration...")
+    models_config_path = project_root / "models" / "models_config.yaml"
+
+    if not models_config_path.exists():
+        print(f"ERROR: Models configuration not found at {models_config_path}")
+        print("Please run 0-setup.ps1 first to install models.")
+        return 1
+
+    with open(models_config_path, 'r', encoding='utf-8') as f:
+        models_config = yaml.safe_load(f)
+
+    installed_models = models_config.get('installed_models', [])
+
+    if not installed_models:
+        print("ERROR: No models are installed!")
+        print("Please run 0-setup.ps1 first to install models.")
+        return 1
+
+    print(f"   Found {len(installed_models)} installed models:")
+    for model_key in installed_models:
+        model_info = models_config['available_models'][model_key]
+        print(f"      - {model_info['name']}")
+    print()
+
+    # Step 2: Configure game
+    print(f"[2/5] Configuring game: {game_name} with language: {language}...")
+    first_model = installed_models[0]
+    print(f"   Using initial model: {first_model}")
+
+    # Get full game path
+    full_game_path = project_root / "games" / game_name
+    if not full_game_path.exists():
+        print(f"ERROR: Game directory not found: {full_game_path}")
+        return 1
+
+    config_script = project_root / "x1-config.ps1"
+    result = subprocess.run(
+        ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File",
+         str(config_script), "-GamePath", str(full_game_path),
+         "-Language", language, "-Model", first_model],
+        capture_output=True,
+        text=True
+    )
+
+    # Check if config file exists
+    current_config_path = project_root / "models" / "current_config.yaml"
+    if not current_config_path.exists():
+        print("ERROR: Configuration failed - config file not created!")
+        return 1
+    print("   [OK] Configuration successful")
+    print()
+
+    # Step 3: Extract translation files
+    print("[3/5] Extracting translation files...")
+    extract_script = project_root / "x2-extract.ps1"
+    result = subprocess.run(
+        ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File",
+         str(extract_script), "-GameName", game_name, "-All"],
+        capture_output=False
+    )
+
+    if result.returncode != 0:
+        print("ERROR: Extraction failed!")
+        return 1
+    print()
+
+    # Step 4: Compare each model
+    print("[4/5] Running comparison translations...")
+    print()
+
+    python_exe = project_root / "venv" / "Scripts" / "python.exe"
+    compare_script = project_root / "scripts" / "compare.py"
+
+    if not python_exe.exists():
+        print(f"ERROR: Python executable not found at {python_exe}")
+        return 1
+
+    # Set up environment
+    env = os.environ.copy()
+    env['PYTHONIOENCODING'] = 'utf-8'
+
+    # Add PyTorch lib directory to PATH for CUDA DLLs
+    torch_lib_path = project_root / "venv" / "Lib" / "site-packages" / "torch" / "lib"
+    if torch_lib_path.exists():
+        env['PATH'] = f"{torch_lib_path};{env.get('PATH', '')}"
+
+    # Track results
+    benchmark_results = []
+    benchmark_start_time = time.time()
+
+    for model_idx, model_key in enumerate(installed_models):
+        model_info = models_config['available_models'][model_key]
+        key_number = model_key[:2].lower()  # Use first 2 chars of model name, lowercase
+
+        print()
+        print(f"   [{model_idx + 1}/{len(installed_models)}] Model: {model_info['name']} -> Key: {key_number}")
+        print("   " + ("=" * 65))
+
+        model_start_time = time.time()
+
+        # Run comparison translation
+        result = subprocess.run(
+            [str(python_exe), str(compare_script),
+             "--game", game_name, "--model", model_key, "--key", key_number],
+            env=env,
+            capture_output=True,
+            text=True
+        )
+
+        # Display output
+        if result.stdout:
+            print(result.stdout)
+
+        model_end_time = time.time()
+        model_duration = model_end_time - model_start_time
+
+        if result.returncode != 0:
+            print(f"   [ERROR] Translation failed for model {model_key}!")
+            if result.stderr:
+                print(result.stderr)
+            benchmark_results.append({
+                'model': model_info['name'],
+                'key': key_number,
+                'duration': model_duration,
+                'status': 'FAILED',
+                'size': model_info.get('size', 'N/A'),
+                'params': model_info.get('params', 'N/A')
+            })
+        else:
+            # Try to extract duration from output
+            import re
+            match = re.search(r'BENCHMARK_DURATION:(\d+\.?\d*)', result.stdout)
+            if match:
+                actual_duration = float(match.group(1))
+            else:
+                actual_duration = model_duration
+
+            print(f"   [OK] Completed in {actual_duration:.2f} seconds")
+
+            benchmark_results.append({
+                'model': model_info['name'],
+                'key': key_number,
+                'duration': actual_duration,
+                'status': 'SUCCESS',
+                'size': model_info.get('size', 'N/A'),
+                'params': model_info.get('params', 'N/A')
+            })
+
+    benchmark_end_time = time.time()
+    total_duration = benchmark_end_time - benchmark_start_time
+
+    print()
+    print()
+
+    # Step 5: Display comparison results
+    print("[5/5] Benchmark Results")
+    print()
+    print("=" * 70)
+    print("                   MODEL COMPARISON")
+    print("=" * 70)
+    print()
+
+    # Sort by duration (fastest first)
+    sorted_results = sorted(benchmark_results, key=lambda x: x.get('duration', float('inf')))
+
+    print(f"   {'Key':<3} {'Model':<20} {'Size':<10} {'Duration':<12} {'Status':<10}")
+    print("   " + ("-" * 65))
+
+    for result in sorted_results:
+        status_color = result['status']
+        duration_str = f"{result['duration']:.2f}s" if result['status'] == 'SUCCESS' else "N/A"
+
+        print(f"   {result['key']:<3} {result['model']:<20} {result['size']:<10} {duration_str:<12} {status_color:<10}")
+
+    print()
+    print(f"   Total benchmark duration: {total_duration:.2f} seconds")
+    print()
+
+    # Find fastest and slowest
+    successful = [r for r in benchmark_results if r['status'] == 'SUCCESS']
+    if len(successful) > 1:
+        fastest = min(successful, key=lambda x: x['duration'])
+        slowest = max(successful, key=lambda x: x['duration'])
+
+        speedup = slowest['duration'] / fastest['duration']
+
+        print(f"   Fastest: {fastest['model']} ({fastest['duration']:.2f}s)")
+        print(f"   Slowest: {slowest['model']} ({slowest['duration']:.2f}s)")
+        print(f"   Speedup: {speedup:.2f}x faster")
+        print()
+
+    print("=" * 70)
+    print()
+    print("   Benchmark complete!")
+    print()
+    print("   Translation files saved with numbered keys (ay, he, ma, etc.)")
+    print("   Review the .parsed.yaml files to compare model outputs.")
+    print()
+    print(f"   Location: games\\{game_name}\\game\\tl\\romanian\\*.parsed.yaml")
+    print()
+    print("   Each block now contains:")
+    print("      en:  Original English text")
+    for result in benchmark_results:
+        print(f"      {result['key']}: Translation from {result['model']}")
+    print()
+    print("=" * 70)
+    print()
+
+    return 0
+
+
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    # Check if running in orchestrator mode
+    if len(sys.argv) > 1 and sys.argv[1] == "orchestrate":
+        parser = argparse.ArgumentParser(description='Run full model comparison workflow')
+        parser.add_argument('_', help='orchestrate command')
+        parser.add_argument('--game', type=str, required=True, help='Game name')
+        parser.add_argument('--language', type=str, required=True, help='Language code (e.g., ro)')
+        args = parser.parse_args()
+
+        exit_code = run_full_comparison(args.game, args.language)
+        sys.exit(exit_code)
+    else:
+        # Regular single-model mode
+        main()

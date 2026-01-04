@@ -71,7 +71,7 @@ def test_tag_extraction():
             len(tags) == expected_tag_count
         )
 
-        status = "✓ PASS" if passed else "✗ FAIL"
+        status = "[PASS]" if passed else "[FAIL]"
         print(f"\nTest {i}: {status}")
         print(f"  Original:  {original}")
         print(f"  Clean:     {clean_text}")
@@ -86,9 +86,9 @@ def test_tag_extraction():
 
     print("\n" + "=" * 70)
     if all_passed:
-        print("✓ All tag extraction tests passed!")
+        print("[OK] All tag extraction tests passed!")
     else:
-        print("✗ Some tag extraction tests failed")
+        print("[FAIL] Some tag extraction tests failed")
 
     return all_passed
 
@@ -131,7 +131,7 @@ def test_tag_restoration():
         tags_present = all(tag in restored for tag in expected_tags)
 
         passed = tags_present
-        status = "✓ PASS" if passed else "✗ FAIL"
+        status = "[PASS]" if passed else "[FAIL]"
 
         print(f"\nTest {i}: {status}")
         print(f"  Original:     {original}")
@@ -145,9 +145,9 @@ def test_tag_restoration():
 
     print("\n" + "=" * 70)
     if all_passed:
-        print("✓ All tag restoration tests passed!")
+        print("[OK] All tag restoration tests passed!")
     else:
-        print("✗ Some tag restoration tests failed")
+        print("[FAIL] Some tag restoration tests failed")
 
     return all_passed
 
@@ -202,9 +202,9 @@ translate english test_label_3:
 
         print("\n" + "=" * 70)
         if passed:
-            print(f"✓ Parser test passed! Found {expected_count} blocks as expected")
+            print(f"[OK] Parser test passed! Found {expected_count} blocks as expected")
         else:
-            print(f"✗ Parser test failed! Expected {expected_count} blocks, found {len(blocks)}")
+            print(f"[FAIL] Parser test failed! Expected {expected_count} blocks, found {len(blocks)}")
 
         return passed
 
@@ -226,8 +226,8 @@ if __name__ == "__main__":
     print("=" * 70)
 
     if all(results):
-        print("✓ All tests passed!")
+        print("[OK] All tests passed!")
         sys.exit(0)
     else:
-        print("✗ Some tests failed")
+        print("[FAIL] Some tests failed")
         sys.exit(1)

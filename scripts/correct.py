@@ -31,13 +31,16 @@ Examples:
 import re
 import sys
 import os
-import json
+import yaml
 import io
 from pathlib import Path
 from typing import List, Tuple, Dict, Optional
 import time
 
-
+# Set UTF-8 encoding for console output on Windows
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # Add src directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -78,9 +81,16 @@ class PatternBasedCorrector:
     """Fast, reliable corrections using predefined patterns"""
 
     def __init__(self, corrections_file: str):
-        """Load correction patterns from JSON file"""
+        """Load correction patterns from YAML or JSON file"""
+        file_path = Path(corrections_file)
+
         with open(corrections_file, 'r', encoding='utf-8') as f:
-            self.corrections = json.load(f)
+            if file_path.suffix == '.yaml' or file_path.suffix == '.yml':
+                self.corrections = yaml.safe_load(f)
+            else:
+                # Backwards compatibility with JSON
+                import json
+                self.corrections = json.load(f)
 
         self.protected_words = set(self.corrections.get('protected_words', []))
         print(f"[OK] Loaded pattern-based corrections")
@@ -635,7 +645,7 @@ class RenpyFileCorrector:
                     print(f"       [QUOTE] Fixed unescaped quotes")
                 if change['pattern_changes']:
                     for pc in change['pattern_changes']:
-                        print(f"       [PATTERN:{pc['type']}] {pc['old']} → {pc['new']}")
+                        print(f"       [PATTERN:{pc['type']}] {pc['old']} -> {pc['new']}")
                 if change['llm_changed']:
                     print(f"       [LLM] Grammar correction applied")
                 print(f"       OLD: {change['old'][:70]}")
@@ -665,7 +675,7 @@ class RenpyFileCorrector:
                         f.write(f"   [QUOTE] Fixed unescaped quotes\n")
                     if change['pattern_changes']:
                         for pc in change['pattern_changes']:
-                            f.write(f"   [PATTERN:{pc['type']}] {pc['old']} → {pc['new']}\n")
+                            f.write(f"   [PATTERN:{pc['type']}] {pc['old']} -> {pc['new']}\n")
                     if change['llm_changed']:
                         f.write(f"   [LLM] Grammar correction applied\n")
                     f.write(f"   OLD: {change['old']}\n")
@@ -810,23 +820,23 @@ def main():
     # Setup paths
     project_root = Path(__file__).parent.parent
 
-    # Load configuration from current_config.json
-    config_file = project_root / "models" / "current_config.json"
+    # Load configuration from current_config.yaml
+    config_file = project_root / "models" / "current_config.yaml"
     if not config_file.exists():
         print(f"ERROR: Configuration not found at {config_file}")
         print("Please run 1-config.ps1 first to set up your game.")
         sys.exit(1)
 
-    with open(config_file, 'r', encoding='utf-8-sig') as f:
-        full_config = json.load(f)
+    with open(config_file, 'r', encoding='utf-8') as f:
+        full_config = yaml.safe_load(f)
     game_config = full_config['games'][full_config['current_game']] # Load specific game config
 
     model_name = game_config['model']
 
-    # Load model configuration from models_config.json
-    models_config_path = project_root / "models" / "models_config.json"
-    with open(models_config_path, 'r', encoding='utf-8-sig') as f:
-        all_models_config = json.load(f)['available_models']
+    # Load model configuration from models_config.yaml
+    models_config_path = project_root / "models" / "models_config.yaml"
+    with open(models_config_path, 'r', encoding='utf-8') as f:
+        all_models_config = yaml.safe_load(f)['available_models']
 
     model_config = all_models_config.get(model_name)
 
@@ -836,9 +846,14 @@ def main():
 
     model_path = project_root / model_config['destination']
 
-    # Generic corrections fallback: uncensored → censored → none
+    # Generic corrections fallback: uncensored → censored, YAML → JSON
     corrections_file = None
-    for corrections_variant in [f"{lang_code}_uncensored_corrections.json", f"{lang_code}_corrections.json"]:
+    for corrections_variant in [
+        f"{lang_code}_uncensored_corrections.yaml",
+        f"{lang_code}_corrections.yaml",
+        f"{lang_code}_uncensored_corrections.json",
+        f"{lang_code}_corrections.json"
+    ]:
         candidate = project_root / "data" / corrections_variant
         if candidate.exists():
             corrections_file = candidate

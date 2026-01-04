@@ -2,11 +2,11 @@
 End-to-End Test: Complete Example Game Translation Pipeline
 
 This test runs the full PowerShell workflow on the Example game:
-- 1-config.ps1: Configure game and discover characters
-- 2-extract.ps1: Extract .rpy → .parsed.yaml + .tags.json
-- 3-translate.ps1: Translate using configured model
-- 4-correct.ps1: Post-translation corrections
-- 5-merge.ps1: Merge translations back to .rpy
+- x1-config.ps1: Configure game and discover characters
+- x2-extract.ps1: Extract .rpy → .parsed.yaml + .tags.yaml
+- x3-translate.ps1: Translate using configured model
+- x4-correct.ps1: Post-translation corrections
+- x5-merge.ps1: Merge translations back to .rpy
 
 This tests the actual user-facing workflow scripts.
 """
@@ -123,65 +123,65 @@ def test_e2e_example_game_translation() -> bool:
     print(f"  Total initial translations: {total_initial}")
 
     try:
-        # Step 1: Run 1-config.ps1
+        # Step 1: Run x1-config.ps1
         print("\n" + "=" * 70)
-        print("[1/5] Running: 1-config.ps1")
+        print("[1/5] Running: x1-config.ps1")
         print("=" * 70)
         config_args = [
             "-GamePath", str(game_path),
             "-Language", target_language,
             "-Model", model_key
         ]
-        success, stdout, stderr = run_powershell_script("1-config.ps1", args=config_args, timeout=60)
+        success, stdout, stderr = run_powershell_script("x1-config.ps1", args=config_args, timeout=60)
 
         if not success:
-            print(f"[FAIL] 1-config.ps1 failed")
+            print(f"[FAIL] x1-config.ps1 failed")
             if stderr:
                 print(f"STDERR: {stderr}")
             return False
 
         print("[OK] Config completed")
 
-        # Step 2: Run 2-extract.ps1
+        # Step 2: Run x2-extract.ps1
         print("\n" + "=" * 70)
-        print("[2/5] Running: 2-extract.ps1")
+        print("[2/5] Running: x2-extract.ps1")
         print("=" * 70)
         extract_args = [
             "-GameName", game_name,
             "-All"
         ]
-        success, stdout, stderr = run_powershell_script("2-extract.ps1", args=extract_args, timeout=120)
+        success, stdout, stderr = run_powershell_script("x2-extract.ps1", args=extract_args, timeout=120)
 
         if not success:
-            print(f"[FAIL] 2-extract.ps1 failed")
+            print(f"[FAIL] x2-extract.ps1 failed")
             if stderr:
                 print(f"STDERR: {stderr}")
             return False
 
         print("[OK] Extract completed")
 
-        # Step 3: Run 3-translate.ps1
+        # Step 3: Run x3-translate.ps1
         print("\n" + "=" * 70)
-        print("[3/5] Running: 3-translate.ps1")
+        print("[3/5] Running: x3-translate.ps1")
         print("=" * 70)
         translate_args = [
             "-GameName", game_name,
             "-All",
             "-Model", model_key
         ]
-        success, stdout, stderr = run_powershell_script("3-translate.ps1", args=translate_args, timeout=600)  # 10 min for translation
+        success, stdout, stderr = run_powershell_script("x3-translate.ps1", args=translate_args, timeout=600)  # 10 min for translation
 
         if not success:
-            print(f"[FAIL] 3-translate.ps1 failed")
+            print(f"[FAIL] x3-translate.ps1 failed")
             if stderr:
                 print(f"STDERR: {stderr}")
             return False
 
         print("[OK] Translate completed")
 
-        # Step 4: Run 4-correct.ps1
+        # Step 4: Run x4-correct.ps1
         print("\n" + "=" * 70)
-        print("[4/5] Running: 4-correct.ps1")
+        print("[4/5] Running: x4-correct.ps1")
         print("=" * 70)
         correct_args = [
             "-GameName", game_name,
@@ -189,28 +189,28 @@ def test_e2e_example_game_translation() -> bool:
             "-ModeName", "Both (Patterns + LLM)", # Assuming this is the desired mode
             "-Yes" # Auto-accept confirmation
         ]
-        success, stdout, stderr = run_powershell_script("4-correct.ps1", args=correct_args, timeout=300)
+        success, stdout, stderr = run_powershell_script("x4-correct.ps1", args=correct_args, timeout=300)
 
         if not success:
-            print(f"[FAIL] 4-correct.ps1 failed")
+            print(f"[FAIL] x4-correct.ps1 failed")
             if stderr:
                 print(f"STDERR: {stderr}")
             return False
 
         print("[OK] Correct completed")
 
-        # Step 5: Run 5-merge.ps1
+        # Step 5: Run x5-merge.ps1
         print("\n" + "=" * 70)
-        print("[5/5] Running: 5-merge.ps1")
+        print("[5/5] Running: x5-merge.ps1")
         print("=" * 70)
         merge_args = [
             "-GameName", game_name,
             "-All"
         ]
-        success, stdout, stderr = run_powershell_script("5-merge.ps1", args=merge_args, timeout=120)
+        success, stdout, stderr = run_powershell_script("x5-merge.ps1", args=merge_args, timeout=120)
 
         if not success:
-            print(f"[FAIL] 5-merge.ps1 failed")
+            print(f"[FAIL] x5-merge.ps1 failed")
             if stdout:
                 print(f"STDOUT: {stdout}")
             if stderr:
@@ -254,7 +254,7 @@ def test_e2e_example_game_translation() -> bool:
             print(f"  - Initial translations: {total_initial}")
             print(f"  - Final translations: {total_final}")
             print(f"  - New translations added: {total_added}")
-            print(f"  - Pipeline: Config → Extract → Translate → Correct → Merge ✓")
+            print(f"  - Pipeline: Config -> Extract -> Translate -> Correct -> Merge [OK]")
             print("=" * 70)
             return True
         else:
@@ -285,14 +285,14 @@ def test_e2e_example_game_translation() -> bool:
         for rpy_file in rpy_files:
             cleanup_files([
                 rpy_file.parent / f"{rpy_file.stem}.parsed.yaml",
-                rpy_file.parent / f"{rpy_file.stem}.tags.json",
+                rpy_file.parent / f"{rpy_file.stem}.tags.yaml",
                 rpy_file.parent / f"{rpy_file.stem}.translated.rpy",
                 rpy_file.parent / f"{rpy_file.stem}.corrections.txt", # Added cleanup for corrections.txt
             ])
 
         cleanup_files([
-            example_dir / "characters.json",
-            example_dir.parent.parent / "characters.json"  # May be in game root
+            example_dir / "characters.yaml",
+            example_dir.parent.parent / "characters.yaml"  # May be in game root
         ])
 
         print("[OK] Cleanup completed")
