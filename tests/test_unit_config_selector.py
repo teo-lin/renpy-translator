@@ -27,18 +27,18 @@ def test_select_item_auto_select_single():
     def formatter(item, num):
         return f"[{num}] {item['name']}"
 
-    # Capture stdout
+    # Capture stderr (where auto-selection message goes)
     captured_output = io.StringIO()
-    sys.stdout = captured_output
+    sys.stderr = captured_output
 
     result = select_item("Test Selection", items, formatter, "item")
 
-    sys.stdout = sys.__stdout__
+    sys.stderr = sys.__stderr__
     output = captured_output.getvalue()
 
     assert result == items[0], "Should return the only item"
     assert "Auto-selecting" in output, "Should show auto-selection message"
-    print("   [PASS] Auto-selected single item correctly")
+    print("   [PASS] Auto-select single item correctly")
     return True
 
 

@@ -42,7 +42,7 @@ target_language_folder = "romanian"
 model_key = "aya23"
 
 
-def run_powershell_script_2(script_name: str, args: list = None, timeout: int = 300) -> tuple[bool, str, str]:
+def run_powershell_script(script_name: str, args: list = None, timeout: int = 300) -> tuple[bool, str, str]:
     """
     Run a PowerShell script with arguments and return success status, stdout, stderr.
 

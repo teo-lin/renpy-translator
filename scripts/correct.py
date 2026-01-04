@@ -775,14 +775,21 @@ def detect_language_from_path(path: Path) -> str:
 
 def main():
     """CLI entry point"""
-    if len(sys.argv) < 2:
-        print(__doc__)
-        sys.exit(1)
+    import argparse
 
-    input_path = Path(sys.argv[1])
-    dry_run = '--dry-run' in sys.argv
-    patterns_only = '--patterns-only' in sys.argv
-    llm_only = '--llm-only' in sys.argv
+    parser = argparse.ArgumentParser(description='Correct Romanian translations in Ren\'Py .rpy files')
+    parser.add_argument('input_path', type=str, help='Input file or directory')
+    parser.add_argument('--language', type=str, help='Target language code (e.g., ro, es, fr)')
+    parser.add_argument('--patterns-only', action='store_true', help='Use only pattern-based corrections')
+    parser.add_argument('--llm-only', action='store_true', help='Use only LLM corrections')
+    parser.add_argument('--dry-run', action='store_true', help='Preview changes without writing files')
+
+    args = parser.parse_args()
+
+    input_path = Path(args.input_path)
+    dry_run = args.dry_run
+    patterns_only = args.patterns_only
+    llm_only = args.llm_only
 
     if not input_path.exists():
         print(f"Error: Path not found: {input_path}")
@@ -793,24 +800,28 @@ def main():
         print("Error: Cannot use both --patterns-only and --llm-only")
         sys.exit(1)
 
-    # Detect language from path
-    target_language = detect_language_from_path(input_path)
-
-    # Map language names to ISO codes
-    lang_code_map = {
-        'Romanian': 'ro',
-        'Spanish': 'es',
-        'French': 'fr',
-        'German': 'de',
-        'Italian': 'it',
-        'Portuguese': 'pt',
-        'Russian': 'ru',
-        'Turkish': 'tr',
-        'Czech': 'cs',
-        'Polish': 'pl',
-        'Ukrainian': 'uk'
-    }
-    lang_code = lang_code_map.get(target_language, target_language.lower()[:2])
+    # Determine language code
+    if args.language:
+        # Language code provided explicitly
+        lang_code = args.language
+    else:
+        # Detect language from path
+        target_language = detect_language_from_path(input_path)
+        # Map language names to ISO codes
+        lang_code_map = {
+            'Romanian': 'ro',
+            'Spanish': 'es',
+            'French': 'fr',
+            'German': 'de',
+            'Italian': 'it',
+            'Portuguese': 'pt',
+            'Russian': 'ru',
+            'Turkish': 'tr',
+            'Czech': 'cs',
+            'Polish': 'pl',
+            'Ukrainian': 'uk'
+        }
+        lang_code = lang_code_map.get(target_language, target_language.lower()[:2])
 
     # Setup paths
     project_root = Path(__file__).parent.parent
