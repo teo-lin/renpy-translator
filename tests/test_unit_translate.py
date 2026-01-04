@@ -149,7 +149,7 @@ def test_context_extraction():
 
     print("    ✓ No context (as expected for CHOICE)")
 
-    print("\n✅ Context extraction test passed!")
+    print("\n[OK] Context extraction test passed!")
     return True
 
 
@@ -225,16 +225,16 @@ def test_translation_workflow():
     # Create temporary files
     with tempfile.NamedTemporaryFile(mode='w', suffix='.parsed.yaml', delete=False, encoding='utf-8') as f:
         yaml.dump(parsed_blocks, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
-        temp_yaml = Path(f.name)
+        temp_parsed_yaml = Path(f.name)
 
     with tempfile.NamedTemporaryFile(mode='w', suffix='.tags.yaml', delete=False, encoding='utf-8') as f:
         yaml.dump(tags_file, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
-        temp_yaml = Path(f.name)
+        temp_tags_yaml = Path(f.name)
 
     try:
         print(f"\n[Created] Test files:")
-        print(f"    YAML: {temp_yaml.name}")
-        print(f"    JSON: {temp_yaml.name}")
+        print(f"    Parsed YAML: {temp_parsed_yaml.name}")
+        print(f"    Tags YAML: {temp_tags_yaml.name}")
 
         # Create mock translator with glossary
         glossary = {
@@ -260,8 +260,8 @@ def test_translation_workflow():
         # Translate
         print("\n[Running] Translation...")
         stats = batch_translator.translate_file(
-            parsed_yaml_path=temp_yaml,
-            tags_yaml_path=temp_yaml,
+            parsed_yaml_path=temp_parsed_yaml,
+            tags_yaml_path=temp_tags_yaml,
             output_yaml_path=None  # Overwrite in place
         )
 
@@ -279,7 +279,7 @@ def test_translation_workflow():
 
         # Verify translations were written to file
         print("\n[Verifying] Output file...")
-        with open(temp_yaml, 'r', encoding='utf-8') as f:
+        with open(temp_parsed_yaml, 'r', encoding='utf-8') as f:
             updated_blocks = yaml.safe_load(f)
 
         # Check that untranslated blocks are now translated
@@ -325,21 +325,21 @@ def test_translation_workflow():
             "Glossary should have been applied"
         print(f"    ✓ Glossary applied: 'Hi' → contains Romanian greeting")
 
-        print("\n✅ Translation workflow test passed!")
+        print("\n[OK] Translation workflow test passed!")
         return True
 
     except AssertionError as e:
-        print(f"\n❌ Translation workflow test failed: {e}")
+        print(f"\n[FAIL] Translation workflow test failed: {e}")
         return False
     except Exception as e:
-        print(f"\n❌ Translation workflow test failed with exception: {e}")
+        print(f"\n[FAIL] Translation workflow test failed with exception: {e}")
         import traceback
         traceback.print_exc()
         return False
     finally:
         # Cleanup
-        temp_yaml.unlink(missing_ok=True)
-        temp_yaml.unlink(missing_ok=True)
+        temp_parsed_yaml.unlink(missing_ok=True)
+        temp_tags_yaml.unlink(missing_ok=True)
 
 
 def test_untranslated_identification():
@@ -391,7 +391,7 @@ def test_untranslated_identification():
     assert '1-Amelia' not in untranslated, "Translated block should be skipped"
     assert '4-Choice' not in untranslated, "Translated choice should be skipped"
 
-    print("\n✅ Untranslated identification test passed!")
+    print("\n[OK] Untranslated identification test passed!")
     return True
 
 
@@ -429,11 +429,11 @@ def test_language_agnostic():
     # Create temporary files
     with tempfile.NamedTemporaryFile(mode='w', suffix='.parsed.yaml', delete=False, encoding='utf-8') as f:
         yaml.dump(parsed_blocks, f, allow_unicode=True)
-        temp_yaml = Path(f.name)
+        temp_parsed_yaml = Path(f.name)
 
     with tempfile.NamedTemporaryFile(mode='w', suffix='.tags.yaml', delete=False, encoding='utf-8') as f:
         yaml.dump(tags_file, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
-        temp_yaml = Path(f.name)
+        temp_tags_yaml = Path(f.name)
 
     try:
         print(f"\n[Testing] Spanish translation...")
@@ -452,8 +452,8 @@ def test_language_agnostic():
 
         # Translate
         stats = batch_translator.translate_file(
-            parsed_yaml_path=temp_yaml,
-            tags_yaml_path=temp_yaml,
+            parsed_yaml_path=temp_parsed_yaml,
+            tags_yaml_path=temp_tags_yaml,
             output_yaml_path=None
         )
 
@@ -463,7 +463,7 @@ def test_language_agnostic():
         assert stats['translated'] == 2, f"Expected 2 translations, got {stats['translated']}"
 
         # Verify Spanish translations were written
-        with open(temp_yaml, 'r', encoding='utf-8') as f:
+        with open(temp_parsed_yaml, 'r', encoding='utf-8') as f:
             updated_blocks = yaml.safe_load(f)
 
         assert updated_blocks['1-Amelia']['es'] != '', "Spanish translation missing"
@@ -472,12 +472,12 @@ def test_language_agnostic():
         print(f"    ✓ Spanish block 1: {updated_blocks['1-Amelia']['es']}")
         print(f"    ✓ Spanish block 2: {updated_blocks['2-MainCharacter']['es']}")
 
-        print("\n✅ Language-agnostic test passed!")
+        print("\n[OK] Language-agnostic test passed!")
         return True
 
     finally:
-        temp_yaml.unlink(missing_ok=True)
-        temp_yaml.unlink(missing_ok=True)
+        temp_parsed_yaml.unlink(missing_ok=True)
+        temp_tags_yaml.unlink(missing_ok=True)
 
 
 def main():
@@ -513,7 +513,7 @@ def main():
             if not passed:
                 all_passed = False
         except Exception as e:
-            print(f"\n❌ {test_name} failed with exception: {e}")
+            print(f"\n[FAIL] {test_name} failed with exception: {e}")
             import traceback
             traceback.print_exc()
             results.append((test_name, False))
@@ -525,7 +525,7 @@ def main():
     print("=" * 70)
 
     for test_name, passed in results:
-        status = "✅ PASSED" if passed else "❌ FAILED"
+        status = "[OK] PASSED" if passed else "[FAIL] FAILED"
         print(f"  {status}: {test_name}")
 
     print("=" * 70)

@@ -16,44 +16,12 @@ param(
 $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-# Simple selection function for interactive mode
-function Select-Item {
-    param(
-        [string]$Title,
-        [string]$ItemTypeName,
-        [array]$Items,
-        [scriptblock]$DisplayItem
-    )
-
-    Write-Host ""
-    Write-Host $Title -ForegroundColor Cyan
-    Write-Host ""
-
-    for ($i = 0; $i -lt $Items.Count; $i++) {
-        & $DisplayItem $Items[$i] ($i + 1)
-    }
-
-    Write-Host ""
-    $selection = Read-Host "Select $ItemTypeName (1-$($Items.Count))"
-
-    try {
-        $index = [int]$selection - 1
-        if ($index -lt 0 -or $index -ge $Items.Count) {
-            throw "Invalid selection"
-        }
-        return $Items[$index]
-    } catch {
-        throw "Invalid input"
-    }
-}
-
 $pythonExe = Join-Path $scriptDir "venv\Scripts\python.exe"
 $correctScript = Join-Path $scriptDir "scripts\correct.py"
-$gamesFolder = Join-Path $scriptDir "games"
-$configFile = Join-Path $scriptDir "models\current_config.yaml"
+$correctUtilsScript = Join-Path $scriptDir "scripts\correct_utils.py"
 
 # Add PyTorch lib directory to PATH for CUDA DLLs (needed by llama-cpp-python)
-$torchLibPath = Join-Path $scriptDir "venv\Lib\site-packages\torch\lib"
+$torchLibPath = Join-Path $scriptDir "venv\Lib\site-packages\torch\lib" # Corrected path
 if (Test-Path $torchLibPath) {
     $env:PATH += ";$torchLibPath"
 }
@@ -74,222 +42,48 @@ if (-not (Test-Path $correctScript)) {
     exit 1
 }
 
-# Define available correction modes
-$modes = @(
-    @{
-        Name = "Both (Patterns + LLM)"
-        Description = "Apply pattern corrections, then LLM corrections (recommended)"
-        Flag = $null
-        Details = "Speed: Slow (~2-3s/sentence) | Quality: Best | Uses: Aya-23-8B + YAML rules"
-    },
-    @{
-        Name = "Patterns Only"
-        Description = "Fast pattern-based corrections using YAML rules"
-        Flag = "--patterns-only"
-        Details = "Speed: Very fast (<1s/file) | Quality: Good | Uses: YAML correction rules"
-    },
-    @{
-        Name = "LLM Only"
-        Description = "AI-powered corrections using Aya-23-8B model"
-        Flag = "--llm-only"
-        Details = "Speed: Slow (~2-3s/sentence) | Quality: Best | Uses: Aya-23-8B only"
-    }
-)
-
-# Load available languages from models_config.yaml
-$modelsConfigPath = Join-Path $scriptDir "models\models_config.yaml"
-if (Test-Path $modelsConfigPath) {
-    $modelsConfigYaml = Get-Content $modelsConfigPath -Raw
-    # Simple YAML parsing for installed_languages
-    $languagesSection = ($modelsConfigYaml -split "installed_languages:")[1] -split "installed_models:"|Select-Object -First 1
-    $languages = @()
-
-    # Parse each language entry
-    $languageMatches = [regex]::Matches($languagesSection, "(?m)^\s*-\s*code:\s*(\w+)\s*\n\s*name:\s*(.+?)$")
-    foreach ($match in $languageMatches) {
-        $languages += @{
-            Code = $match.Groups[1].Value
-            Name = $match.Groups[2].Value
-        }
-    }
-} else {
-    Write-Host "ERROR: models_config.yaml not found at $modelsConfigPath" -ForegroundColor Red
+# Check correct_utils.py exists
+if (-not (Test-Path $correctUtilsScript)) {
+    Write-Host "ERROR: Helper script correct_utils.py not found at $correctUtilsScript" -ForegroundColor Red
+    Write-Host "This is a new feature. Please ensure your project is up-to-date or re-run setup.ps1." -ForegroundColor Yellow
     exit 1
 }
 
-# Banner
-Write-Host ""
-Write-Host "=================================================================" -ForegroundColor Green
-Write-Host "       Ren'Py Grammar Correction - Interactive Setup            " -ForegroundColor Green
-Write-Host "=================================================================" -ForegroundColor Green
 
-# Step 1: Select Mode
-if ($ModeName) {
-    $foundMode = $modes | Where-Object { $_.Name -eq $ModeName }
-    if ($foundMode) {
-        $Mode = ($modes.IndexOf($foundMode) + 1)
-        Write-Host ""
-        Write-Host "Auto-selecting mode by name '$ModeName'. Resolved to index $Mode." -ForegroundColor Cyan
-    } else {
-        Write-Host "ERROR: Invalid mode name: $ModeName. Available modes: $($modes.Name -join ', ')" -ForegroundColor Red
-        exit 1
-    }
-}
-if ($Mode -gt 0) {
-    if ($Mode -le $modes.Count) {
-        $selectedMode = $modes[$Mode - 1]
-        Write-Host ""
-        Write-Host "Auto-selecting mode $Mode`: $($selectedMode.Name)" -ForegroundColor Cyan
-    } else {
-        Write-Host "ERROR: Invalid mode number: $Mode. Available modes: 1-$($modes.Count)" -ForegroundColor Red
-        exit 1
-    }
-} else {
-    try {
-        $selectedMode = Select-Item `
-            -Title "Step 1: Select Correction Mode" `
-            -ItemTypeName "mode" `
-            -Items $modes `
-            -DisplayItem {
-                param($mode, $num)
-                Write-Host "  [$num] " -NoNewline -ForegroundColor Yellow
-                Write-Host $mode.Name -NoNewline -ForegroundColor Green
-                Write-Host " - $($mode.Description)" -ForegroundColor White
-                Write-Host "      $($mode.Details)" -ForegroundColor DarkGray
-                Write-Host ""
-            }
-    } catch {
-        Write-Host "Selection cancelled." -ForegroundColor Yellow
-        exit 0
-    }
+# Prepare arguments for correct_utils.py
+$correctUtilsArgs = @()
+if ($Mode -ne 0) { $correctUtilsArgs += "--mode", $Mode }
+if ($ModeName) { $correctUtilsArgs += "--mode-name", $ModeName }
+if ($Language -ne 0) { $correctUtilsArgs += "--language", $Language }
+if ($LanguageName) { $correctUtilsArgs += "--language-name", $LanguageName }
+if ($Game -ne 0) { $correctUtilsArgs += "--game", $Game }
+if ($GameName) { $correctUtilsArgs += "--game-name", $GameName }
+
+# Pass along any remaining arguments from PowerShell to correct_utils.py
+# The correct_utils.py script will then pass these along to scripts/correct.py
+if ($Arguments.Count -gt 0) {
+    # Need to prefix with --arguments to let correct_utils.py know these are generic additional args
+    $correctUtilsArgs += "--arguments"
+    $correctUtilsArgs += $Arguments
 }
 
-# Step 2: Select Language
-if ($LanguageName) {
-    $foundLanguage = $languages | Where-Object { $_.Code -eq $LanguageName }
-    if ($foundLanguage) {
-        $Language = ($languages.IndexOf($foundLanguage) + 1)
-        Write-Host ""
-        Write-Host "Auto-selecting language by name '$LanguageName'. Resolved to index $Language." -ForegroundColor Cyan
-    } else {
-        Write-Host "ERROR: Invalid language name: $LanguageName. Available languages: $($languages.Name -join ', ')" -ForegroundColor Red
-        exit 1
-    }
-}
-if ($Language -gt 0) {
-    if ($Language -le $languages.Count) {
-        $selectedLanguage = $languages[$Language - 1]
-        Write-Host ""
-        Write-Host "Auto-selecting language $Language`: $($selectedLanguage.Name) ($($selectedLanguage.Code))" -ForegroundColor Cyan
-    } else {
-        Write-Host "ERROR: Invalid language number: $Language. Available languages: 1-$($languages.Count)" -ForegroundColor Red
-        exit 1
-    }
-} else {
-    try {
-        $selectedLanguage = Select-Item `
-            -Title "Step 2: Select Target Language" `
-            -ItemTypeName "language" `
-            -Items $languages `
-            -DisplayItem {
-                param($lang, $num)
-                Write-Host "  [$num] " -NoNewline -ForegroundColor Yellow
-                Write-Host "$($lang.Name) " -NoNewline -ForegroundColor Green
-                Write-Host "($($lang.Code))" -ForegroundColor DarkGray
-            }
-    } catch {
-        Write-Host "Selection cancelled." -ForegroundColor Yellow
-        exit 0
-    }
+# Call correct_utils.py to get the actual script arguments
+# It will print each argument on a new line
+Write-Host "DEBUG: About to call Python script correct_utils.py" -ForegroundColor DarkYellow
+$pythonOutput = & $pythonExe $correctUtilsScript @correctUtilsArgs 2>&1 | Out-String
+Write-Host "DEBUG: Returned from Python script correct_utils.py. LastExitCode: $LASTEXITCODE" -ForegroundColor DarkYellow
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: Failed to prepare arguments using correct_utils.py. Output: $pythonOutput" -ForegroundColor Red
+    exit $LASTEXITCODE
 }
 
-# Step 3: Scan games and select game
-Write-Host ""
-Write-Host "Scanning games folder for $($selectedLanguage.Name) translations..." -ForegroundColor Cyan
+# Parse the multi-line string output from Python into a PowerShell array
+# Each argument is printed on a new line by correct_utils.py
+$scriptArgs = $pythonOutput.Trim().Split("`n") | ForEach-Object { $_.Trim() } | Where-Object { -not [string]::IsNullOrEmpty($_) }
 
-# Scan games folder
-$games = @()
-if (Test-Path $gamesFolder) {
-    $gameFolders = Get-ChildItem -Path $gamesFolder -Directory
-    foreach ($gameFolder in $gameFolders) {
-        $tlPath = Join-Path $gameFolder.FullName "game\tl\$($selectedLanguage.Name.ToLower())"
-        if (Test-Path $tlPath) {
-            $renpyFiles = Get-ChildItem -Path $tlPath -Filter "*.rpy" -Recurse
-            if ($renpyFiles.Count -gt 0) {
-                $games += @{
-                    Name = $gameFolder.Name
-                    Path = $tlPath
-                }
-            }
-        }
-    }
-}
-
-if ($games.Count -eq 0) {
-    Write-Host ""
-    Write-Host "ERROR: No games found with $($selectedLanguage.Name) translations!" -ForegroundColor Red
-    Write-Host ""
-    Write-Host "Please generate translation files first using Ren'Py:" -ForegroundColor Yellow
-    Write-Host "  renpy.exe `"path\to\game`" generate-translations $($selectedLanguage.Name.ToLower())" -ForegroundColor Yellow
-    Write-Host ""
-    exit 1
-}
-
-if ($GameName) {
-    $foundGame = $games | Where-Object { $_.Name -eq $GameName }
-    if ($foundGame) {
-        $Game = ($games.IndexOf($foundGame) + 1)
-        Write-Host ""
-        Write-Host "Auto-selecting game by name '$GameName'. Resolved to index $Game." -ForegroundColor Cyan
-    } else {
-        Write-Host "ERROR: Invalid game name: $GameName. Available games: $($games.Name -join ', ')" -ForegroundColor Red
-        exit 1
-    }
-}
-if ($Game -gt 0) {
-    if ($Game -le $games.Count) {
-        $selectedGame = $games[$Game - 1]
-        Write-Host ""
-        Write-Host "Auto-selecting game $Game`: $($selectedGame.Name)" -ForegroundColor Cyan
-    } else {
-        Write-Host "ERROR: Invalid game number: $Game. Available games: 1-$($games.Count)" -ForegroundColor Red
-        exit 1
-    }
-} else {
-    try {
-        $selectedGame = Select-Item `
-            -Title "Step 3: Select Game to Correct" `
-            -ItemTypeName "game" `
-            -Items $games `
-            -DisplayItem {
-                param($game, $num)
-                Write-Host "  [$num] " -NoNewline -ForegroundColor Yellow
-                Write-Host $game.Name -ForegroundColor Green
-                Write-Host "      Path: $($game.Path)" -ForegroundColor DarkGray
-            }
-    } catch {
-        Write-Host "Selection cancelled." -ForegroundColor Yellow
-        exit 0
-    }
-}
-
-# Summary
-Write-Host ""
-Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host "       Correction Summary                                        " -ForegroundColor Cyan
-Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host "  Mode:     " -NoNewline -ForegroundColor White
-Write-Host $selectedMode.Name -ForegroundColor Green
-Write-Host "  Language: " -NoNewline -ForegroundColor White
-Write-Host "$($selectedLanguage.Name) ($($selectedLanguage.Code))" -ForegroundColor Green
-Write-Host "  Game:     " -NoNewline -ForegroundColor White
-Write-Host $selectedGame.Name -ForegroundColor Green
-Write-Host "  Path:     " -NoNewline -ForegroundColor White
-Write-Host $selectedGame.Path -ForegroundColor Green
-Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host ""
-
+# Handle the confirmation if not auto-skipped
 if (-not $Yes) {
+    # The summary is already printed by correct_utils.py
     $confirm = Read-Host "Proceed with correction? (Y/N)"
     if ($confirm -ne "Y" -and $confirm -ne "y") {
         Write-Host "Cancelled by user." -ForegroundColor Yellow
@@ -297,18 +91,9 @@ if (-not $Yes) {
     }
 }
 
-# Build arguments
-$scriptArgs = @($selectedGame.Path, "--language", $selectedLanguage.Code)
-if ($selectedMode.Flag) {
-    $scriptArgs += $selectedMode.Flag
-}
-if ($Arguments.Count -gt 0) {
-    $scriptArgs += $Arguments
-}
-
-# Run the correction script
+# Run the actual correction script
 Write-Host ""
-Write-Host "Starting correction with mode: $($selectedMode.Name)..." -ForegroundColor Cyan
+Write-Host "Starting correction with mode (determined by Python script)..." -ForegroundColor Cyan
 Write-Host ""
 
 & $pythonExe $correctScript $scriptArgs

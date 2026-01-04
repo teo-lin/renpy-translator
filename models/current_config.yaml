@@ -1,12 +1,3 @@
-installed_languages:
-- code: ro
-  name: Romanian
-installed_models:
-- aya23
-- helsinkiRo
-- madlad400
-- mbartRo
-- seamlessm96
 games:
   Example:
     name: Example

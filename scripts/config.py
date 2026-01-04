@@ -364,8 +364,9 @@ def save_configuration(
     print(f"   [OK] Saved game config to: {config_path}")
 
     # Save characters.yaml
-    language_code = selected_language.get('code', selected_language.get('name', 'unknown').lower())
-    characters_path = game_path / "game" / "tl" / language_code / "characters.yaml"
+    language_name = selected_language.get('name', 'unknown').lower()
+    print(f"   [Save] Saving characters for language: {language_name}")
+    characters_path = game_path / "game" / "tl" / language_name / "characters.yaml"
 
     save_yaml_config(characters_path, characters)
     print(f"   [OK] Saved characters to: {characters_path}")

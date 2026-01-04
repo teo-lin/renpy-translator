@@ -18,7 +18,7 @@ def test_unit_config():
 
     # Paths
     project_root = Path(__file__).parent.parent
-    characters_file = project_root / "games" / "Example" / "game" / "tl" / "ro" / "characters.yaml"
+    characters_file = project_root / "games" / "Example" / "game" / "tl" / "romanian" / "characters.yaml"
     backup_file = characters_file.with_suffix(".yaml.backup")
     config_script = project_root / "scripts" / "config.py"
 
