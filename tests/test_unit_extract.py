@@ -19,7 +19,8 @@ from pathlib import Path
 # Project paths
 project_root = Path(__file__).parent.parent
 test_game_dir = project_root / "temp_test_game"
-test_tl_dir = test_game_dir / "game" / "tl" / "ro"
+# Use lowercase language name for the translation directory (not the code)
+test_tl_dir = test_game_dir / "game" / "tl" / "romanian"
 
 # Sample Ren'Py content for testing
 TEST_RPY_CONTENT = """

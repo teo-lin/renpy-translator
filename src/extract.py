@@ -449,9 +449,9 @@ def load_game_config(game_name: str) -> Dict[str, any]:
     return games[game_name]
 
 
-def load_character_map(game_path: Path, language_code: str) -> Dict[str, str]:
+def load_character_map(game_path: Path, language_dir: str) -> Dict[str, str]:
     """Load character map from characters.yaml"""
-    characters_path = game_path / "game" / "tl" / language_code / "characters.yaml"
+    characters_path = game_path / "game" / "tl" / language_dir / "characters.yaml"
 
     if not characters_path.exists():
         print(f"Warning: characters.yaml not found at {characters_path}")
@@ -467,7 +467,7 @@ def load_character_map(game_path: Path, language_code: str) -> Dict[str, str]:
 def extract_single_file(
     file_path: Path,
     game_path: Path,
-    language_code: str,
+    language_dir: str,
     character_map: Dict[str, str]
 ):
     """Extract a single .rpy file"""
@@ -483,7 +483,7 @@ def extract_single_file(
     extractor = RenpyExtractor(character_map)
     parsed_blocks, tags_file = extractor.extract_file(
         file_path,
-        target_language=language_code,
+        target_language=language_dir,
         source_language='english'
     )
 
@@ -545,6 +545,7 @@ def main():
     game_path = Path(game_config['path'])
     language_info = game_config['target_language']
     language_code = language_info.get('code', language_info.get('name', 'unknown').lower())
+    language_dir = language_info['name'].lower()  # Directory name is lowercase language name
 
     print(f"Game: {game_config['name']}")
     print(f"Language: {language_info['name']} ({language_code})")
@@ -552,10 +553,10 @@ def main():
     print()
 
     # Load character map
-    character_map = load_character_map(game_path, language_code)
+    character_map = load_character_map(game_path, language_dir)
 
     # Get translation directory
-    tl_path = game_path / "game" / "tl" / language_info['name'].lower()
+    tl_path = game_path / "game" / "tl" / language_dir
 
     if not tl_path.exists():
         print(f"Error: Translation directory not found: {tl_path}")
@@ -574,7 +575,7 @@ def main():
         print(f"Found {len(rpy_files)} files\n")
 
         for file_path in rpy_files:
-            extract_single_file(file_path, game_path, language_code, character_map)
+            extract_single_file(file_path, game_path, language_dir, character_map)
             print()
 
     elif args.source:
@@ -588,7 +589,7 @@ def main():
             print(f"Error: File not found: {file_path}")
             exit(1)
 
-        extract_single_file(file_path, game_path, language_code, character_map)
+        extract_single_file(file_path, game_path, language_dir, character_map)
 
     else:
         # Interactive mode - ask user
@@ -611,7 +612,7 @@ def main():
             print(f"Found {len(rpy_files)} files\n")
 
             for file_path in rpy_files:
-                extract_single_file(file_path, game_path, language_code, character_map)
+                extract_single_file(file_path, game_path, language_dir, character_map)
                 print()
 
         elif choice == "2":
@@ -636,7 +637,7 @@ def main():
                 if 0 <= index < len(rpy_files):
                     selected_file = rpy_files[index]
                     print()
-                    extract_single_file(selected_file, game_path, language_code, character_map)
+                    extract_single_file(selected_file, game_path, language_dir, character_map)
                 else:
                     print("Invalid selection!")
                     exit(1)
