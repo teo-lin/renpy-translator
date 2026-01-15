@@ -422,8 +422,9 @@ def main():
     context_before = game_config.get('context_before', 3)
     context_after = game_config.get('context_after', 1)
 
-    target_language_code = target_language_obj.get('code', target_language_obj.get('Code'))
-    target_language_name = target_language_obj.get('name', target_language_obj.get('Name'))
+    # Language data always uses lowercase keys
+    target_language_code = target_language_obj['code']
+    target_language_name = target_language_obj['name']
 
     print(f"  Game: {game_name}")
     print(f"  Language: {target_language_name} ({target_language_code})")

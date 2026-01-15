@@ -24,22 +24,22 @@ def get_available_correction_modes() -> List[Dict[str, Any]]:
     """Define available correction modes."""
     return [
         {
-            "Name": "Both (Patterns + LLM)",
-            "Description": "Apply pattern corrections, then LLM corrections (recommended)",
-            "Flag": None,
-            "Details": "Speed: Slow (~2-3s/sentence) | Quality: Best | Uses: Aya-23-8B + YAML rules"
+            "name": "Both (Patterns + LLM)",
+            "description": "Apply pattern corrections, then LLM corrections (recommended)",
+            "flag": None,
+            "details": "Speed: Slow (~2-3s/sentence) | Quality: Best | Uses: Aya-23-8B + YAML rules"
         },
         {
-            "Name": "Patterns Only",
-            "Description": "Fast pattern-based corrections using YAML rules",
-            "Flag": "--patterns-only",
-            "Details": "Speed: Very fast (<1s/file) | Quality: Good | Uses: YAML correction rules"
+            "name": "Patterns Only",
+            "description": "Fast pattern-based corrections using YAML rules",
+            "flag": "--patterns-only",
+            "details": "Speed: Very fast (<1s/file) | Quality: Good | Uses: YAML correction rules"
         },
         {
-            "Name": "LLM Only",
-            "Description": "AI-powered corrections using Aya-23-8B model",
-            "Flag": "--llm-only",
-            "Details": "Speed: Slow (~2-3s/sentence) | Quality: Best | Uses: Aya-23-8B only"
+            "name": "LLM Only",
+            "description": "AI-powered corrections using Aya-23-8B model",
+            "flag": "--llm-only",
+            "details": "Speed: Slow (~2-3s/sentence) | Quality: Best | Uses: Aya-23-8B only"
         }
     ]
 
@@ -71,8 +71,8 @@ def scan_games_folder(selected_language: Dict[str, str]) -> List[Dict[str, Any]]
                 rpy_files = list(tl_path.glob("*.rpy"))
                 if rpy_files:
                     found_games.append({
-                        "Name": game_folder.name,
-                        "Path": str(tl_path) # Store as string to avoid PowerShell path issues
+                        "name": game_folder.name,
+                        "path": str(tl_path) # Store as string to avoid PowerShell path issues
                     })
     return found_games
 
@@ -87,10 +87,10 @@ def display_summary(selected_mode: Dict[str, Any], selected_language: Dict[str, 
     print("\n" + "=" * 70, file=sys.stderr)
     print("       Correction Summary                                        ", file=sys.stderr)
     print("=" * 70, file=sys.stderr)
-    print(f"  Mode:     {selected_mode['Name']}", file=sys.stderr)
+    print(f"  Mode:     {selected_mode['name']}", file=sys.stderr)
     print(f"  Language: {selected_language['name']} ({selected_language['code']})", file=sys.stderr)
-    print(f"  Game:     {selected_game['Name']}", file=sys.stderr)
-    print(f"  Path:     {selected_game['Path']}", file=sys.stderr)
+    print(f"  Game:     {selected_game['name']}", file=sys.stderr)
+    print(f"  Path:     {selected_game['path']}", file=sys.stderr)
     print("=" * 70, file=sys.stderr)
 
 def get_correction_arguments(args_from_ps: Dict[str, Any]) -> None:
@@ -108,18 +108,18 @@ def get_correction_arguments(args_from_ps: Dict[str, Any]) -> None:
     modes = get_available_correction_modes()
     selected_mode = None
     if args_from_ps.get('mode_name'):
-        found_mode = next((m for m in modes if m['Name'] == args_from_ps['mode_name']), None)
+        found_mode = next((m for m in modes if m['name'] == args_from_ps['mode_name']), None)
         if found_mode:
             selected_mode = found_mode
-            print(f"\nAuto-selecting mode by name '{args_from_ps['mode_name']}': {selected_mode['Name']}", file=sys.stderr)
+            print(f"\nAuto-selecting mode by name '{args_from_ps['mode_name']}': {selected_mode['name']}", file=sys.stderr)
         else:
-            print(f"ERROR: Invalid mode name: {args_from_ps['mode_name']}. Available modes: {[m['Name'] for m in modes]}", file=sys.stderr)
+            print(f"ERROR: Invalid mode name: {args_from_ps['mode_name']}. Available modes: {[m['name'] for m in modes]}", file=sys.stderr)
             sys.exit(1)
     elif args_from_ps.get('mode'): # Mode number (1-based index)
         mode_idx = args_from_ps['mode'] - 1
         if 0 <= mode_idx < len(modes):
             selected_mode = modes[mode_idx]
-            print(f"\nAuto-selecting mode {args_from_ps['mode']}: {selected_mode['Name']}", file=sys.stderr)
+            print(f"\nAuto-selecting mode {args_from_ps['mode']}: {selected_mode['name']}", file=sys.stderr)
         else:
             print(f"ERROR: Invalid mode number: {args_from_ps['mode']}. Available modes: 1-{len(modes)}", file=sys.stderr)
             sys.exit(1)
@@ -128,8 +128,8 @@ def get_correction_arguments(args_from_ps: Dict[str, Any]) -> None:
             title="Step 1: Select Correction Mode",
             items=modes,
             item_formatter_func=lambda m, num: (
-                f"  [{num}] {m['Name']} - {m['Description']}\n"
-                f"      {m['Details']}"
+                f"  [{num}] {m['name']} - {m['description']}\n"
+                f"      {m['details']}"
             ),
             item_type_name="mode"
         )
@@ -176,18 +176,18 @@ def get_correction_arguments(args_from_ps: Dict[str, Any]) -> None:
     
     selected_game = None
     if args_from_ps.get('game_name'):
-        found_game = next((g for g in games if g['Name'] == args_from_ps['game_name']), None)
+        found_game = next((g for g in games if g['name'] == args_from_ps['game_name']), None)
         if found_game:
             selected_game = found_game
-            print(f"\nAuto-selecting game by name '{args_from_ps['game_name']}': {selected_game['Name']}", file=sys.stderr)
+            print(f"\nAuto-selecting game by name '{args_from_ps['game_name']}': {selected_game['name']}", file=sys.stderr)
         else:
-            print(f"ERROR: Invalid game name: {args_from_ps['game_name']}. Available games: {[g['Name'] for g in games]}", file=sys.stderr)
+            print(f"ERROR: Invalid game name: {args_from_ps['game_name']}. Available games: {[g['name'] for g in games]}", file=sys.stderr)
             sys.exit(1)
     elif args_from_ps.get('game'): # Game number (1-based index)
         game_idx = args_from_ps['game'] - 1
         if 0 <= game_idx < len(games):
             selected_game = games[game_idx]
-            print(f"\nAuto-selecting game {args_from_ps['game']}: {selected_game['Name']}", file=sys.stderr)
+            print(f"\nAuto-selecting game {args_from_ps['game']}: {selected_game['name']}", file=sys.stderr)
         else:
             print(f"ERROR: Invalid game number: {args_from_ps['game']}. Available games: 1-{len(games)}", file=sys.stderr)
             sys.exit(1)
@@ -195,16 +195,16 @@ def get_correction_arguments(args_from_ps: Dict[str, Any]) -> None:
         selected_game = select_item(
             title="Step 3: Select Game to Correct",
             items=games,
-            item_formatter_func=lambda g, num: f"  [{num}] {g['Name']} (Path: {g['Path']})",
+            item_formatter_func=lambda g, num: f"  [{num}] {g['name']} (Path: {g['path']})",
             item_type_name="game"
         )
     
     display_summary(selected_mode, selected_language, selected_game)
 
     # Build arguments for scripts/correct.py
-    script_args = [selected_game['Path'], "--language", selected_language['code']]
-    if selected_mode['Flag']:
-        script_args.append(selected_mode['Flag'])
+    script_args = [selected_game['path'], "--language", selected_language['code']]
+    if selected_mode['flag']:
+        script_args.append(selected_mode['flag'])
     
     # Any additional arguments provided in the initial PowerShell call are also passed through
     if args_from_ps.get('arguments'):
