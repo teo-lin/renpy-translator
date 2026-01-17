@@ -1,11 +1,16 @@
-# Plan: Decouple Translation System into Three Apps
+# Plan: Decouple Translation System into Three Apps (Monorepo)
 
 ## Overview
 
-Split the current monolithic translation system into three independent Python packages:
-1. **poly-trans** (`c:\_____\_CODE\poly-trans`) - Core translation engine (publishable to PyPI)
-2. **poly-ren** (`c:\_____\_CODE\poly-ren`) - Renpy-specific text extraction/merging
-3. **poly-bench** (`c:\_____\_CODE\poly-bench`) - Model comparison CLI tool
+Reorganize the current monolithic translation system into three independent Python packages within a single monorepo:
+1. **poly-trans** (`src/poly-trans/`) - Core translation engine (publishable to PyPI)
+2. **poly-ren** (`src/poly-ren/`) - Renpy-specific text extraction/merging
+3. **poly-bench** (`src/poly-bench/`) - Model comparison CLI tool
+
+**Architecture**: Monorepo with workspace configuration
+- All packages in one repository (enro)
+- Each package publishable separately to PyPI
+- Shared development environment and tooling
 
 **Strategy**: Two-phase approach
 - **Phase 1**: Pure architectural split with NO logic changes
@@ -21,66 +26,64 @@ Split the current monolithic translation system into three independent Python pa
 
 Extract three separate Python packages from the current codebase while preserving all existing functionality exactly as-is.
 
-### 1.1 Create poly-trans Package (local_translator)
+### 1.1 Create poly-trans Package
 
-**Location:** `c:\_____\_CODE\poly-trans`
+**Location:** `src/poly-trans/` (within enro monorepo)
 
 **Package Structure:**
 ```
-poly-trans/
-├── pyproject.toml              # Python packaging config
-├── setup.py                    # Backward compatibility
-├── README.md
-├── LICENSE
-├── local_translator/           # Python package name
+src/poly-trans/
+├── __init__.py
+├── __version__.py
+├── translate.py            # From scripts/translate.py (ModularBatchTranslator)
+├── models/
 │   ├── __init__.py
-│   ├── __version__.py
-│   ├── translate.py            # From enro/scripts/translate.py (ModularBatchTranslator)
-│   ├── models/
-│   │   ├── __init__.py
-│   │   ├── aya23_translator.py      # From enro/src/translators/
-│   │   ├── madlad400_translator.py  # From enro/src/translators/
-│   │   ├── helsinkyRo_translator.py # From enro/src/translators/
-│   │   ├── mbartRo_translator.py    # From enro/src/translators/
-│   │   └── seamless96_translator.py # From enro/src/translators/
-│   └── prompts.py              # From enro/src/prompts.py
-├── data/                       # From enro/data/
+│   ├── aya23_translator.py      # From src/translators/
+│   ├── madlad400_translator.py  # From src/translators/
+│   ├── helsinkyRo_translator.py # From src/translators/
+│   ├── mbartRo_translator.py    # From src/translators/
+│   └── seamless96_translator.py # From src/translators/
+├── prompts.py              # From src/prompts.py
+├── data/                   # From data/
 │   ├── prompts/
 │   │   ├── translate.txt
 │   │   └── translate_uncensored.txt
 │   ├── ro_glossary.yaml
 │   ├── ro_uncensored_glossary.yaml
 │   └── ro_benchmark.json
-├── scripts/                    # PowerShell wrappers (keep for Windows)
-│   └── translate.ps1
-└── tests/
-    └── test_translators.py
+└── pyproject.toml          # Package-specific config (for PyPI publishing)
 ```
 
-**Files to Move from enro:**
-- `scripts/translate.py` → `poly-trans/local_translator/translate.py`
+**Files to Copy:**
+- `scripts/translate.py` → `src/poly-trans/translate.py`
   - Keep ModularBatchTranslator class exactly as-is
   - Keep all current context logic (3 before, 1 after)
-- `src/translators/*.py` → `poly-trans/local_translator/models/*.py`
+- `src/translators/*.py` → `src/poly-trans/models/*.py`
   - Copy all 5 translator classes unchanged
-- `src/prompts.py` → `poly-trans/local_translator/prompts.py`
+- `src/prompts.py` → `src/poly-trans/prompts.py`
   - Keep prompt loading logic unchanged
-- `data/` → `poly-trans/data/`
-  - Move entire data folder (prompts, glossaries, benchmark files)
+- `data/` → `src/poly-trans/data/`
+  - Copy entire data folder (prompts, glossaries, benchmark files)
 
-**PowerShell Wrappers:**
-- Keep existing PowerShell scripts as thin wrappers
-- Create Python CLI alongside (don't replace)
-- Both should work independently for Windows testing
+**Old Files:**
+- Keep original files in `src/translators/`, `scripts/`, `data/` during transition
+- Can be archived/removed after Phase 1 validation
 
 **Critical Files:**
-- `poly-trans/local_translator/translate.py:27-340` - ModularBatchTranslator class
-- `poly-trans/local_translator/models/aya23_translator.py:128-160` - Aya23 translation logic
-- `poly-trans/local_translator/prompts.py` - Prompt loading
-- `poly-trans/data/prompts/translate.txt` - Translation prompts
+- `src/poly-trans/translate.py:27-340` - ModularBatchTranslator class
+- `src/poly-trans/models/aya23_translator.py:128-160` - Aya23 translation logic
+- `src/poly-trans/prompts.py` - Prompt loading
+- `src/poly-trans/data/prompts/translate.txt` - Translation prompts
 
-**Dependencies (pyproject.toml):**
+**Package Config (src/poly-trans/pyproject.toml):**
 ```toml
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "poly-trans"
+version = "1.0.0"
 dependencies = [
     "pyyaml>=6.0",
     "torch>=2.0.0",
@@ -92,188 +95,211 @@ dependencies = [
 
 **API:** Keep current file-based API (load YAML, translate, save YAML) - no new interfaces yet
 
-**Testing on Windows:**
-- Install locally: `pip install -e c:\_____\_CODE\poly-trans`
-- Run PowerShell wrapper: `.\scripts\translate.ps1`
-- Run Python CLI: `python -m local_translator.translate`
-- Both should produce identical results
+**Testing:**
+- Install in editable mode: `pip install -e .` (from repo root with workspace config)
+- Import: `from src.poly_trans.translate import ModularBatchTranslator`
+- Both old and new code paths should work during transition
 
 ---
 
-### 1.2 Create poly-ren Package (renpy_translator)
+### 1.2 Create poly-ren Package
 
-**Location:** `c:\_____\_CODE\poly-ren`
+**Location:** `src/poly-ren/` (within enro monorepo)
 
 **Package Structure:**
 ```
-poly-ren/
-├── pyproject.toml
-├── README.md
-├── renpy_translator/           # Python package name
-│   ├── __init__.py
-│   ├── extract.py              # From enro/src/extract.py
-│   ├── merge.py                # From enro/src/merge.py
-│   ├── models.py               # From enro/src/models.py
-│   ├── renpy_utils.py          # From enro/src/renpy_utils.py
-│   └── cli.py                  # Python CLI
-├── scripts/                    # PowerShell wrappers (keep for Windows)
-│   ├── extract.ps1
-│   ├── merge.ps1
-│   └── translate.ps1
-└── tests/
-    ├── test_extract.py
-    ├── test_merge.py
-    └── fixtures/
+src/poly-ren/
+├── __init__.py
+├── extract.py              # From src/extract.py
+├── merge.py                # From src/merge.py
+├── models.py               # From src/models.py
+├── renpy_utils.py          # From src/renpy_utils.py
+├── cli.py                  # Python CLI (new)
+└── pyproject.toml          # Package-specific config (for PyPI publishing)
 ```
 
-**Files to Move from enro:**
-- `src/extract.py` → `poly-ren/renpy_translator/extract.py` (unchanged)
-- `src/merge.py` → `poly-ren/renpy_translator/merge.py` (unchanged)
-- `src/models.py` → `poly-ren/renpy_translator/models.py` (unchanged)
-- `src/renpy_utils.py` → `poly-ren/renpy_translator/renpy_utils.py` (unchanged)
+**Files to Copy:**
+- `src/extract.py` → `src/poly-ren/extract.py` (unchanged)
+- `src/merge.py` → `src/poly-ren/merge.py` (unchanged)
+- `src/models.py` → `src/poly-ren/models.py` (unchanged)
+- `src/renpy_utils.py` → `src/poly-ren/renpy_utils.py` (unchanged)
 
 **New Files to Create:**
-- `poly-ren/renpy_translator/cli.py` - Python CLI
+- `src/poly-ren/cli.py` - Python CLI
   - Provide Python entry points for extract/merge/translate
-  - Call `local_translator` functions via import
-- `poly-ren/scripts/*.ps1` - PowerShell wrappers (keep existing)
-  - Keep current PowerShell workflow scripts
-  - Update to call Python CLI underneath
-  - Don't delete - needed for Windows testing
+  - Import from `src.poly_trans` (monorepo import)
+
+**Old Files:**
+- Keep original files in `src/` during transition
+- Can be archived/removed after Phase 1 validation
 
 **Critical Files:**
-- `poly-ren/renpy_translator/extract.py:27-195` - RenpyExtractor class
-- `poly-ren/renpy_translator/merge.py:19-230` - RenpyMerger class
-- `poly-ren/renpy_translator/renpy_utils.py:9-118` - RenpyTagExtractor class
+- `src/poly-ren/extract.py:27-195` - RenpyExtractor class
+- `src/poly-ren/merge.py:19-230` - RenpyMerger class
+- `src/poly-ren/renpy_utils.py:9-118` - RenpyTagExtractor class
 
-**Dependencies (pyproject.toml):**
+**Package Config (src/poly-ren/pyproject.toml):**
 ```toml
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "poly-ren"
+version = "1.0.0"
 dependencies = [
     "pyyaml>=6.0",
-    # For local development: pip install -e c:\_____\_CODE\poly-trans
-    # For PyPI release: "local-translator>=1.0.0"
+    # For monorepo: imports from src.poly_trans
+    # For PyPI release: "poly-trans>=1.0.0"
 ]
 ```
 
-**Note:** During Phase 1, install poly-trans locally with `-e` flag. After PyPI publish, use package dependency.
-
-**Testing on Windows:**
-- Install locally: `pip install -e c:\_____\_CODE\poly-ren`
-- Also install poly-trans: `pip install -e c:\_____\_CODE\poly-trans`
-- Run PowerShell: `.\scripts\extract.ps1 game.rpy`
-- Run Python CLI: `python -m renpy_translator extract game.rpy`
+**Testing:**
+- Install in editable mode: `pip install -e .` (from repo root)
+- Import: `from src.poly_ren.extract import RenpyExtractor`
+- Import poly-trans: `from src.poly_trans.translate import ModularBatchTranslator`
 
 ---
 
-### 1.3 Create poly-bench Package (translation_model_comparer)
+### 1.3 Create poly-bench Package
 
-**Location:** `c:\_____\_CODE\poly-bench`
+**Location:** `src/poly-bench/` (within enro monorepo)
 
 **Package Structure:**
 ```
-poly-bench/
-├── pyproject.toml
-├── README.md
-├── translation_model_comparer/ # Python package name
-│   ├── __init__.py
-│   ├── compare.py              # From enro/scripts/compare.py
-│   ├── benchmark.py            # From enro/scripts/benchmark.py
-│   └── cli.py                  # Python CLI
-├── scripts/                    # PowerShell wrappers (keep for Windows)
-│   ├── compare.ps1
-│   └── benchmark.ps1
-└── tests/
-    └── test_benchmark.py
+src/poly-bench/
+├── __init__.py
+├── compare.py              # From scripts/compare.py
+├── benchmark.py            # From scripts/benchmark.py
+├── cli.py                  # Python CLI (new)
+└── pyproject.toml          # Package-specific config (for PyPI publishing)
 ```
 
-**Files to Move from enro:**
-- `scripts/compare.py` → `poly-bench/translation_model_comparer/compare.py`
+**Files to Copy:**
+- `scripts/compare.py` → `src/poly-bench/compare.py`
   - Keep model comparison logic unchanged
-  - Update imports to use local_translator
-- `scripts/benchmark.py` → `poly-bench/translation_model_comparer/benchmark.py`
+  - Update imports to use `src.poly_trans`
+- `scripts/benchmark.py` → `src/poly-bench/benchmark.py`
   - Keep BLEU scoring logic unchanged
-  - Update imports to use local_translator
+  - Update imports to use `src.poly_trans`
 
 **New Files to Create:**
-- `poly-bench/translation_model_comparer/cli.py` - Python CLI
+- `src/poly-bench/cli.py` - Python CLI
   - Provide Python entry points for compare/benchmark
-- `poly-bench/scripts/compare.ps1` - PowerShell wrapper (from enro/8-compare.ps1)
-  - Keep existing PowerShell logic
-  - Update to call Python CLI
-- `poly-bench/scripts/benchmark.ps1` - PowerShell wrapper (from enro/9-benchmark.ps1)
-  - Keep existing PowerShell logic
-  - Don't delete - needed for Windows
+  - Import from `src.poly_trans` (monorepo import)
+
+**Old Files:**
+- Keep original files in `scripts/` during transition
+- PowerShell scripts (8-compare.ps1, 9-benchmark.ps1) remain at root
+- Can be updated to call new code paths
 
 **Critical Files:**
-- `poly-bench/translation_model_comparer/compare.py` - Speed comparison orchestration
-- `poly-bench/translation_model_comparer/benchmark.py` - BLEU quality scoring
+- `src/poly-bench/compare.py` - Speed comparison orchestration
+- `src/poly-bench/benchmark.py` - BLEU quality scoring
 
-**Dependencies (pyproject.toml):**
+**Package Config (src/poly-bench/pyproject.toml):**
 ```toml
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "poly-bench"
+version = "1.0.0"
 dependencies = [
     "pyyaml>=6.0",
     "nltk>=3.8",
-    # For local development: pip install -e c:\_____\_CODE\poly-trans
-    # For PyPI release: "local-translator>=1.0.0"
+    # For monorepo: imports from src.poly_trans
+    # For PyPI release: "poly-trans>=1.0.0"
 ]
 ```
 
-**Note:** poly-bench uses benchmark data from poly-trans/data/ro_benchmark.json
+**Note:** Uses benchmark data from `src/poly-trans/data/ro_benchmark.json`
 
-**Testing on Windows:**
-- Install locally: `pip install -e c:\_____\_CODE\poly-bench`
-- Also install poly-trans: `pip install -e c:\_____\_CODE\poly-trans`
-- Run PowerShell: `.\scripts\compare.ps1`
-- Run Python CLI: `python -m translation_model_comparer compare`
+**Testing:**
+- Install in editable mode: `pip install -e .` (from repo root)
+- Import: `from src.poly_bench.compare import compare_models`
+- Import poly-trans: `from src.poly_trans.translate import ModularBatchTranslator`
+
 
 ---
 
 ### 1.4 Update Import Paths
 
-**In poly-trans/local_translator:**
+**In src/poly-trans/:**
 - No external imports from other packages
 - Self-contained translation engine
+- Internal imports: `from .models.aya23_translator import Aya23Translator`
 
-**In poly-ren/renpy_translator:**
+**In src/poly-ren/:**
 ```python
-# Before (in current enro monolith):
+# Before (current monolith):
 from src.translators.aya23_translator import Aya23Translator
 from scripts.translate import ModularBatchTranslator
 
-# After:
-from local_translator.models.aya23_translator import Aya23Translator
-from local_translator.translate import ModularBatchTranslator
+# After (monorepo):
+from src.poly_trans.models.aya23_translator import Aya23Translator
+from src.poly_trans.translate import ModularBatchTranslator
 ```
 
-**In poly-bench/translation_model_comparer:**
+**In src/poly-bench/:**
 ```python
 # Before:
 from src.translators.aya23_translator import Aya23Translator
 
-# After:
-from local_translator.models.aya23_translator import Aya23Translator
+# After (monorepo):
+from src.poly_trans.models.aya23_translator import Aya23Translator
+from src.poly_trans.translate import ModularBatchTranslator
+```
+
+**For PyPI Publishing:**
+When publishing to PyPI, imports change to:
+```python
+# poly-ren and poly-bench after PyPI publish:
+from poly_trans.models.aya23_translator import Aya23Translator
+from poly_trans.translate import ModularBatchTranslator
 ```
 
 ---
 
-### 1.5 Configuration and Data Files
+### 1.5 Root Workspace Configuration
 
-**Moved to poly-trans:**
-- `data/prompts/translate.txt` → `poly-trans/data/prompts/translate.txt`
-- `data/prompts/translate_uncensored.txt` → `poly-trans/data/prompts/translate_uncensored.txt`
-- `data/ro_glossary.yaml` → `poly-trans/data/ro_glossary.yaml`
-- `data/ro_uncensored_glossary.yaml` → `poly-trans/data/ro_uncensored_glossary.yaml`
-- `data/ro_benchmark.json` → `poly-trans/data/ro_benchmark.json`
+**Create root pyproject.toml** (for monorepo workspace):
+```toml
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
 
-**Keep in enro project:**
+[project]
+name = "enro-workspace"
+version = "1.0.0"
+requires-python = ">=3.9"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = "."
+testpaths = ["tests", "src/poly-trans", "src/poly-ren", "src/poly-bench"]
+```
+
+**Configuration and Data Files:**
+
+**Copied to src/poly-trans/data/:**
+- `data/prompts/` → `src/poly-trans/data/prompts/`
+- `data/ro_glossary.yaml` → `src/poly-trans/data/ro_glossary.yaml`
+- `data/ro_uncensored_glossary.yaml` → `src/poly-trans/data/ro_uncensored_glossary.yaml`
+- `data/ro_benchmark.json` → `src/poly-trans/data/ro_benchmark.json`
+
+**Keep at root:**
 - `models/models_config.yaml` - Model file paths/configurations
 - `models/current_config.yaml` - Current game configuration
+- `data/` - Original data folder (keep during transition)
 - Game-specific data (characters.yaml, etc.)
 
 **Path Resolution:**
-- poly-trans loads data from its own `data/` folder
-- poly-trans loads model configs from enro `models/models_config.yaml` (absolute path or env var)
-- poly-ren and poly-bench load data via poly-trans package
+- All three packages can access `models/` and `data/` via relative paths from repo root
+- poly-trans has its own copy in `src/poly-trans/data/` for standalone use
 
 ---
 
@@ -436,52 +462,48 @@ results:
 
 ### Week 1: Setup & poly-trans
 
-1. Create directory: `c:\_____\_CODE\poly-trans`
-2. Set up package structure with `local_translator/` subfolder
-3. Move files from enro:
-   - `src/translators/*.py` → `poly-trans/local_translator/models/`
-   - `scripts/translate.py` → `poly-trans/local_translator/translate.py`
-   - `src/prompts.py` → `poly-trans/local_translator/prompts.py`
-   - `data/` → `poly-trans/data/`
-4. Create `pyproject.toml` with dependencies
-5. Create PowerShell wrapper: `poly-trans/scripts/translate.ps1`
-6. Test local install: `pip install -e c:\_____\_CODE\poly-trans`
-7. Test PowerShell wrapper on Windows
-8. Verify translation produces identical output to enro
+1. Create root workspace config: `pyproject.toml`
+2. Create directory structure: `src/poly-trans/` and `src/poly-trans/models/`
+3. Copy files:
+   - `src/translators/*.py` → `src/poly-trans/models/`
+   - `scripts/translate.py` → `src/poly-trans/translate.py`
+   - `src/prompts.py` → `src/poly-trans/prompts.py`
+   - `data/` → `src/poly-trans/data/`
+4. Create `src/poly-trans/__init__.py` and `src/poly-trans/__version__.py`
+5. Create `src/poly-trans/pyproject.toml` with dependencies
+6. Test import: `from src.poly_trans.translate import ModularBatchTranslator`
+7. Test local install: `pip install -e .` from repo root
+8. Verify translation produces identical output to old code
 
 ### Week 2: poly-ren
 
-1. Create directory: `c:\_____\_CODE\poly-ren`
-2. Set up package structure with `renpy_translator/` subfolder
-3. Move files from enro:
-   - `src/extract.py` → `poly-ren/renpy_translator/extract.py`
-   - `src/merge.py` → `poly-ren/renpy_translator/merge.py`
-   - `src/models.py` → `poly-ren/renpy_translator/models.py`
-   - `src/renpy_utils.py` → `poly-ren/renpy_translator/renpy_utils.py`
-4. Create `poly-ren/renpy_translator/cli.py` (Python CLI)
-5. Copy PowerShell wrappers from enro to `poly-ren/scripts/`
-6. Update imports to use `local_translator` from poly-trans
-7. Create `pyproject.toml`
-8. Test install: `pip install -e c:\_____\_CODE\poly-ren`
-9. Test PowerShell wrappers on Windows
-10. Verify extract → translate → merge workflow works identically
+1. Create directory structure: `src/poly-ren/`
+2. Copy files:
+   - `src/extract.py` → `src/poly-ren/extract.py`
+   - `src/merge.py` → `src/poly-ren/merge.py`
+   - `src/models.py` → `src/poly-ren/models.py`
+   - `src/renpy_utils.py` → `src/poly-ren/renpy_utils.py`
+3. Create `src/poly-ren/__init__.py`
+4. Create `src/poly-ren/cli.py` (Python CLI)
+5. Update imports to use `src.poly_trans`
+6. Create `src/poly-ren/pyproject.toml`
+7. Test imports: `from src.poly_ren.extract import RenpyExtractor`
+8. Update PowerShell wrappers to call new code paths (optional)
+9. Verify extract → translate → merge workflow works identically
 
 ### Week 3: poly-bench
 
-1. Create directory: `c:\_____\_CODE\poly-bench`
-2. Set up package structure with `translation_model_comparer/` subfolder
-3. Move files from enro:
-   - `scripts/compare.py` → `poly-bench/translation_model_comparer/compare.py`
-   - `scripts/benchmark.py` → `poly-bench/translation_model_comparer/benchmark.py`
-4. Create `poly-bench/translation_model_comparer/cli.py` (Python CLI)
-5. Copy PowerShell scripts from enro:
-   - `8-compare.ps1` → `poly-bench/scripts/compare.ps1`
-   - `9-benchmark.ps1` → `poly-bench/scripts/benchmark.ps1`
-6. Update imports to use `local_translator` from poly-trans
-7. Create `pyproject.toml`
-8. Test install: `pip install -e c:\_____\_CODE\poly-bench`
-9. Test PowerShell wrappers on Windows
-10. Verify comparison and benchmark produce same results as enro
+1. Create directory structure: `src/poly-bench/`
+2. Copy files:
+   - `scripts/compare.py` → `src/poly-bench/compare.py`
+   - `scripts/benchmark.py` → `src/poly-bench/benchmark.py`
+3. Create `src/poly-bench/__init__.py`
+4. Create `src/poly-bench/cli.py` (Python CLI)
+5. Update imports to use `src.poly_trans`
+6. Create `src/poly-bench/pyproject.toml`
+7. Test imports: `from src.poly_bench.compare import compare_models`
+8. Update PowerShell scripts to call new code paths (optional)
+9. Verify comparison and benchmark produce same results
 
 ### Week 4: Validation & Testing
 
@@ -502,57 +524,59 @@ results:
 
 ## Critical Files Reference
 
-**Files to Move (Phase 1):**
+**Files to Copy (Phase 1):**
 
-**From enro → poly-trans:**
-- `scripts/translate.py:27-340` → `poly-trans/local_translator/translate.py`
-- `src/translators/aya23_translator.py` → `poly-trans/local_translator/models/`
-- `src/translators/madlad400_translator.py` → `poly-trans/local_translator/models/`
-- `src/translators/helsinkyRo_translator.py` → `poly-trans/local_translator/models/`
-- `src/translators/mbartRo_translator.py` → `poly-trans/local_translator/models/`
-- `src/translators/seamless96_translator.py` → `poly-trans/local_translator/models/`
-- `src/prompts.py` → `poly-trans/local_translator/prompts.py`
-- `data/` → `poly-trans/data/`
+**To src/poly-trans/:**
+- `scripts/translate.py:27-340` → `src/poly-trans/translate.py`
+- `src/translators/aya23_translator.py` → `src/poly-trans/models/`
+- `src/translators/madlad400_translator.py` → `src/poly-trans/models/`
+- `src/translators/helsinkyRo_translator.py` → `src/poly-trans/models/`
+- `src/translators/mbartRo_translator.py` → `src/poly-trans/models/`
+- `src/translators/seamless96_translator.py` → `src/poly-trans/models/`
+- `src/prompts.py` → `src/poly-trans/prompts.py`
+- `data/` → `src/poly-trans/data/`
 
-**From enro → poly-ren:**
-- `src/extract.py` → `poly-ren/renpy_translator/extract.py`
-- `src/merge.py` → `poly-ren/renpy_translator/merge.py`
-- `src/models.py` → `poly-ren/renpy_translator/models.py`
-- `src/renpy_utils.py` → `poly-ren/renpy_translator/renpy_utils.py`
-- PowerShell scripts → `poly-ren/scripts/`
+**To src/poly-ren/:**
+- `src/extract.py` → `src/poly-ren/extract.py`
+- `src/merge.py` → `src/poly-ren/merge.py`
+- `src/models.py` → `src/poly-ren/models.py`
+- `src/renpy_utils.py` → `src/poly-ren/renpy_utils.py`
 
-**From enro → poly-bench:**
-- `scripts/compare.py` → `poly-bench/translation_model_comparer/compare.py`
-- `scripts/benchmark.py` → `poly-bench/translation_model_comparer/benchmark.py`
-- `8-compare.ps1` → `poly-bench/scripts/compare.ps1`
-- `9-benchmark.ps1` → `poly-bench/scripts/benchmark.ps1`
+**To src/poly-bench/:**
+- `scripts/compare.py` → `src/poly-bench/compare.py`
+- `scripts/benchmark.py` → `src/poly-bench/benchmark.py`
+
+**Original Files:**
+- Keep all original files in place during transition
+- Can archive after Phase 1 validation
 
 **Files to Create (Phase 1):**
 
-**poly-trans:**
-- `poly-trans/pyproject.toml`
-- `poly-trans/local_translator/__init__.py`
-- `poly-trans/local_translator/__version__.py`
-- `poly-trans/scripts/translate.ps1` (PowerShell wrapper)
+**Root:**
+- `pyproject.toml` (workspace config)
 
-**poly-ren:**
-- `poly-ren/pyproject.toml`
-- `poly-ren/renpy_translator/__init__.py`
-- `poly-ren/renpy_translator/cli.py` (Python CLI)
-- Updated PowerShell wrappers in `poly-ren/scripts/`
+**src/poly-trans/:**
+- `src/poly-trans/__init__.py`
+- `src/poly-trans/__version__.py`
+- `src/poly-trans/models/__init__.py`
+- `src/poly-trans/pyproject.toml`
 
-**poly-bench:**
-- `poly-bench/pyproject.toml`
-- `poly-bench/translation_model_comparer/__init__.py`
-- `poly-bench/translation_model_comparer/cli.py` (Python CLI)
-- Updated PowerShell wrappers in `poly-bench/scripts/`
+**src/poly-ren/:**
+- `src/poly-ren/__init__.py`
+- `src/poly-ren/cli.py` (Python CLI)
+- `src/poly-ren/pyproject.toml`
+
+**src/poly-bench/:**
+- `src/poly-bench/__init__.py`
+- `src/poly-bench/cli.py` (Python CLI)
+- `src/poly-bench/pyproject.toml`
 
 **Files to Create (Phase 2):**
-- `poly-trans/local_translator/context.py`
-- `poly-trans/local_translator/style.py`
-- `poly-trans/local_translator/strategies/base.py`
-- `poly-trans/local_translator/strategies/line_context.py`
-- `poly-trans/local_translator/strategies/line_summary.py`
+- `src/poly-trans/context.py`
+- `src/poly-trans/style.py`
+- `src/poly-trans/strategies/base.py`
+- `src/poly-trans/strategies/line_context.py`
+- `src/poly-trans/strategies/line_summary.py`
 
 ---
 
@@ -577,29 +601,63 @@ results:
 ## Directory Structure Summary
 
 ```
-c:\_____\_CODE\
-├── enro/                       # Original project (eventually deprecated)
-├── poly-trans/                 # Core translator (publishable to PyPI)
-│   ├── local_translator/       # Python package
-│   ├── data/                   # Prompts, glossaries, benchmarks
-│   └── scripts/                # PowerShell wrappers
-├── poly-ren/                   # Renpy translator
-│   ├── renpy_translator/       # Python package
-│   └── scripts/                # PowerShell wrappers
-└── poly-bench/                 # Model comparer
-    ├── translation_model_comparer/  # Python package
-    └── scripts/                # PowerShell wrappers
+enro/  (monorepo root at c:\_____\_CODE\enro)
+├── src/
+│   ├── poly-trans/             # Core translator package (publishable to PyPI)
+│   │   ├── __init__.py
+│   │   ├── __version__.py
+│   │   ├── translate.py
+│   │   ├── models/
+│   │   │   ├── __init__.py
+│   │   │   ├── aya23_translator.py
+│   │   │   ├── madlad400_translator.py
+│   │   │   ├── helsinkyRo_translator.py
+│   │   │   ├── mbartRo_translator.py
+│   │   │   └── seamless96_translator.py
+│   │   ├── prompts.py
+│   │   ├── data/               # Prompts, glossaries, benchmarks
+│   │   └── pyproject.toml
+│   ├── poly-ren/               # Renpy translator package
+│   │   ├── __init__.py
+│   │   ├── extract.py
+│   │   ├── merge.py
+│   │   ├── models.py
+│   │   ├── renpy_utils.py
+│   │   ├── cli.py
+│   │   └── pyproject.toml
+│   ├── poly-bench/             # Model comparer package
+│   │   ├── __init__.py
+│   │   ├── compare.py
+│   │   ├── benchmark.py
+│   │   ├── cli.py
+│   │   └── pyproject.toml
+│   ├── translators/            # Old files (keep during transition)
+│   ├── extract.py              # Old files (keep during transition)
+│   ├── merge.py                # Old files (keep during transition)
+│   └── ...
+├── scripts/                    # PowerShell wrappers (existing)
+│   ├── translate.ps1
+│   ├── 8-compare.ps1
+│   └── 9-benchmark.ps1
+├── models/                     # Model configurations
+├── data/                       # Original data (keep during transition)
+├── tests/                      # Integration tests
+├── pyproject.toml              # Root workspace config
+├── README.md
+└── .git
 ```
 
 ---
 
 ## Notes
 
+- **Monorepo architecture**: All three packages in one repository (enro)
 - All packages use YAML exclusively (no JSON)
 - Windows/CUDA primary target, but Python-based for cross-platform expandability
-- **PowerShell wrappers kept alongside Python CLIs** - don't delete, needed for Windows
-- Both PowerShell and Python entry points must work independently
-- Data folder moved to poly-trans (prompts, glossaries, benchmark)
-- Model configs (`models_config.yaml`) stay in enro for now
-- Publishing only for poly-trans/local_translator (others may be published later)
-- Each app must be runnable and testable individually on Windows
+- **PowerShell wrappers** remain at repo root - can be updated to call new code paths
+- Original files kept in place during transition for safety
+- Data folder copied to `src/poly-trans/data/` (original stays at root)
+- Model configs (`models_config.yaml`) stay at root
+- Each package can be published separately to PyPI
+- Monorepo imports: `from src.poly_trans import ...`
+- PyPI imports (after publishing): `from poly_trans import ...`

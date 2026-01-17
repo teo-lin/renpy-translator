@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "enro-workspace"
+version = "1.0.0"
+requires-python = ">=3.9"
+description = "Polyglot translation tools monorepo"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = "."
+testpaths = ["tests", "src/poly-trans", "src/poly-ren", "src/poly-bench"]
