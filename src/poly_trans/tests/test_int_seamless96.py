@@ -9,20 +9,19 @@ and produces the expected output.
 import sys
 from pathlib import Path
 
-# Add project root and src/translators to sys.path for module discovery
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-sys.path.insert(0, str(project_root / "src"))
-sys.path.insert(0, str(project_root / "src" / "translators"))
+# Add src to path to access poly_trans package
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import unittest
 
-# Import the base test class and utility functions
+# Import from standalone poly_trans package
+from poly_trans.translators.seamless96_translator import SeamlessM4Tv2Translator, TRANSFORMERS_AVAILABLE, IMPORT_ERROR
+
+# Import the base test class from repo root
+project_root = Path(__file__).parent.parent.parent.parent
+sys.path.insert(0, str(project_root))
 from tests.utils import (BaseTranslatorIntegrationTest, get_test_device,
                          skip_if_transformers_unavailable, safe_init_translator)
-
-# Import the specific translator and its related flags
-from seamless96_translator import SeamlessM4Tv2Translator, TRANSFORMERS_AVAILABLE, IMPORT_ERROR
 
 
 class TestSeamlessM4TIntegration(BaseTranslatorIntegrationTest):

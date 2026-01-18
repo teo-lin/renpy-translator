@@ -56,3 +56,29 @@ pytest ../../tests/test_unit_renpy_tags.py
 ## Debug
 
 Check extracted YAML structure or enable verbose output in extractor/merger classes.
+
+# Workflow
+
+  Extract (poly_ren) → Translate (poly_trans) → Merge (poly_ren)
+       ↓                      ↓                        ↓
+    .parsed.yaml    →   .parsed.yaml (with ro)  →  game.rpy
+
+  It's a YAML-in → translate line-by-line → YAML-out system with smart context extraction and resumability.
+
+    Translation Process
+
+  1. Scans for .parsed.yaml files in the target language directory
+  2. Identifies untranslated blocks (where target language field is empty/whitespace)
+  3. Extracts context for each block:
+    - DIALOGUE blocks: 3 lines before + 1 line after (configurable)
+    - CHOICE blocks: No dialogue context (only character info)
+  4. Translates each block using the AI model with:
+    - The text to translate
+    - Surrounding dialogue context
+    - Character information
+    - Glossary terms
+    - Custom prompts
+  5. Writes translation back to the same YAML file under the target language code
+  6. Saves the updated .parsed.yaml file
+
+  Output Format: Same .parsed.yaml (updated)

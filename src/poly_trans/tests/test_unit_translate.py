@@ -23,12 +23,12 @@ import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
-# Import modules
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+# Add poly_trans to path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from models import ParsedBlock, is_separator_block, parse_block_id
-from translate import ModularBatchTranslator
+# Import modules from standalone poly_trans package
+from poly_trans.models import ParsedBlock, is_separator_block, parse_block_id
+from poly_trans.translate import ModularBatchTranslator
 
 
 class MockTranslator:

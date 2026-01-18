@@ -9,19 +9,20 @@ and produces the expected output.
 import sys
 from pathlib import Path
 
-# Add project root and src/translators to sys.path for module discovery
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-sys.path.insert(0, str(project_root / "src"))
-sys.path.insert(0, str(project_root / "src" / "translators"))
+# Add src to path to access poly_trans package
+# Current location: src/poly_trans/tests/test_int_aya23.py
+# Need to access: src/poly_trans
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import unittest
 
-# Import the base test class and utility functions
-from tests.utils import BaseTranslatorIntegrationTest
+# Import from standalone poly_trans package
+from poly_trans.translators.aya23_translator import Aya23Translator
 
-# Import the specific translator
-from aya23_translator import Aya23Translator
+# Import the base test class from repo root
+project_root = Path(__file__).parent.parent.parent.parent
+sys.path.insert(0, str(project_root))
+from tests.utils import BaseTranslatorIntegrationTest
 
 
 # Test configuration

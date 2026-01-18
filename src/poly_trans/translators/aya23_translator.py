@@ -12,8 +12,11 @@ from pathlib import Path
 # Fix Windows PATH for CUDA DLLs (required for llama-cpp-python)
 # This must happen BEFORE importing llama_cpp
 if sys.platform == "win32":
-    project_root = Path(__file__).parent.parent.parent
-    torch_lib = project_root / "venv" / "Lib" / "site-packages" / "torch" / "lib"
+    # Current location: src/poly_trans/translators/aya23_translator.py
+    # Need to reach: repo_root/venv/Lib/site-packages/torch/lib
+    # Go up 4 levels: translators -> poly_trans -> src -> repo_root
+    repo_root = Path(__file__).parent.parent.parent.parent
+    torch_lib = repo_root / "venv" / "Lib" / "site-packages" / "torch" / "lib"
     if torch_lib.exists() and str(torch_lib) not in os.environ["PATH"]:
         os.environ["PATH"] = str(torch_lib) + os.pathsep + os.environ["PATH"]
 

@@ -16,14 +16,10 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
-# Add src directory to path for imports
-# Current location: src/poly_trans/translate.py
-# We need to import from: src/models.py, src/translators/, src/renpy_utils.py
-sys.path.insert(0, str(Path(__file__).parent.parent))
+from poly_trans.models import ParsedBlock, is_separator_block, parse_block_id
+from poly_trans.utils import show_progress
 
-from models import ParsedBlock, is_separator_block, parse_block_id
-from translators.aya23_translator import Aya23Translator
-from renpy_utils import show_progress
+# Translator import is lazy - imported in main() when needed
 
 
 class ModularBatchTranslator:
@@ -491,6 +487,9 @@ def main():
     print("\n" + "=" * 70)
     print("  Initializing Translator")
     print("=" * 70)
+
+    # Import translator here to avoid loading heavy dependencies at module import
+    from poly_trans.translators.aya23_translator import Aya23Translator
 
     translator = Aya23Translator(
         model_path=str(model_path),
