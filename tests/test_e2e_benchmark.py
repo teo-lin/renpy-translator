@@ -190,6 +190,3 @@ def test_all_models_have_unique_keys(models_config):
     print(f"\n[OK] Each model will get a unique key")
 
 
-if __name__ == "__main__":
-    # Run tests with verbose output
-    pytest.main([__file__, "-v", "-s"])

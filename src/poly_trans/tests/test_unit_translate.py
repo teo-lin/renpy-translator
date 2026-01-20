@@ -18,11 +18,6 @@ import tempfile
 import argparse
 from unittest.mock import MagicMock
 
-# Set UTF-8 encoding for console output on Windows
-import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
-
 # Add poly_trans to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -480,63 +475,4 @@ def test_language_agnostic():
         temp_tags_yaml.unlink(missing_ok=True)
 
 
-def main():
-    """Run all tests"""
-    parser = argparse.ArgumentParser(description='Test modular translation pipeline')
-    parser.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
-    # Accept but ignore test runner arguments (--model_script, --language)
-    parser.add_argument('--model_script', type=str, help=argparse.SUPPRESS)
-    parser.add_argument('--language', type=str, help=argparse.SUPPRESS)
-    args = parser.parse_args()
 
-    print("\n" + "=" * 70)
-    print("  MODULAR TRANSLATION PIPELINE - TEST SUITE")
-    print("=" * 70)
-    print("\nTesting the new 3-translate.ps1 workflow")
-    print("This test uses a mock translator (no model required)")
-
-    all_passed = True
-
-    # Run tests
-    tests = [
-        ("Context Extraction", test_context_extraction),
-        ("Translation Workflow", test_translation_workflow),
-        ("Untranslated Identification", test_untranslated_identification),
-        ("Language-Agnostic", test_language_agnostic),
-    ]
-
-    results = []
-    for test_name, test_func in tests:
-        try:
-            passed = test_func()
-            results.append((test_name, passed))
-            if not passed:
-                all_passed = False
-        except Exception as e:
-            print(f"\n[FAIL] {test_name} failed with exception: {e}")
-            import traceback
-            traceback.print_exc()
-            results.append((test_name, False))
-            all_passed = False
-
-    # Summary
-    print("\n" + "=" * 70)
-    print("  TEST SUMMARY")
-    print("=" * 70)
-
-    for test_name, passed in results:
-        status = "[OK] PASSED" if passed else "[FAIL] FAILED"
-        print(f"  {status}: {test_name}")
-
-    print("=" * 70)
-
-    if all_passed:
-        print("\n[Success] All tests passed!")
-        return 0
-    else:
-        print("\n[Warning] Some tests failed")
-        return 1
-
-
-if __name__ == "__main__":
-    sys.exit(main())

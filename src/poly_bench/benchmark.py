@@ -42,12 +42,11 @@ if sys.platform == "win32":
 # Add src directory to path
 # Current location: src/poly_bench/benchmark.py
 # We need to import from: src/translators/
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from translators.aya23_translator import Aya23Translator
-from translators.helsinkyRo_translator import QuickMTTranslator
-from translators.madlad400_translator import MADLAD400Translator
-from translators.mbartRo_translator import MBARTTranslator
-from translators.seamless96_translator import SeamlessM4Tv2Translator
+from poly_trans.translators.aya23_translator import Aya23Translator
+from poly_trans.translators.helsinkyRo_translator import QuickMTTranslator
+from poly_trans.translators.madlad400_translator import MADLAD400Translator
+from poly_trans.translators.mbartRo_translator import MBARTTranslator
+from poly_trans.translators.seamless96_translator import SeamlessM4Tv2Translator
 
 
 def tokenize(text: str) -> List[str]:
@@ -179,7 +178,7 @@ def run_benchmark(data_path: Path, glossary_path: Path = None, model_key: str = 
         print(f"  Loaded {len(glossary)} terms")
 
     # Load model configuration
-    project_root = Path(__file__).parent.parent
+    project_root = Path(__file__).parent.parent.parent
     models_config_path = project_root / "models" / "models_config.yaml"
 
     with open(models_config_path, 'r', encoding='utf-8') as f:

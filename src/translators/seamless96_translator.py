@@ -150,11 +150,11 @@ class SeamlessM4Tv2Translator:
         print(f"  Loading model... This may take 60-90 seconds...")
 
         # Load processor and model from local path
-        self.processor = AutoProcessor.from_pretrained(model_path, local_files_only=True)
+        self.processor = AutoProcessor.from_pretrained(str(model_path), local_files_only=True)
 
         # Use memory-efficient loading to avoid paging file errors
         self.model = SeamlessM4Tv2Model.from_pretrained(
-            model_path,
+            str(model_path),
             low_cpu_mem_usage=True,  # Reduces RAM usage during loading
             device_map="auto",  # Automatically manages memory across CPU/GPU
             dtype=torch.float16 if device == "cuda" else torch.float32,  # Use half precision on GPU

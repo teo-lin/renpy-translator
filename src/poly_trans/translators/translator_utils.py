@@ -17,7 +17,7 @@ def get_project_root() -> Path:
     Returns:
         Path: Project root directory
     """
-    return Path(__file__).parent.parent.parent
+    return Path(__file__).parent.parent.parent.parent
 
 
 def load_glossary(lang_code: str, project_root: Optional[Path] = None) -> Optional[Dict]:

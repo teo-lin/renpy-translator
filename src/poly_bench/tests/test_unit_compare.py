@@ -13,11 +13,6 @@ from pathlib import Path
 import tempfile
 from unittest.mock import MagicMock
 
-# Set UTF-8 encoding for console output on Windows
-import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
-
 # Import modules
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
@@ -273,45 +268,4 @@ def test_context_extraction():
     return True
 
 
-def main():
-    """Run all tests"""
-    print("\n" + "=" * 70)
-    print("UNIT TESTS: compare.py (BenchmarkTranslator)")
-    print("=" * 70)
 
-    tests = [
-        test_benchmark_translator_translates_all_blocks,
-        test_numbered_key_storage,
-        test_context_extraction
-    ]
-
-    passed = 0
-    failed = 0
-
-    for test in tests:
-        try:
-            if test():
-                passed += 1
-        except Exception as e:
-            print(f"\n  [FAIL] Test failed with error: {e}")
-            import traceback
-            traceback.print_exc()
-            failed += 1
-
-    # Summary
-    print("\n" + "=" * 70)
-    print("TEST SUMMARY")
-    print("=" * 70)
-    print(f"  Passed: {passed}/{len(tests)}")
-    print(f"  Failed: {failed}/{len(tests)}")
-
-    if failed == 0:
-        print("\n  ✓ ALL TESTS PASSED!")
-        return 0
-    else:
-        print("\n  ✗ SOME TESTS FAILED")
-        return 1
-
-
-if __name__ == '__main__':
-    sys.exit(main())

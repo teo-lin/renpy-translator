@@ -4,16 +4,8 @@ Test Ren'Py tag extraction and restoration logic
 
 import sys
 from pathlib import Path
-
-# Set UTF-8 encoding for console output on Windows
-import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
-
-# Import the tag extractor from scripts
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-from renpy_utils import RenpyTagExtractor
-from renpy_utils import RenpyTranslationParser
+import pytest
+import yaml
 
 
 def test_tag_extraction():

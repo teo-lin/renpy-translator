@@ -12,5 +12,25 @@ description = "Polyglot translation tools monorepo"
 where = ["src"]
 
 [tool.pytest.ini_options]
-pythonpath = "."
-testpaths = ["tests", "src/poly-trans", "src/poly-ren", "src/poly-bench"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+testpaths = [
+    "tests",
+    "src/poly_trans/tests",
+    "src/poly_ren/tests",
+    "src/poly_bench/tests"
+]
+pythonpath = [".", "src"]
+addopts = "--tb=short -s"
+filterwarnings = [
+    "ignore:builtin type.*has no __module__ attribute:DeprecationWarning",
+]
+markers = [
+    "unit: Unit tests (fast, no external dependencies)",
+    "integration: Integration tests (may require external resources)",
+    "e2e: End-to-end tests (slow, require full setup)",
+    "slow: Slow running tests"
+]
+minversion = "3.10"
+

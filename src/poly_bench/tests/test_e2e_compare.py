@@ -17,11 +17,6 @@ import subprocess
 from pathlib import Path
 import re
 
-# Set UTF-8 encoding for console output on Windows
-import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
-
 # Project paths
 project_root = Path(__file__).parent.parent
 compare_script = project_root / "8-compare.ps1"
@@ -260,62 +255,4 @@ def test_key_format():
     return True
 
 
-def main():
-    """Run all integration tests"""
 
-    print("\n" + "=" * 70)
-    print("INTEGRATION TESTS: Model Comparison (9-compare.ps1)")
-    print("=" * 70)
-    print("\nNOTE: This test requires:")
-    print("  - All models installed (run 0-setup.ps1)")
-    print("  - Example game present")
-    print("  - May take 5-10 minutes depending on model count")
-    print("=" * 70)
-
-    tests = [
-        ("Main workflow", test_compare_workflow),
-        ("Key format", test_key_format)
-    ]
-
-    passed = 0
-    failed = 0
-
-    for test_name, test_func in tests:
-        print(f"\n{'=' * 70}")
-        print(f"Running: {test_name}")
-        print('=' * 70)
-
-        try:
-            if test_func():
-                print(f"\n  ✓ {test_name} PASSED")
-                passed += 1
-            else:
-                print(f"\n  ✗ {test_name} FAILED")
-                failed += 1
-        except Exception as e:
-            print(f"\n  ✗ {test_name} FAILED with exception:")
-            print(f"     {e}")
-            import traceback
-            traceback.print_exc()
-            failed += 1
-
-    # Summary
-    print("\n" + "=" * 70)
-    print("INTEGRATION TEST SUMMARY")
-    print("=" * 70)
-    print(f"  Passed: {passed}/{len(tests)}")
-    print(f"  Failed: {failed}/{len(tests)}")
-
-    if failed == 0:
-        print("\n  ✓ ALL INTEGRATION TESTS PASSED!")
-        print(f"\n  Translation files saved at:")
-        print(f"    {test_dir}")
-        print(f"\n  You can review the translations to compare model outputs.")
-        return 0
-    else:
-        print("\n  ✗ SOME TESTS FAILED")
-        return 1
-
-
-if __name__ == '__main__':
-    sys.exit(main())

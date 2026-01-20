@@ -9,8 +9,6 @@ import pytest
 
 def pytest_configure(config):
     """Configure pytest to avoid Windows I/O errors"""
-    # Disable output capture to prevent I/O errors on Windows
-    config.option.capture = 'no'
 
     # Add custom markers
     config.addinivalue_line("markers", "unit: mark test as a unit test")

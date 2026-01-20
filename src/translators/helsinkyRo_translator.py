@@ -76,11 +76,11 @@ class QuickMTTranslator:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message=".*sacremoses.*")
             # Load tokenizer and model from local path
-            self.tokenizer = MarianTokenizer.from_pretrained(model_path)
+            self.tokenizer = MarianTokenizer.from_pretrained(str(model_path))
 
         # Use memory-efficient loading
         self.model = MarianMTModel.from_pretrained(
-            model_path,
+            str(model_path),
             low_cpu_mem_usage=True,
             device_map="auto",
             dtype=torch.float16 if device == "cuda" else torch.float32

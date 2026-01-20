@@ -57,7 +57,7 @@ class MBARTTranslator:
         self.device = device
 
         # Use local model path if not provided
-        project_root = Path(__file__).parent.parent.parent
+        project_root = Path(__file__).parent.parent.parent.parent
         if model_path is None:
             model_path = project_root / "models" / "mbartRo"
         else:
@@ -72,11 +72,11 @@ class MBARTTranslator:
         print(f"  Loading model... This may take 30-60 seconds...")
 
         # Load tokenizer and model from local path
-        self.tokenizer = MBartTokenizer.from_pretrained(model_path)
+        self.tokenizer = MBartTokenizer.from_pretrained(str(model_path))
 
         # Use memory-efficient loading
         self.model = MBartForConditionalGeneration.from_pretrained(
-            model_path,
+            str(model_path),
             low_cpu_mem_usage=True,
             device_map="auto",
             dtype=torch.float16 if device == "cuda" else torch.float32

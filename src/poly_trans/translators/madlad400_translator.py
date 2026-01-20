@@ -11,15 +11,15 @@ from pathlib import Path
 # Try to import transformers dependencies
 try:
     import torch
-    from transformers import T5ForConditionalGeneration, T5Tokenizer, BitsAndBytesConfig
+    from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, BitsAndBytesConfig
     TRANSFORMERS_AVAILABLE = True
     IMPORT_ERROR = None
 except ImportError as e:
     TRANSFORMERS_AVAILABLE = False
     IMPORT_ERROR = str(e)
     # Define dummy classes to avoid NameError
-    T5ForConditionalGeneration = None
-    T5Tokenizer = None
+    AutoTokenizer = None
+    AutoModelForSeq2SeqLM = None
     BitsAndBytesConfig = None
     torch = None
 
@@ -120,7 +120,7 @@ class MADLAD400Translator:
         warnings.filterwarnings("ignore", message=".*swigvarlink.*", category=DeprecationWarning)
 
         # Use local model path
-        project_root = Path(__file__).parent.parent.parent
+        project_root = Path(__file__).parent.parent.parent.parent
         model_path = project_root / "models" / "madlad400"
 
         # Load model and tokenizer
@@ -131,16 +131,16 @@ class MADLAD400Translator:
                 trust_remote_code=trust_remote_code
             )
         else:
-            self.tokenizer = T5Tokenizer.from_pretrained(model_path, local_files_only=True)
+            self.tokenizer = AutoTokenizer.from_pretrained(str(model_path), local_files_only=True)
 
             # Use memory-efficient loading with float16 (like other models)
             # NOTE: We avoid device_map="auto" for MADLAD because the large vocabulary (400 languages)
             # causes it to incorrectly offload layers to CPU even when GPU has enough memory
             try:
-                self.model = T5ForConditionalGeneration.from_pretrained(
-                    model_path,
+                self.model = AutoModelForSeq2SeqLM.from_pretrained(
+                    str(model_path),
                     trust_remote_code=trust_remote_code,
-                    torch_dtype=torch.float16 if device == "cuda" else torch.float32,
+                    dtype=torch.float16 if device == "cuda" else torch.float32,
                     local_files_only=True
                 )
                 # Manually move to device (more reliable than device_map for this model)
@@ -248,12 +248,14 @@ class MADLAD400Translator:
             # Generate with proper parameters
             # NOTE: MADLAD requires explicit max_new_tokens and beam search for quality
             outputs = self.model.generate(
-                input_ids=inputs['input_ids'],
+                **inputs,  # Pass all tokenizer outputs (input_ids, attention_mask, etc.)
                 max_new_tokens=max_length,
                 num_beams=max(1, num_beams),
                 early_stopping=True,
-                no_repeat_ngram_size=3,  # Prevent repetition issues
-                repetition_penalty=1.1  # Light penalty to prevent repetitions
+                do_sample=False,  # Use deterministic generation for better quality
+                no_repeat_ngram_size=4,  # Stronger prevention of repetition
+                repetition_penalty=1.2,  # Stronger penalty to prevent repetitions
+                length_penalty=1.0  # Neutral length penalty
             )
 
         if os.getenv('DEBUG_MADLAD'):
@@ -261,7 +263,7 @@ class MADLAD400Translator:
             print(f"[DEBUG] Output tokens: {outputs[0][:20]}")  # First 20 tokens
 
         # Decode translation
-        translation = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        translation = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
 
         # Apply glossary if available
         translation = self._apply_glossary(text, translation)
