@@ -39,7 +39,7 @@ def test_select_item_auto_select_single():
     assert result == items[0], "Should return the only item"
     assert "Auto-selecting" in output, "Should show auto-selection message"
     print("   [PASS] Auto-select single item correctly")
-    return True
+
 
 
 def test_select_item_user_selection():
@@ -61,7 +61,7 @@ def test_select_item_user_selection():
 
     assert result == items[1], "Should return the second item"
     print("   [PASS] User selection (option 2) works correctly")
-    return True
+
 
 
 def test_select_item_quit():
@@ -84,7 +84,7 @@ def test_select_item_quit():
         except SystemExit as e:
             assert e.code == 0, "Should exit with code 0"
             print("   [PASS] Quit functionality works correctly")
-            return True
+
 
 
 def test_select_item_invalid_then_valid():
@@ -105,7 +105,7 @@ def test_select_item_invalid_then_valid():
 
     assert result == items[0], "Should return first item after retry"
     print("   [PASS] Invalid input handling works correctly")
-    return True
+
 
 
 def test_select_multiple_items_all():
@@ -128,7 +128,7 @@ def test_select_multiple_items_all():
     assert result == items, "Should return all items"
     assert len(result) == 3, "Should have 3 items"
     print("   [PASS] Select all works correctly")
-    return True
+
 
 
 def test_select_multiple_items_specific():
@@ -153,7 +153,7 @@ def test_select_multiple_items_specific():
     assert result[0] == items[0], "First item should be Item1"
     assert result[1] == items[2], "Second item should be Item3"
     print("   [PASS] Select specific items (1,3) works correctly")
-    return True
+
 
 
 def test_select_multiple_items_duplicates():
@@ -177,7 +177,7 @@ def test_select_multiple_items_duplicates():
     assert result[0] == items[0], "First item should be Item1"
     assert result[1] == items[1], "Second item should be Item2"
     print("   [PASS] Duplicate selection handled correctly")
-    return True
+
 
 
 def test_select_multiple_items_quit():
@@ -200,7 +200,7 @@ def test_select_multiple_items_quit():
         except SystemExit as e:
             assert e.code == 0, "Should exit with code 0"
             print("   [PASS] Quit works correctly")
-            return True
+
 
 
 def test_select_languages_single_row_all():
@@ -223,7 +223,7 @@ def test_select_languages_single_row_all():
     assert result == languages, "Should return all languages"
     assert len(result) == 3, "Should have 3 languages"
     print("   [PASS] Select all languages works correctly")
-    return True
+
 
 
 def test_select_languages_single_row_specific():
@@ -248,7 +248,7 @@ def test_select_languages_single_row_specific():
     assert result[0]['code'] == 'ro', "First should be Romanian"
     assert result[1]['code'] == 'fr', "Second should be French"
     print("   [PASS] Select specific languages works correctly")
-    return True
+
 
 
 def test_select_item_empty_list():
@@ -266,7 +266,6 @@ def test_select_item_empty_list():
     except ValueError as e:
         assert "No items to select" in str(e), "Should have appropriate error message"
         print("   [PASS] Empty list raises ValueError correctly")
-        return True
 
 
 def test_select_multiple_items_empty_list():
@@ -284,7 +283,6 @@ def test_select_multiple_items_empty_list():
     except ValueError as e:
         assert "No items to select" in str(e), "Should have appropriate error message"
         print("   [PASS] Empty list raises ValueError correctly")
-        return True
 
 
 def run_all_tests():
@@ -313,11 +311,8 @@ def run_all_tests():
 
     for test_name, test_func in tests:
         try:
-            if test_func():
-                passed += 1
-            else:
-                failed += 1
-                print(f"   [FAIL] {test_name}")
+            test_func()
+            passed += 1
         except Exception as e:
             failed += 1
             print(f"   [FAIL] {test_name}: {e}")

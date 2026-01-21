@@ -106,7 +106,7 @@ class TestProjectSetup:
         assert ps.selected_languages == [], "Selected languages should be empty list"
         assert ps.selected_models == [], "Selected models should be empty list"
         print("   [PASS] Initialization works correctly")
-        return True
+
 
     @staticmethod
     def test_build_all_languages_list():
@@ -125,7 +125,7 @@ class TestProjectSetup:
         assert ps.all_languages[2]['code'] == 'fr', "French should be third"
         assert ps.all_languages[3]['code'] == 'no', "Norwegian 'no' should be fixed from False"
         print("   [PASS] Language list built correctly with 'ro' first and 'no' fixed")
-        return True
+
 
     @staticmethod
     def test_select_languages_all():
@@ -141,7 +141,7 @@ class TestProjectSetup:
 
         assert len(ps.selected_languages) == 4, "Should select all 4 languages"
         print("   [PASS] --languages all selects all languages")
-        return True
+
 
     @staticmethod
     def test_select_languages_specific():
@@ -160,7 +160,7 @@ class TestProjectSetup:
         assert 'ro' in codes, "Should have Romanian"
         assert 'fr' in codes, "Should have French"
         print("   [PASS] --languages ro,fr selects Romanian and French")
-        return True
+
 
     @staticmethod
     def test_select_models_filter_by_language():
@@ -179,7 +179,7 @@ class TestProjectSetup:
         assert len(ps.available_models) == 3, "All 3 models support Romanian"
         assert len(ps.selected_models) == 3, "All models selected with 'all'"
         print("   [PASS] Models filtered and selected correctly")
-        return True
+
 
     @staticmethod
     def test_select_models_specific():
@@ -196,7 +196,7 @@ class TestProjectSetup:
 
         assert len(ps.selected_models) == 2, "Should select 2 models"
         print("   [PASS] --models 1,2 selects first two models")
-        return True
+
 
     @staticmethod
     @patch('setup.yaml')
@@ -228,7 +228,7 @@ class TestProjectSetup:
                 assert config_data['installed_models'] == ['aya23'], "Should save model keys"
 
         print("   [PASS] Configuration saved correctly")
-        return True
+
 
     @staticmethod
     def test_load_installed_models_from_config():
@@ -262,7 +262,7 @@ class TestProjectSetup:
                 assert len(ps.selected_models) == 2, "Should load 2 models"
 
         print("   [PASS] Loaded config correctly")
-        return True
+
 
     @staticmethod
     def test_load_installed_models_no_config():
@@ -284,7 +284,7 @@ class TestProjectSetup:
                 assert len(ps.selected_languages) == 4, "Should use all languages as fallback"
 
         print("   [PASS] Fallback to all languages works")
-        return True
+
 
     @staticmethod
     @patch('setup.subprocess.run')
@@ -304,7 +304,7 @@ class TestProjectSetup:
         assert ps._check_package_installed('nonexistent') == False, "Should return False when not installed"
 
         print("   [PASS] Package check works correctly")
-        return True
+
 
     @staticmethod
     @patch('setup.subprocess.run')
@@ -328,7 +328,7 @@ class TestProjectSetup:
         assert ps._check_torch_cuda() == False, "Should return False when CUDA not available"
 
         print("   [PASS] CUDA check works correctly")
-        return True
+
 
     @staticmethod
     @patch('setup.subprocess.run')
@@ -366,7 +366,7 @@ class TestProjectSetup:
 
         assert result == True, "Should return True when all checks pass"
         print("   [PASS] Verification passes when all components installed")
-        return True
+
 
     @staticmethod
     @patch('setup.subprocess.run')
@@ -399,7 +399,7 @@ class TestProjectSetup:
 
         assert result == False, "Should return False when model missing"
         print("   [PASS] Verification fails when model missing")
-        return True
+
 
     @staticmethod
     def test_print_footer_success():
@@ -413,18 +413,21 @@ class TestProjectSetup:
 
         import io
         captured_output = io.StringIO()
-        sys.stdout = captured_output
+        old_stdout = sys.stdout
 
-        ps._print_footer(all_good=True)
+        try:
+            sys.stdout = captured_output
+            ps._print_footer(all_good=True)
+        finally:
+            sys.stdout = old_stdout
 
-        sys.stdout = sys.__stdout__
         output = captured_output.getvalue()
 
         assert "SETUP COMPLETE!" in output, "Should show success message"
         assert "1 configured during setup" in output, "Should show language count"
         assert "1 installed during setup" in output, "Should show model count"
         print("   [PASS] Success footer printed correctly")
-        return True
+
 
     @staticmethod
     def test_print_footer_warnings():
@@ -438,16 +441,19 @@ class TestProjectSetup:
 
         import io
         captured_output = io.StringIO()
-        sys.stdout = captured_output
+        old_stdout = sys.stdout
 
-        ps._print_footer(all_good=False)
+        try:
+            sys.stdout = captured_output
+            ps._print_footer(all_good=False)
+        finally:
+            sys.stdout = old_stdout
 
-        sys.stdout = sys.__stdout__
         output = captured_output.getvalue()
 
         assert "COMPLETED WITH WARNINGS" in output, "Should show warning message"
         print("   [PASS] Warning footer printed correctly")
-        return True
+
 
 
 def run_all_tests():
@@ -479,11 +485,8 @@ def run_all_tests():
 
     for test_name, test_func in tests:
         try:
-            if test_func():
-                passed += 1
-            else:
-                failed += 1
-                print(f"   [FAIL] {test_name}")
+            test_func()
+            passed += 1
         except Exception as e:
             failed += 1
             print(f"   [FAIL] {test_name}: {e}")

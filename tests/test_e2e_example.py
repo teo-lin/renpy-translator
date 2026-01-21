@@ -14,6 +14,7 @@ This tests the actual user-facing workflow scripts.
 import sys
 import subprocess
 from pathlib import Path
+import pytest
 
 # Set UTF-8 encoding for console output on Windows
 # import io
@@ -75,12 +76,14 @@ def run_powershell_script(script_name: str, args: list = None, timeout: int = 30
     except Exception as e:
         return (False, "", str(e))
 
-def test_e2e_example_game_translation() -> bool:
+@pytest.mark.e2e
+@pytest.mark.slow
+def test_e2e_example_game_translation():
     """
     Test the full e2e PowerShell pipeline on the Example game.
 
-    Returns:
-        True if test passed, False otherwise
+    This test loads models and runs the full translation pipeline.
+    It may fail if GPU memory is exhausted from other tests.
     """
     print("\n" + "=" * 70)
     print("  E2E TEST: Example Game Full Pipeline")
@@ -90,14 +93,14 @@ def test_e2e_example_game_translation() -> bool:
     if not model_path.exists():
         print(f"\n[SKIP] Model not found: {model_path}")
         print("[INFO] Please download the Aya-23-8B model to run this test")
-        return False
+        pytest.skip(f"Model not found: {model_path}")
 
     # Get all .rpy files in the Example game
     rpy_files = get_rpy_files(example_dir)
 
     if not rpy_files:
         print(f"[FAIL] No .rpy files found in {example_dir}")
-        return False
+        assert False, "Test step failed"
 
     print(f"\nFound {len(rpy_files)} file(s) to translate:")
     for rpy_file in rpy_files:
@@ -138,7 +141,7 @@ def test_e2e_example_game_translation() -> bool:
             print(f"[FAIL] 1-config.ps1 failed")
             if stderr:
                 print(f"STDERR: {stderr}")
-            return False
+            assert False, "Test step failed"
 
         print("[OK] Config completed")
 
@@ -156,7 +159,7 @@ def test_e2e_example_game_translation() -> bool:
             print(f"[FAIL] 2-extract.ps1 failed")
             if stderr:
                 print(f"STDERR: {stderr}")
-            return False
+            assert False, "Test step failed"
 
         print("[OK] Extract completed")
 
@@ -175,7 +178,7 @@ def test_e2e_example_game_translation() -> bool:
             print(f"[FAIL] 3-translate.ps1 failed")
             if stderr:
                 print(f"STDERR: {stderr}")
-            return False
+            assert False, "Test step failed"
 
         print("[OK] Translate completed")
 
@@ -195,7 +198,7 @@ def test_e2e_example_game_translation() -> bool:
             print(f"[FAIL] 4-correct.ps1 failed")
             if stderr:
                 print(f"STDERR: {stderr}")
-            return False
+            assert False, "Test step failed"
 
         print("[OK] Correct completed")
 
@@ -215,7 +218,7 @@ def test_e2e_example_game_translation() -> bool:
                 print(f"STDOUT: {stdout}")
             if stderr:
                 print(f"STDERR: {stderr}")
-            return False
+            assert False, "Test step failed"
 
         print("[OK] Merge completed")
 
@@ -256,18 +259,18 @@ def test_e2e_example_game_translation() -> bool:
             print(f"  - New translations added: {total_added}")
             print(f"  - Pipeline: Config -> Extract -> Translate -> Correct -> Merge [OK]")
             print("=" * 70)
-            return True
+
         else:
             print("[FAIL] TEST FAILED!")
             print("  - No new translations were added")
             print("=" * 70)
-            return False
+            assert False, "Test step failed"
 
     except Exception as e:
         print(f"\n[FAIL] FATAL ERROR: {e}")
         import traceback
         traceback.print_exc()
-        return False
+        assert False, "Test step failed"
 
     finally:
         # Always restore original files
@@ -300,8 +303,9 @@ def test_e2e_example_game_translation() -> bool:
 
 if __name__ == "__main__":
     try:
-        success = test_e2e_example_game_translation()
-        sys.exit(0 if success else 1)
+        test_e2e_example_game_translation()
+        # If we get here without exception, test passed
+        sys.exit(0)
     except KeyboardInterrupt:
         print("\n\nTest cancelled by user")
         sys.exit(1)

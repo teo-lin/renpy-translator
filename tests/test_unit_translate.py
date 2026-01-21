@@ -145,7 +145,7 @@ def test_context_extraction():
     print("    ✓ No context (as expected for CHOICE)")
 
     print("\n[OK] Context extraction test passed!")
-    return True
+
 
 
 def test_translation_workflow():
@@ -387,7 +387,7 @@ def test_untranslated_identification():
     assert '4-Choice' not in untranslated, "Translated choice should be skipped"
 
     print("\n[OK] Untranslated identification test passed!")
-    return True
+
 
 
 def test_language_agnostic():

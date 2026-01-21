@@ -131,7 +131,7 @@ def test_benchmark_translator_translates_all_blocks():
 
 
     print("\n  [PASS] All assertions passed!")
-    return True
+
 
 
 def test_numbered_key_storage():
@@ -196,7 +196,7 @@ def test_numbered_key_storage():
             print(f"  ✓ Key '{key}' correctly stored with translation")
 
     print("\n  [PASS] All two-letter keys work correctly!")
-    return True
+
 
 
 def test_context_extraction():
@@ -265,7 +265,7 @@ def test_context_extraction():
         print(f"    After:  {context[2:]}")
 
     print("\n  [PASS] Context extraction works correctly!")
-    return True
+
 
 
 

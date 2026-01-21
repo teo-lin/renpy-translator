@@ -208,7 +208,7 @@ def test_compare_workflow():
         print(f"\n  [WARNING] Some output checks failed, but core functionality works")
 
     print("\n  ✓ Verification complete!")
-    return True
+
 
 
 def test_key_format():
@@ -252,7 +252,7 @@ def test_key_format():
                         return False
 
     print(f"  ✓ All keys use correct format (e.g., ay, he)")
-    return True
+
 
 
 

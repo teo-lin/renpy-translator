@@ -311,6 +311,15 @@ class BaseTranslatorIntegrationTest(unittest.TestCase):
             del cls.translator
             cls.translator = None
 
+        # Free GPU memory if using CUDA
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+        except (ImportError, RuntimeError):
+            pass  # Torch not available or CUDA error, skip cleanup
+
     def _get_model_path(self, model_subdir: str, model_filename: str) -> Path:
         """
         Helper method to construct model paths.

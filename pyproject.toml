@@ -25,6 +25,7 @@ pythonpath = [".", "src"]
 addopts = "--tb=short -s"
 filterwarnings = [
     "ignore:builtin type.*has no __module__ attribute:DeprecationWarning",
+    "ignore::pytest.PytestReturnNotNoneWarning",
 ]
 markers = [
     "unit: Unit tests (fast, no external dependencies)",
