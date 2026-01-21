@@ -1,7 +1,7 @@
 games:
   Example:
     name: Example
-    path: C:\_____\_CODE\enro\games\Example
+    path: c:\_____\_CODE\enro\games\Example
     target_language:
       code: ro
       name: Romanian

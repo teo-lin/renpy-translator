@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 import pytest
 import yaml
+from poly_ren.renpy_utils import RenpyTagExtractor, RenpyTranslationParser
 
 
 def test_tag_extraction():
