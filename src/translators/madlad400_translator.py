@@ -131,7 +131,10 @@ class MADLAD400Translator:
                 trust_remote_code=trust_remote_code
             )
         else:
-            self.tokenizer = AutoTokenizer.from_pretrained(str(model_path), local_files_only=True)
+            # Suppress the Mistral regex warning for MADLAD400 tokenizer
+            with warnings.catch_warnings():
+                warnings.filterwarnings('ignore', message='.*incorrect regex pattern.*')
+                self.tokenizer = AutoTokenizer.from_pretrained(str(model_path), local_files_only=True)
 
             # Use memory-efficient loading with float16 (like other models)
             # NOTE: We avoid device_map="auto" for MADLAD because the large vocabulary (400 languages)

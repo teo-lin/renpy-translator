@@ -117,16 +117,24 @@ class Aya23Translator:
                 text=text
             )
         else:
-            # Fallback: import from prompts module
+            # Fallback: import from poly_trans.prompts module (standalone package)
             try:
-                from prompts import create_translation_prompt
+                from poly_trans.prompts import create_translation_prompt
                 return create_translation_prompt(
                     text, self._target_language,
                     glossary_instructions, context_section, speaker_hint
                 )
             except ImportError:
-                # Ultimate fallback: simple inline template
-                return f"Translate this English text to {self._target_language}.\n\nEnglish: {text}\n{self._target_language}:"
+                # Try root-level prompts module (legacy)
+                try:
+                    from prompts import create_translation_prompt
+                    return create_translation_prompt(
+                        text, self._target_language,
+                        glossary_instructions, context_section, speaker_hint
+                    )
+                except ImportError:
+                    # Ultimate fallback: simple inline template
+                    return f"Translate this English text to {self._target_language}.\n\nEnglish: {text}\n{self._target_language}:"
 
     def translate(self, text: str, context: list = None, speaker: str = None,
                   temperature: float = 0.2, max_tokens: int = 512) -> str:
@@ -193,77 +201,3 @@ class Aya23Translator:
                 break
 
         return text
-
-
-if __name__ == "__main__":
-    """
-    CLI entry point for standalone translation script usage.
-
-    Usage:
-        python aya23_translator.py <input_file> --language <language>
-
-    Example:
-        python aya23_translator.py script.rpy --language ro
-    """
-    import sys
-    from pathlib import Path
-    from translator_utils import (
-        get_project_root, load_glossary, parse_cli_language_arg,
-        load_prompt_template, setup_sys_path
-    )
-
-    # Add parent directory to path for imports
-    setup_sys_path()
-    from translation_pipeline import RenpyTranslationPipeline
-
-    if len(sys.argv) < 3:
-        print("Usage: python aya23_translator.py <input_file> --language <lang_code>")
-        print("Example: python aya23_translator.py script.rpy --language ro")
-        sys.exit(1)
-
-    # Parse arguments
-    input_file = Path(sys.argv[1])
-    target_language, target_language_code = parse_cli_language_arg()
-
-    if not target_language:
-        print("Error: --language parameter is required")
-        sys.exit(1)
-
-    if not input_file.exists():
-        print(f"Error: Input file not found: {input_file}")
-        sys.exit(1)
-
-    # Default paths
-    project_root = get_project_root()
-    model_path = project_root / "models" / "aya-23-8B-GGUF" / "aya-23-8B-Q4_K_M.gguf"
-
-    if not model_path.exists():
-        print(f"Error: Model file not found: {model_path}")
-        sys.exit(1)
-
-    # Load glossary using shared utility
-    glossary = load_glossary(target_language_code, project_root)
-
-    # Load prompt template using shared utility
-    prompt_template = load_prompt_template(target_language_code, project_root)
-
-    # Initialize translator
-    translator = Aya23Translator(
-        model_path=str(model_path),
-        target_language=target_language,
-        prompt_template=prompt_template,
-        glossary=glossary
-    )
-
-    # Initialize pipeline
-    pipeline = RenpyTranslationPipeline(translator)
-
-    # Translate file
-    try:
-        pipeline.translate_file(input_file, output_path=None)
-        sys.exit(0)
-    except Exception as e:
-        print(f"Error during translation: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
