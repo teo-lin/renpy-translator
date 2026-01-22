@@ -4,22 +4,15 @@ CLI entry points for poly_bench
 Provides command-line interface for model comparison and benchmarking.
 """
 
-import sys
-from pathlib import Path
-
-# Add src directory to path for imports during transition
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-
 def compare_cli():
     """CLI entry point for model comparison (speed test)"""
-    from src.poly_bench.compare import main
+    from poly_bench.compare import main
     main()
 
 
 def benchmark_cli():
     """CLI entry point for model benchmarking (BLEU quality test)"""
-    from src.poly_bench.benchmark import main
+    from poly_bench.benchmark import main
     main()
 
 

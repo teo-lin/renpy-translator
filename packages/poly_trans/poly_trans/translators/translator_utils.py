@@ -12,12 +12,17 @@ from typing import Dict, Optional, Tuple
 
 def get_project_root() -> Path:
     """
-    Get the project root directory (3 levels up from this file).
+    DEPRECATED: This function assumes a monorepo structure and should not be used.
 
-    Returns:
-        Path: Project root directory
+    For standalone usage, pass project_root explicitly to functions that need it.
+
+    Raises:
+        RuntimeError: Always - use explicit paths instead
     """
-    return Path(__file__).parent.parent.parent.parent
+    raise RuntimeError(
+        "get_project_root() is deprecated. "
+        "Pass project_root explicitly to load_glossary(), load_prompt_template(), etc."
+    )
 
 
 def load_glossary(lang_code: str, project_root: Optional[Path] = None) -> Optional[Dict]:

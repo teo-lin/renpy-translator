@@ -4,22 +4,15 @@ CLI entry points for poly_ren
 Provides command-line interface for Renpy text extraction and merging.
 """
 
-import sys
-from pathlib import Path
-
-# Add src directory to path for imports during transition
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-
 def extract_cli():
     """CLI entry point for extraction"""
-    from src.poly_ren.extract import main
+    from poly_ren.extract import main
     main()
 
 
 def merge_cli():
     """CLI entry point for merging"""
-    from src.poly_ren.merge import main
+    from poly_ren.merge import main
     main()
 
 

@@ -421,7 +421,10 @@ def main():
     args = parser.parse_args()
 
     # Setup paths
-    project_root = Path(__file__).parent.parent
+    # NOTE: main() assumes monorepo structure with models/ and games/ at root
+    # Current location: packages/poly_trans/poly_trans/translate.py
+    # Project root: 3 levels up
+    project_root = Path(__file__).parent.parent.parent.parent
 
     # Load configuration
     print("\n" + "=" * 70)

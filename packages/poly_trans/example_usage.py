@@ -5,16 +5,14 @@ This demonstrates how to use poly_trans programmatically to translate
 YAML files with dialogue blocks.
 """
 
-import sys
 from pathlib import Path
 
-# Add src to path if running from repo
-repo_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(repo_root / "src"))
-
+# Import from installed poly_trans package
 from poly_trans.translate import ModularBatchTranslator
 
-# Translator import is lazy - imported when needed to avoid CUDA DLL issues
+# NOTE: This example assumes monorepo structure with models/ at root
+# For standalone usage, provide your own model paths
+repo_root = Path(__file__).parent.parent.parent.parent
 
 
 def example_basic_translation():

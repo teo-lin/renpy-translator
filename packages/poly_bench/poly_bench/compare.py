@@ -18,18 +18,14 @@ import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-# Add src directory to path for imports
-# Current location: src/poly_bench/compare.py
-# We need to import from: src/models.py, src/translators/, src/renpy_utils.py
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from models import ParsedBlock, is_separator_block, parse_block_id
-from translators.aya23_translator import Aya23Translator
-from translators.helsinkyRo_translator import QuickMTTranslator
-from translators.madlad400_translator import MADLAD400Translator
-from translators.mbartRo_translator import MBARTTranslator
-from translators.seamless96_translator import SeamlessM4Tv2Translator
-from renpy_utils import show_progress
+# Import from installed poly_trans package
+from poly_trans.models import ParsedBlock, is_separator_block, parse_block_id
+from poly_trans.translators.aya23_translator import Aya23Translator
+from poly_trans.translators.helsinkyRo_translator import QuickMTTranslator
+from poly_trans.translators.madlad400_translator import MADLAD400Translator
+from poly_trans.translators.mbartRo_translator import MBARTTranslator
+from poly_trans.translators.seamless96_translator import SeamlessM4Tv2Translator
+from poly_trans.utils import show_progress
 
 
 class BenchmarkTranslator:
@@ -409,7 +405,10 @@ def main():
     args = parser.parse_args()
 
     # Setup paths
-    project_root = Path(__file__).parent.parent
+    # NOTE: main() assumes monorepo structure with models/ and games/ at root
+    # Current location: packages/poly_bench/poly_bench/compare.py
+    # Project root: 3 levels up
+    project_root = Path(__file__).parent.parent.parent.parent
 
     # Load configuration
     print("\n" + "=" * 70)
@@ -576,7 +575,10 @@ def run_full_comparison(game_name: str, language: str) -> int:
     import os
     from datetime import datetime
 
-    project_root = Path(__file__).parent.parent
+    # NOTE: compare_all_models() assumes monorepo structure
+    # Current location: packages/poly_bench/poly_bench/compare.py
+    # Project root: 3 levels up
+    project_root = Path(__file__).parent.parent.parent.parent
 
     print()
     print("=" * 70)

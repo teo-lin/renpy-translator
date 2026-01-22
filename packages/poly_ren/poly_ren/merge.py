@@ -337,8 +337,13 @@ def show_banner():
 
 
 def load_game_config(game_name: str) -> Dict:
-    """Load game configuration from current_config.yaml"""
-    project_root = Path(__file__).parent.parent
+    """Load game configuration from current_config.yaml
+
+    NOTE: Assumes monorepo structure with models/ at root
+    """
+    # Current location: packages/poly_ren/poly_ren/merge.py
+    # Project root: 3 levels up
+    project_root = Path(__file__).parent.parent.parent.parent
     config_path = project_root / "models" / "current_config.yaml"
 
     if not config_path.exists():
@@ -414,7 +419,10 @@ def main():
     show_banner()
 
     # Load configuration
-    project_root = Path(__file__).parent.parent
+    # NOTE: main() assumes monorepo structure with models/ at root
+    # Current location: packages/poly_ren/poly_ren/merge.py
+    # Project root: 3 levels up
+    project_root = Path(__file__).parent.parent.parent.parent
     config_path = project_root / "models" / "current_config.yaml"
 
     if not config_path.exists():

@@ -34,10 +34,13 @@ except ImportError:
 # Fix Windows PATH for CUDA DLLs
 if sys.platform == "win32":
     import os
-    # Current location: src/poly_bench/benchmark.py -> need to go up 2 levels to repo root
-    torch_lib = str(Path(__file__).parent.parent.parent / "venv" / "Lib" / "site-packages" / "torch" / "lib")
-    if os.path.exists(torch_lib) and torch_lib not in os.environ["PATH"]:
-        os.environ["PATH"] = torch_lib + os.pathsep + os.environ["PATH"]
+    try:
+        import torch
+        torch_lib = str(Path(torch.__file__).parent / "lib")
+        if os.path.exists(torch_lib) and torch_lib not in os.environ["PATH"]:
+            os.environ["PATH"] = torch_lib + os.pathsep + os.environ["PATH"]
+    except ImportError:
+        pass  # torch not installed
 
 # Add src directory to path
 # Current location: src/poly_bench/benchmark.py
@@ -178,7 +181,10 @@ def run_benchmark(data_path: Path, glossary_path: Path = None, model_key: str = 
         print(f"  Loaded {len(glossary)} terms")
 
     # Load model configuration
-    project_root = Path(__file__).parent.parent.parent
+    # NOTE: main() assumes monorepo structure
+    # Current location: packages/poly_bench/poly_bench/benchmark.py
+    # Project root: 3 levels up
+    project_root = Path(__file__).parent.parent.parent.parent
     models_config_path = project_root / "models" / "models_config.yaml"
 
     with open(models_config_path, 'r', encoding='utf-8') as f:
