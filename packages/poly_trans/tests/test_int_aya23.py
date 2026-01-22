@@ -8,18 +8,14 @@ and produces the expected output.
 
 import sys
 from pathlib import Path
-
-# Add src to path to access poly_trans package
-# Current location: src/poly_trans/tests/test_int_aya23.py
-# Need to access: src/poly_trans
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 import unittest
 
-# Import from standalone poly_trans package
+# Import from installed poly_trans package
 from poly_trans.translators.aya23_translator import Aya23Translator
 
 # Import the base test class from repo root
+# Current location: packages/poly_trans/tests/test_int_aya23.py
+# Project root: 3 levels up
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 from tests.utils import BaseTranslatorIntegrationTest

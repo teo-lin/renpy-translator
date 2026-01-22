@@ -8,13 +8,9 @@ and produces the expected output.
 
 import sys
 from pathlib import Path
-
-# Add src to path to access poly_trans package
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 import unittest
 
-# Import from standalone poly_trans package
+# Import from installed poly_trans package
 from poly_trans.translators.seamless96_translator import SeamlessM4Tv2Translator, TRANSFORMERS_AVAILABLE, IMPORT_ERROR
 
 # Import the base test class from repo root
