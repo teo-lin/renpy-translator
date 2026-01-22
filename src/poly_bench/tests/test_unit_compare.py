@@ -14,11 +14,8 @@ import tempfile
 from unittest.mock import MagicMock
 
 # Import modules
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-
 from models import ParsedBlock, is_separator_block
-from compare import BenchmarkTranslator
+from poly_bench.compare import BenchmarkTranslator
 
 
 class MockTranslator:

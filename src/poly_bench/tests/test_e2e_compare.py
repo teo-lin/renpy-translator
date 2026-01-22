@@ -18,7 +18,7 @@ from pathlib import Path
 import re
 
 # Project paths
-project_root = Path(__file__).parent.parent
+project_root = Path(__file__).parent.parent.parent.parent
 compare_script = project_root / "8-compare.ps1"
 models_config_path = project_root / "models" / "models_config.yaml"
 test_game = "Example"
