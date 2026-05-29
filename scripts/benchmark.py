@@ -234,28 +234,29 @@ def run_benchmark(data_path: Path, glossary_path: Path = None, model_key: str = 
 
     lang_code = detect_lang_code_from_filename(data_path.name)
 
-    # Create translator based on model type
+    # Create translator based on model type. Glossary is passed to the constructor
+    # (none of the translate() methods accept it as a kwarg).
     if model_key == "aya23":
         model_path = project_root / model_info['destination']
-        translator = Aya23Translator(str(model_path), target_language=target_language)
+        translator = Aya23Translator(str(model_path), target_language=target_language, glossary=glossary)
     elif model_key in ("helsinkyRo", "helsinkiRo"):
         model_path = project_root / model_info['destination']
-        translator = QuickMTTranslator(model_path=str(model_path), target_language=target_language)
+        translator = QuickMTTranslator(model_path=str(model_path), target_language=target_language, glossary=glossary)
     elif model_key == "madlad400":
-        translator = MADLAD400Translator(target_language=target_language)
+        translator = MADLAD400Translator(target_language=target_language, glossary=glossary)
     elif model_key == "mbartRo":
         model_path = project_root / model_info['destination']
-        translator = MBARTTranslator(model_path=str(model_path), target_language=target_language)
+        translator = MBARTTranslator(model_path=str(model_path), target_language=target_language, glossary=glossary)
     elif model_key == "nllb200":
         model_path = project_root / model_info['destination']
-        translator = NLLB200Translator(model_path=str(model_path), target_language=target_language, lang_code=lang_code)
+        translator = NLLB200Translator(model_path=str(model_path), target_language=target_language, lang_code=lang_code, glossary=glossary)
     elif model_key in ("seamlessm96", "seamless96"):
         model_path = project_root / model_info['destination']
-        translator = SeamlessM4Tv2Translator(model_name=str(model_path), target_language=target_language)
+        translator = SeamlessM4Tv2Translator(model_name=str(model_path), target_language=target_language, glossary=glossary)
     elif model_key in ("ayaExpanse8b", "euroLLM9b"):
         model_path = _resolve_model_file(project_root, model_key, model_info)
         profile_params = _load_profile_params(project_root, model_key)
-        translator = LlamaCppTranslator(model_path=str(model_path), target_language=target_language, **profile_params)
+        translator = LlamaCppTranslator(model_path=str(model_path), target_language=target_language, glossary=glossary, **profile_params)
     else:
         print(f"ERROR: Model '{model_key}' not supported for benchmarking")
         sys.exit(1)
@@ -284,10 +285,9 @@ def run_benchmark(data_path: Path, glossary_path: Path = None, model_key: str = 
             elif isinstance(context, list):
                 context_list = context
 
-        # Translate
+        # Translate (glossary was already passed to the translator constructor)
         hypothesis = translator.translate(
             source,
-            glossary=glossary,
             context=context_list
         )
 
@@ -349,6 +349,141 @@ def run_benchmark(data_path: Path, glossary_path: Path = None, model_key: str = 
     }
 
 
+def _auto_detect_glossary(data_path: Path) -> Path:
+    lang_code = data_path.stem.split('_')[0]
+    uncensored = data_path.parent / f"{lang_code}_uncensored_glossary.yaml"
+    regular = data_path.parent / f"{lang_code}_glossary.yaml"
+    if uncensored.exists():
+        print(f"Auto-detected glossary: {uncensored}")
+        return uncensored
+    if regular.exists():
+        print(f"Auto-detected glossary: {regular}")
+        return regular
+    return None
+
+
+def _select_model_interactive(installed_models: list, available_models: dict) -> str:
+    print()
+    print("=" * 65)
+    print("       Step 1: Select Model to Benchmark")
+    print("=" * 65)
+    print()
+    for i, key in enumerate(installed_models, 1):
+        info = available_models.get(key, {})
+        name = info.get('name', key)
+        params = info.get('params', '?')
+        size = info.get('size', '?')
+        print(f"  [{i}] {name} ({params}, {size})")
+    print("  [Q] Quit")
+    print()
+    while True:
+        choice = input(f"Select a model (1-{len(installed_models)} or Q): ").strip()
+        if choice.lower() == 'q':
+            print("Cancelled by user.")
+            sys.exit(0)
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(installed_models):
+                return installed_models[idx]
+        except ValueError:
+            pass
+        print(f"Invalid selection. Please enter a number between 1 and {len(installed_models)}.")
+
+
+def run_orchestrate():
+    """Interactive orchestrator: load YAML config, prompt for model, run benchmark."""
+    import argparse
+    parser = argparse.ArgumentParser(description='Benchmark a translation model with BLEU scoring')
+    parser.add_argument('_', help='orchestrate command')
+    parser.add_argument('--benchmark', type=str, default='data/ro_benchmark.yaml',
+                        help='Benchmark YAML file (default: data/ro_benchmark.yaml)')
+    parser.add_argument('--glossary', type=str, default=None,
+                        help='Glossary YAML file (auto-detected if not specified)')
+    parser.add_argument('--model-key', type=str, default=None,
+                        help='Model key (e.g., aya23); prompts interactively if not specified')
+    parser.add_argument('--model-number', type=int, default=0,
+                        help='Model number (1-based index in installed_models)')
+    parser.add_argument('-y', '--yes', action='store_true', help='Skip confirmation prompt')
+    args = parser.parse_args()
+
+    project_root = Path(__file__).parent.parent
+
+    # Resolve benchmark file
+    data_path = Path(args.benchmark)
+    if not data_path.is_absolute():
+        data_path = project_root / data_path
+    if not data_path.exists():
+        print(f"ERROR: Benchmark data not found: {data_path}")
+        sys.exit(1)
+
+    # Load models config (catalog of available models)
+    models_config_path = project_root / "models" / "models_config.yaml"
+    if not models_config_path.exists():
+        print(f"ERROR: Models configuration not found at {models_config_path}")
+        print("Please run 0-setup.ps1 first to install models.")
+        sys.exit(1)
+    with open(models_config_path, 'r', encoding='utf-8') as f:
+        models_config = yaml.safe_load(f)
+    available_models = models_config.get('available_models', {})
+
+    # Source of truth for installed_models is current_config.yaml (written by setup.py).
+    # Fall back to models_config.yaml.installed_models if current_config is missing.
+    current_config_path = project_root / "models" / "current_config.yaml"
+    installed_models = []
+    if current_config_path.exists():
+        with open(current_config_path, 'r', encoding='utf-8') as f:
+            current_config = yaml.safe_load(f) or {}
+        installed_models = current_config.get('installed_models', [])
+    if not installed_models:
+        installed_models = models_config.get('installed_models', [])
+    if not installed_models:
+        print("ERROR: No models are installed!")
+        sys.exit(1)
+
+    # Resolve model key
+    if args.model_key:
+        if args.model_key not in installed_models:
+            print(f"ERROR: Model '{args.model_key}' is not installed. Available: {', '.join(installed_models)}")
+            sys.exit(1)
+        model_key = args.model_key
+    elif args.model_number > 0:
+        if args.model_number > len(installed_models):
+            print(f"ERROR: Invalid model number: {args.model_number}. Available: 1-{len(installed_models)}")
+            sys.exit(1)
+        model_key = installed_models[args.model_number - 1]
+    else:
+        model_key = _select_model_interactive(installed_models, available_models)
+
+    # Resolve glossary
+    if args.glossary:
+        glossary_path = Path(args.glossary)
+        if not glossary_path.is_absolute():
+            glossary_path = project_root / glossary_path
+    else:
+        glossary_path = _auto_detect_glossary(data_path)
+
+    # Confirmation
+    model_info = available_models.get(model_key, {})
+    print()
+    print("=" * 65)
+    print("       Benchmark Summary")
+    print("=" * 65)
+    print(f"  Model:     {model_info.get('name', model_key)} "
+          f"({model_info.get('params', '?')}, {model_info.get('size', '?')})")
+    print(f"  Benchmark: {data_path}")
+    print(f"  Glossary:  {glossary_path if glossary_path else 'None'}")
+    print("=" * 65)
+    print()
+
+    if not args.yes:
+        confirm = input("Proceed with benchmark? (Y/N): ").strip().lower()
+        if confirm not in ('y', 'yes'):
+            print("Cancelled by user.")
+            sys.exit(0)
+
+    run_benchmark(data_path, glossary_path, model_key)
+
+
 def main():
     """CLI entry point"""
     if len(sys.argv) < 2:
@@ -357,6 +492,7 @@ def main():
         print("  python benchmark.py data/ro_benchmark.yaml")
         print("  python benchmark.py data/ro_benchmark.yaml --model aya23")
         print("  python benchmark.py data/ro_benchmark.yaml --model madlad400 --glossary data/ro_glossary.yaml")
+        print("  python benchmark.py orchestrate [--benchmark FILE] [--model-key KEY] [-y]")
         sys.exit(1)
 
     # Parse arguments
@@ -383,23 +519,14 @@ def main():
 
     # Auto-detect glossary if not specified
     if glossary_path is None:
-        # Try to find matching glossary (e.g., ro_benchmark.yaml → ro_glossary.yaml)
-        lang_code = data_path.stem.split('_')[0]  # Extract 'ro' from 'ro_benchmark'
-
-        # Try uncensored first, then regular
-        uncensored_glossary = data_path.parent / f"{lang_code}_uncensored_glossary.yaml"
-        regular_glossary = data_path.parent / f"{lang_code}_glossary.yaml"
-
-        if uncensored_glossary.exists():
-            glossary_path = uncensored_glossary
-            print(f"Auto-detected glossary: {glossary_path}")
-        elif regular_glossary.exists():
-            glossary_path = regular_glossary
-            print(f"Auto-detected glossary: {glossary_path}")
+        glossary_path = _auto_detect_glossary(data_path)
 
     # Run benchmark
     run_benchmark(data_path, glossary_path, model_key)
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1 and sys.argv[1] == "orchestrate":
+        run_orchestrate()
+    else:
+        main()
