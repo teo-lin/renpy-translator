@@ -8,7 +8,9 @@ Optimized for high-quality text translation with nearly 100 languages supported.
 import warnings
 from pathlib import Path
 from contextlib import contextmanager
-from translators.translator_utils import probe_device, safe_generate, apply_glossary
+from translators.translator_utils import (
+    probe_device, safe_generate, apply_glossary, apply_source_conditioned, back_map_for,
+)
 
 # Suppress known non-critical warnings for this module
 warnings.filterwarnings("ignore", message=".*SwigPy.*", category=DeprecationWarning)
@@ -172,7 +174,9 @@ class SeamlessM4Tv2Translator:
         return self._target_language
 
     def _apply_glossary(self, text: str, translation: str) -> str:
-        return apply_glossary(text, translation, self.glossary)
+        translation = apply_glossary(text, translation, self.glossary)
+        translation = apply_source_conditioned(text, translation, back_map_for(self.target_language))
+        return translation
 
     def translate(self, text: str, max_length: int = 256, num_beams: int = 5,
                   context: list = None, speaker: str = None) -> str:

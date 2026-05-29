@@ -18,7 +18,7 @@ games:
       code: ro
       name: Romanian
     source_language: english
-    model: ayaExpanse8b
+    model: aya23
     context_before: 3
     context_after: 1
   Example:
@@ -31,4 +31,4 @@ games:
     model: aya23
     context_before: 3
     context_after: 1
-current_game: Example
+current_game: Example Uncensored

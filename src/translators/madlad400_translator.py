@@ -7,7 +7,9 @@ Optimized for broad language coverage including rare and low-resource languages.
 
 import warnings
 from pathlib import Path
-from translators.translator_utils import probe_device, safe_generate, apply_glossary
+from translators.translator_utils import (
+    probe_device, safe_generate, apply_glossary, apply_source_conditioned, back_map_for,
+)
 
 # Try to import transformers dependencies
 try:
@@ -187,7 +189,9 @@ class MADLAD400Translator:
         return self._target_language
 
     def _apply_glossary(self, text: str, translation: str) -> str:
-        return apply_glossary(text, translation, self.glossary)
+        translation = apply_glossary(text, translation, self.glossary)
+        translation = apply_source_conditioned(text, translation, back_map_for(self.target_language))
+        return translation
 
     def translate(self, text: str, max_length: int = 256, num_beams: int = 4,
                   temperature: float = 1.0, context: list = None,

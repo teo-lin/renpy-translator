@@ -353,6 +353,58 @@ def apply_glossary(source_text: str, translation: str, glossary: dict) -> str:
     return translation
 
 
+def apply_source_conditioned(source_text: str, translation: str, replacements) -> str:
+    """
+    Apply Romanian-side substitutions that depend on the English source.
+
+    `replacements` is a list of dicts, each with `source_contains`, `wrong`,
+    `right`. A replacement fires when `source_contains` appears anywhere in
+    the source (case-insensitive) AND `wrong` appears as a whole word in the
+    translation. Used to rescue HF translation models that never see the
+    prompt-injected glossary and emit wrong domain terms (e.g. 'cocoșul'
+    for 'cock', 'păsărica' for 'pussy').
+    """
+    import re
+    if not replacements:
+        return translation
+    src_lower = source_text.lower()
+    for entry in replacements:
+        if not isinstance(entry, dict):
+            continue
+        en = entry.get("source_contains")
+        wrong = entry.get("wrong")
+        right = entry.get("right")
+        if not (en and wrong and right):
+            continue
+        if en.lower() not in src_lower:
+            continue
+        pattern = r'\b' + re.escape(wrong) + r'\b'
+        if re.search(pattern, translation, flags=re.IGNORECASE):
+            translation = re.sub(pattern, right, translation, flags=re.IGNORECASE)
+    return translation
+
+
+_BACK_MAP_CACHE: Dict[str, list] = {}
+
+
+def back_map_for(target_language: str, project_root: Optional[Path] = None) -> list:
+    """
+    Return the source-conditioned replacement list for a target language name.
+    Lazy-loaded from the corrections YAML; cached per language.
+    Returns [] when no list is configured for that language.
+    """
+    name_to_code = {v: k for k, v in get_language_code_map().items()}
+    lang_code = name_to_code.get(target_language)
+    if not lang_code:
+        return []
+    if lang_code in _BACK_MAP_CACHE:
+        return _BACK_MAP_CACHE[lang_code]
+    corrections = load_corrections(lang_code, project_root) or {}
+    replacements = corrections.get("source_conditioned_replacements") or []
+    _BACK_MAP_CACHE[lang_code] = replacements
+    return replacements
+
+
 def probe_device() -> str:
     """
     Return 'cuda' if CUDA is available and kernels actually work, else 'cpu'.

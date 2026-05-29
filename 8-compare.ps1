@@ -2,7 +2,7 @@
 # Compares all installed models by translating the same content
 
 param(
-    [string]$GameName = "Example",
+    [string]$GameName,
     [string]$Language = "ro"
 )
 
@@ -19,6 +19,11 @@ if (-not (Test-Path $pythonCmd)) {
     exit 1
 }
 
-# Run the Python orchestrator
-& $pythonCmd $compareScript orchestrate --game $GameName --language $Language
+# Build orchestrator args; omit --game to fall through to the interactive picker
+$scriptArgs = @("orchestrate", "--language", $Language)
+if ($GameName) {
+    $scriptArgs += @("--game", $GameName)
+}
+
+& $pythonCmd $compareScript $scriptArgs
 exit $LASTEXITCODE

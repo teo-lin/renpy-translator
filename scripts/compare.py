@@ -606,6 +606,33 @@ def main():
     print(f"\nBENCHMARK_DURATION:{total_duration:.2f}")
 
 
+def _select_game_interactive() -> str:
+    """Prompt the user to pick a game from the games/ folder."""
+    from config_selector import select_item
+
+    project_root = Path(__file__).parent.parent
+    games_dir = project_root / "games"
+    if not games_dir.exists():
+        print(f"ERROR: games directory not found: {games_dir}")
+        sys.exit(1)
+
+    games = sorted(
+        ({"name": d.name} for d in games_dir.iterdir() if d.is_dir()),
+        key=lambda g: g["name"].lower(),
+    )
+    if not games:
+        print(f"ERROR: No games found under {games_dir}")
+        sys.exit(1)
+
+    selected = select_item(
+        title="Step 1: Select Game to Compare",
+        items=games,
+        item_formatter_func=lambda g, i: f"  [{i}] {g['name']}",
+        item_type_name="game",
+    )
+    return selected["name"]
+
+
 def run_full_comparison(game_name: str, language: str) -> int:
     """
     Run the full model comparison workflow.
@@ -861,11 +888,13 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "orchestrate":
         parser = argparse.ArgumentParser(description='Run full model comparison workflow')
         parser.add_argument('_', help='orchestrate command')
-        parser.add_argument('--game', type=str, required=True, help='Game name')
+        parser.add_argument('--game', type=str, default=None,
+                            help='Game name (prompts interactively if omitted)')
         parser.add_argument('--language', type=str, required=True, help='Language code (e.g., ro)')
         args = parser.parse_args()
 
-        exit_code = run_full_comparison(args.game, args.language)
+        game_name = args.game or _select_game_interactive()
+        exit_code = run_full_comparison(game_name, args.language)
         sys.exit(exit_code)
     else:
         # Regular single-model mode
