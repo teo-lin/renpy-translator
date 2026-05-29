@@ -174,8 +174,10 @@ def load_prompt_template(lang_code: str, project_root: Optional[Path] = None) ->
     Load prompt template for a language with fallback hierarchy.
 
     Tries to load in this order:
-    1. prompts/{lang_code}_uncensored_prompt.txt
-    2. prompts/{lang_code}_prompt.txt
+    1. prompts/{lang_code}_uncensored_prompt.txt   (per-language uncensored override)
+    2. prompts/{lang_code}_prompt.txt              (per-language override)
+    3. prompts/translate_uncensored.txt            (generic uncensored — default)
+    4. prompts/translate.txt                       (generic — default)
 
     Args:
         lang_code: Language code (e.g., 'ro', 'es', 'fr')
@@ -189,7 +191,9 @@ def load_prompt_template(lang_code: str, project_root: Optional[Path] = None) ->
 
     prompt_variants = [
         f"prompts/{lang_code}_uncensored_prompt.txt",
-        f"prompts/{lang_code}_prompt.txt"
+        f"prompts/{lang_code}_prompt.txt",
+        "prompts/translate_uncensored.txt",
+        "prompts/translate.txt",
     ]
 
     for prompt_variant in prompt_variants:
@@ -276,6 +280,55 @@ def safe_generate(model, inputs: dict, device: str, generate_fn):
                 cpu_inputs = {k: v.to("cpu") for k, v in inputs.items()}
                 return generate_fn(cpu_inputs), model, device
             raise
+
+
+_GLOSSARY_PAREN_SUFFIX = None  # compiled lazily to avoid top-level import cost
+
+
+def _glossary_base_form(key: str) -> str:
+    """Strip a trailing parenthetical disambiguator from a glossary key.
+    'to fuck (subjunctive he/she)' -> 'to fuck'."""
+    import re
+    global _GLOSSARY_PAREN_SUFFIX
+    if _GLOSSARY_PAREN_SUFFIX is None:
+        _GLOSSARY_PAREN_SUFFIX = re.compile(r'\s*\([^)]*\)\s*$')
+    return _GLOSSARY_PAREN_SUFFIX.sub('', key).strip()
+
+
+def glossary_prompt_entries(glossary: dict, text: str, limit: int = 30) -> list:
+    """Pick glossary entries to include in an LLM translation prompt.
+
+    Matches on the base form of each key (parenthetical disambiguators stripped),
+    so an entry like 'to fuck (subjunctive he/she)' is matched against a source
+    containing 'to fuck'. When a base matches, ALL variants sharing that base
+    are emitted together so the model sees the full conjugation table in context.
+
+    Returns formatted '"en" = "target"' strings, capped at `limit` entries
+    with longer (more specific) base forms prioritized first.
+    """
+    if not glossary:
+        return []
+    text_lower = text.lower()
+    by_base = {}
+    for en, tgt in glossary.items():
+        en_str = str(en)
+        if en_str.startswith("_comment"):
+            continue
+        if not isinstance(tgt, str):
+            continue
+        base = _glossary_base_form(en_str).lower()
+        if not base:
+            continue
+        by_base.setdefault(base, []).append((en_str, tgt))
+
+    matched = []
+    for base in sorted(by_base.keys(), key=len, reverse=True):
+        if base in text_lower:
+            for en, tgt in by_base[base]:
+                matched.append(f'"{en}" = "{tgt}"')
+                if len(matched) >= limit:
+                    return matched
+    return matched
 
 
 def apply_glossary(source_text: str, translation: str, glossary: dict) -> str:

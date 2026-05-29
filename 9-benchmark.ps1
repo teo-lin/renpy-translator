@@ -4,8 +4,9 @@
 param(
     [int]$Model = 0,                                  # Model number (1-based), 0 = prompt user
     [string]$ModelName,                               # Model key (e.g., "aya23")
-    [string]$BenchmarkFile = "data/ro_benchmark.yaml",
-    [string]$GlossaryFile,                            # Optional glossary file
+    [string]$BenchmarkFile,                           # Optional; auto-detected (uncensored first, then regular) if omitted
+    [string]$GlossaryFile,                            # Optional; auto-detected (uncensored first, then regular) if omitted
+    [string]$Lang = "ro",                             # Language code for auto-detection
     [switch]$Yes                                      # Skip confirmation prompt
 )
 
@@ -33,7 +34,10 @@ if (-not (Test-Path $benchmarkScript)) {
 }
 
 # Build arguments for the Python orchestrator
-$scriptArgs = @("orchestrate", "--benchmark", $BenchmarkFile)
+$scriptArgs = @("orchestrate", "--lang", $Lang)
+if ($BenchmarkFile) {
+    $scriptArgs += @("--benchmark", $BenchmarkFile)
+}
 if ($ModelName) {
     $scriptArgs += @("--model-key", $ModelName)
 }

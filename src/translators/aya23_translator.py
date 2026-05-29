@@ -19,6 +19,8 @@ if sys.platform == "win32":
 
 from llama_cpp import Llama
 
+from translators.translator_utils import glossary_prompt_entries
+
 
 class Aya23Translator:
     """
@@ -81,17 +83,9 @@ class Aya23Translator:
         # Build glossary instructions if provided
         glossary_instructions = ""
         if self.glossary:
-            key_terms = []
-            # Only include terms that actually appear in the text
-            for en_term, target_term in self.glossary.items():
-                # Skip comment entries
-                if en_term.startswith("_comment"):
-                    continue
-                if en_term.lower() in text.lower():
-                    key_terms.append(f'"{en_term}" = "{target_term}"')
-
+            key_terms = glossary_prompt_entries(self.glossary, text)
             if key_terms:
-                glossary_instructions = "\nMandatory term translations: " + ", ".join(key_terms[:10]) + "."
+                glossary_instructions = "\nMandatory term translations: " + ", ".join(key_terms) + "."
 
         # Build context if provided
         context_section = ""

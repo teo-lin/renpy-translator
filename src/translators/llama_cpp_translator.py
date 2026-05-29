@@ -17,6 +17,8 @@ if sys.platform == "win32":
 
 from llama_cpp import Llama
 
+from translators.translator_utils import glossary_prompt_entries
+
 
 class LlamaCppTranslator:
     """
@@ -63,11 +65,7 @@ class LlamaCppTranslator:
     ) -> str:
         glossary_instructions = ""
         if self.glossary:
-            key_terms = [
-                f'"{en}" = "{tgt}"'
-                for en, tgt in self.glossary.items()
-                if not str(en).startswith("_comment") and str(en).lower() in text.lower()
-            ][:10]
+            key_terms = glossary_prompt_entries(self.glossary, text)
             if key_terms:
                 glossary_instructions = "\nMandatory term translations: " + ", ".join(key_terms) + "."
 

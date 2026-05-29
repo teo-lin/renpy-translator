@@ -133,7 +133,13 @@ def select_model(current_model: Optional[str] = None) -> str:
 
     models_config = load_yaml_config(models_config_path)
 
-    installed_models = models_config.get('installed_models', [])
+    current_config_path = get_project_root() / "models" / "current_config.yaml"
+    installed_models = []
+    if current_config_path.exists():
+        current_config = load_yaml_config(current_config_path)
+        installed_models = current_config.get('installed_models', [])
+    if not installed_models:
+        installed_models = models_config.get('installed_models', [])
 
     if not installed_models:
         print("[ERROR] No models are installed!")

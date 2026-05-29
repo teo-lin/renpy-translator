@@ -21,4 +21,14 @@ games:
     model: aya23
     context_before: 3
     context_after: 1
+  Example Uncensored:
+    name: Example Uncensored
+    path: C:\_____\_CODE\enro\games\Example Uncensored
+    target_language:
+      code: ro
+      name: Romanian
+    source_language: english
+    model: aya23
+    context_before: 3
+    context_after: 1
 current_game: Example

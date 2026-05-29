@@ -7,6 +7,9 @@ using BLEU (Bilingual Evaluation Understudy) scores.
 Benchmark data format (YAML):
 - source: English text to translate
   target: Reference translation
+  alt_targets:                            # optional: equally-valid alternates
+    - "Another acceptable translation"
+    - "Yet another"
   context: Optional previous dialogue for context
 - source: Another text...
   target: Another translation...
@@ -40,13 +43,6 @@ if sys.platform == "win32":
 
 # Add src directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-from translators.aya23_translator import Aya23Translator
-from translators.helsinkyRo_translator import QuickMTTranslator
-from translators.llama_cpp_translator import LlamaCppTranslator
-from translators.madlad400_translator import MADLAD400Translator
-from translators.mbartRo_translator import MBARTTranslator
-from translators.nllb200_translator import NLLB200Translator
-from translators.seamless96_translator import SeamlessM4Tv2Translator
 
 
 def tokenize(text: str) -> List[str]:
@@ -59,27 +55,36 @@ def tokenize(text: str) -> List[str]:
     return text.lower().split()
 
 
-def calculate_bleu(reference: str, hypothesis: str) -> float:
+def calculate_bleu(references, hypothesis: str) -> float:
     """
-    Calculate BLEU score between reference and hypothesis
+    Calculate BLEU score between hypothesis and one or more references.
 
-    Returns score between 0.0 (worst) and 1.0 (perfect match)
+    `references` may be a single string or a list of strings; in the list case
+    this is standard multi-reference BLEU (max n-gram overlap per position),
+    so adding alternates can only raise the score.
+
+    Returns score between 0.0 (worst) and 1.0 (perfect match).
     """
+    if isinstance(references, str):
+        references = [references]
+
     if not NLTK_AVAILABLE:
-        # Fallback: simple word overlap accuracy
-        ref_words = set(tokenize(reference))
+        # Fallback: max single-reference word overlap
         hyp_words = set(tokenize(hypothesis))
-        if not ref_words:
-            return 0.0
-        overlap = len(ref_words & hyp_words)
-        return overlap / len(ref_words)
+        best = 0.0
+        for ref in references:
+            ref_words = set(tokenize(ref))
+            if not ref_words:
+                continue
+            best = max(best, len(ref_words & hyp_words) / len(ref_words))
+        return best
 
     # NLTK BLEU with smoothing (for short sentences)
-    ref_tokens = tokenize(reference)
+    ref_token_lists = [tokenize(r) for r in references]
     hyp_tokens = tokenize(hypothesis)
 
     smoothing = SmoothingFunction().method1
-    return sentence_bleu([ref_tokens], hyp_tokens, smoothing_function=smoothing)
+    return sentence_bleu(ref_token_lists, hyp_tokens, smoothing_function=smoothing)
 
 
 def load_benchmark_data(data_path: Path) -> List[Dict]:
@@ -94,6 +99,10 @@ def load_benchmark_data(data_path: Path) -> List[Dict]:
     for i, item in enumerate(data):
         if 'source' not in item or 'target' not in item:
             raise ValueError(f"Item {i} missing 'source' or 'target' field")
+        if 'alt_targets' in item:
+            alts = item['alt_targets']
+            if not isinstance(alts, list) or not all(isinstance(t, str) for t in alts):
+                raise ValueError(f"Item {i}: 'alt_targets' must be a list of strings")
 
     return data
 
@@ -237,23 +246,30 @@ def run_benchmark(data_path: Path, glossary_path: Path = None, model_key: str = 
     # Create translator based on model type. Glossary is passed to the constructor
     # (none of the translate() methods accept it as a kwarg).
     if model_key == "aya23":
+        from translators.aya23_translator import Aya23Translator
         model_path = project_root / model_info['destination']
         translator = Aya23Translator(str(model_path), target_language=target_language, glossary=glossary)
     elif model_key in ("helsinkyRo", "helsinkiRo"):
+        from translators.helsinkyRo_translator import QuickMTTranslator
         model_path = project_root / model_info['destination']
         translator = QuickMTTranslator(model_path=str(model_path), target_language=target_language, glossary=glossary)
     elif model_key == "madlad400":
+        from translators.madlad400_translator import MADLAD400Translator
         translator = MADLAD400Translator(target_language=target_language, glossary=glossary)
     elif model_key == "mbartRo":
+        from translators.mbartRo_translator import MBARTTranslator
         model_path = project_root / model_info['destination']
         translator = MBARTTranslator(model_path=str(model_path), target_language=target_language, glossary=glossary)
     elif model_key == "nllb200":
+        from translators.nllb200_translator import NLLB200Translator
         model_path = project_root / model_info['destination']
         translator = NLLB200Translator(model_path=str(model_path), target_language=target_language, lang_code=lang_code, glossary=glossary)
     elif model_key in ("seamlessm96", "seamless96"):
+        from translators.seamless96_translator import SeamlessM4Tv2Translator
         model_path = project_root / model_info['destination']
         translator = SeamlessM4Tv2Translator(model_name=str(model_path), target_language=target_language, glossary=glossary)
     elif model_key in ("ayaExpanse8b", "euroLLM9b"):
+        from translators.llama_cpp_translator import LlamaCppTranslator
         model_path = _resolve_model_file(project_root, model_key, model_info)
         profile_params = _load_profile_params(project_root, model_key)
         translator = LlamaCppTranslator(model_path=str(model_path), target_language=target_language, glossary=glossary, **profile_params)
@@ -272,6 +288,8 @@ def run_benchmark(data_path: Path, glossary_path: Path = None, model_key: str = 
     for i, item in enumerate(benchmark_data, 1):
         source = item['source']
         reference = item['target']
+        alt_targets = item.get('alt_targets') or []
+        references = [reference] + alt_targets
         context = item.get('context', None)
 
         print(f"\n[{i}/{len(benchmark_data)}]")
@@ -291,11 +309,13 @@ def run_benchmark(data_path: Path, glossary_path: Path = None, model_key: str = 
             context=context_list
         )
 
-        # Calculate BLEU
-        score = calculate_bleu(reference, hypothesis)
+        # Calculate BLEU against primary + any alternates
+        score = calculate_bleu(references, hypothesis)
         scores.append(score)
 
         print(f"  Reference:  {reference}")
+        for alt in alt_targets:
+            print(f"  Alt:        {alt}")
         print(f"  Hypothesis: {hypothesis}")
         print(f"  BLEU Score: {score:.4f}")
 
@@ -395,8 +415,11 @@ def run_orchestrate():
     import argparse
     parser = argparse.ArgumentParser(description='Benchmark a translation model with BLEU scoring')
     parser.add_argument('_', help='orchestrate command')
-    parser.add_argument('--benchmark', type=str, default='data/ro_benchmark.yaml',
-                        help='Benchmark YAML file (default: data/ro_benchmark.yaml)')
+    parser.add_argument('--benchmark', type=str, default=None,
+                        help='Benchmark YAML file (auto-detected if not specified: '
+                             'data/<lang>_uncensored_benchmark.yaml -> data/<lang>_benchmark.yaml)')
+    parser.add_argument('--lang', type=str, default='ro',
+                        help='Language code for benchmark auto-detection (default: ro)')
     parser.add_argument('--glossary', type=str, default=None,
                         help='Glossary YAML file (auto-detected if not specified)')
     parser.add_argument('--model-key', type=str, default=None,
@@ -408,13 +431,29 @@ def run_orchestrate():
 
     project_root = Path(__file__).parent.parent
 
-    # Resolve benchmark file
-    data_path = Path(args.benchmark)
-    if not data_path.is_absolute():
-        data_path = project_root / data_path
-    if not data_path.exists():
-        print(f"ERROR: Benchmark data not found: {data_path}")
-        sys.exit(1)
+    # Resolve benchmark file: explicit --benchmark wins; otherwise auto-detect
+    # uncensored first, then fall back to regular.
+    if args.benchmark:
+        data_path = Path(args.benchmark)
+        if not data_path.is_absolute():
+            data_path = project_root / data_path
+        if not data_path.exists():
+            print(f"ERROR: Benchmark data not found: {data_path}")
+            sys.exit(1)
+    else:
+        uncensored = project_root / "data" / f"{args.lang}_uncensored_benchmark.yaml"
+        regular = project_root / "data" / f"{args.lang}_benchmark.yaml"
+        if uncensored.exists():
+            data_path = uncensored
+            print(f"Auto-detected benchmark: {data_path}")
+        elif regular.exists():
+            data_path = regular
+            print(f"Auto-detected benchmark: {data_path}")
+        else:
+            print(f"ERROR: No benchmark file found for language '{args.lang}'.")
+            print(f"  Looked for: {uncensored}")
+            print(f"  Looked for: {regular}")
+            sys.exit(1)
 
     # Load models config (catalog of available models)
     models_config_path = project_root / "models" / "models_config.yaml"
