@@ -79,7 +79,7 @@ class MBARTTranslator:
         self.model = MBartForConditionalGeneration.from_pretrained(
             str(model_path),
             low_cpu_mem_usage=True,
-            torch_dtype=torch.float16 if device == "cuda" else torch.float32
+            dtype=torch.float16 if device == "cuda" else torch.float32
         )
         self.model = self.model.to(device)
 

@@ -726,9 +726,17 @@ def run_full_comparison(game_name: str, language: str) -> int:
     benchmark_results = []
     benchmark_start_time = time.time()
 
+    # Explicit key overrides to avoid collisions (e.g. aya23 and ayaExpanse8b both start with "ay")
+    _KEY_OVERRIDES = {
+        'ayaExpanse8b': 'ae',
+        'euroLLM9b':    'eu',
+        'euroLLM22b':   'e2',
+        'seamlessm96':  'se',
+    }
+
     for model_idx, model_key in enumerate(installed_models):
         model_info = models_config['available_models'][model_key]
-        key_number = model_key[:2].lower()  # Use first 2 chars of model name, lowercase
+        key_number = _KEY_OVERRIDES.get(model_key, model_key[:2].lower())
 
         print()
         print(f"   [{model_idx + 1}/{len(installed_models)}] Model: {model_info['name']} -> Key: {key_number}")

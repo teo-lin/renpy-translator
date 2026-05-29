@@ -356,16 +356,18 @@ class BaseTranslatorIntegrationTest(unittest.TestCase):
 
 def get_test_device() -> str:
     """
-    Auto-detect best available device for testing.
-
-    Returns:
-        'cuda' if GPU is available, otherwise 'cpu'
+    Auto-detect best available device for testing, using the same probe as the
+    translators (verifies CUDA kernels actually work, not just that CUDA is present).
     """
     try:
-        import torch
-        return "cuda" if torch.cuda.is_available() else "cpu"
-    except ImportError:
-        return "cpu"
+        from translators.translator_utils import probe_device
+        return probe_device()
+    except Exception:
+        try:
+            import torch
+            return "cuda" if torch.cuda.is_available() else "cpu"
+        except ImportError:
+            return "cpu"
 
 
 def skip_if_transformers_unavailable(transformers_available: bool, import_error: str,

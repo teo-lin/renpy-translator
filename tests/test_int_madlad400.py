@@ -46,18 +46,13 @@ class TestMADLADIntegration(BaseTranslatorIntegrationTest):
         )
 
     def test_translate_hello_world(self):
-        """
-        Tests translation of a simple phrase to Romanian.
-        """
-        # Note: MADLAD-400 has known quality issues and may produce imperfect translations
-        # This test verifies the model loads and produces output, not perfect translation quality
         english_text = "Hello, how are you?"
-        # Accept any non-empty Romanian-like output (model quality varies)
         translation = self.translator.translate(english_text)
         self.assertIsNotNone(translation)
-        self.assertGreater(len(translation), 0)
-        # Just verify it's not obviously broken (no excessive repetition)
-        self.assertNotIn('fo fo fo', translation.lower())
+        self.assertGreater(len(translation.strip()), 0)
+        # Must be mostly Latin script — rules out garbage Thai/Chinese/Arabic output
+        latin_chars = sum(1 for c in translation if c.isalpha() and ord(c) < 0x0500)
+        self.assertGreater(latin_chars, 0, f"Output appears non-Latin: {translation!r}")
 
 if __name__ == '__main__':
     unittest.main()

@@ -144,7 +144,7 @@ class MADLAD400Translator:
                 self.model = AutoModelForSeq2SeqLM.from_pretrained(
                     str(model_path),
                     trust_remote_code=trust_remote_code,
-                    dtype=torch.float16 if device == "cuda" else torch.float32,
+                    dtype=torch.bfloat16,
                     local_files_only=True
                 )
                 # Manually move to device (more reliable than device_map for this model)

@@ -157,7 +157,7 @@ class SeamlessM4Tv2Translator:
         self.model = SeamlessM4Tv2Model.from_pretrained(
             str(model_path),
             low_cpu_mem_usage=True,
-            torch_dtype=torch.float16 if device == "cuda" else torch.float32,
+            dtype=torch.float16 if device == "cuda" else torch.float32,
             local_files_only=True
         )
         self.model = self.model.to(device)
