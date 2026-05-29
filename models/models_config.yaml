@@ -115,6 +115,8 @@ available_models:
     languages:
     - 'ro'
     huggingface_download: true
+    model_class: MarianMTModel
+    tokenizer_class: MarianTokenizer
   madlad400:
     name: madlad400
     repo: google/madlad400-3b-mt
@@ -174,6 +176,164 @@ available_models:
     languages:
     - 'ro'
     huggingface_download: true
+  nllb200:
+    name: nllb200
+    params: 0.6B
+    format: safetensors
+    languages_supported: 200
+    repo: facebook/nllb-200-distilled-600M
+    http_link: https://huggingface.co/facebook/nllb-200-distilled-600M
+    file: null
+    size: ~1.2GB
+    destination: models/nllb200
+    script: scripts/translate.py
+    description: Multilingual seq2seq, 600M params distilled, Flores 44 en→ro, VRAM
+      1.5GB. Meta NLLB-200, 200 languages, better than mBART/M2M-100. No context window.
+    languages:
+    - 'ro'
+    - 'es'
+    - 'fr'
+    - 'de'
+    - 'it'
+    - 'pt'
+    - 'ru'
+    - 'tr'
+    - 'cs'
+    - 'pl'
+    - 'uk'
+    - 'bg'
+    - 'zh'
+    - 'ja'
+    - 'ko'
+    - 'vi'
+    - 'th'
+    - 'id'
+    - 'ar'
+    - 'he'
+    - 'fa'
+    - 'hi'
+    - 'bn'
+    - 'nl'
+    - 'sv'
+    - 'no'
+    - 'da'
+    - 'fi'
+    - 'el'
+    - 'hu'
+    huggingface_download: true
+  ayaExpanse8b:
+    name: ayaExpanse8b
+    languages_supported: 23
+    params: 8B
+    format: GGUF
+    repo: bartowski/aya-expanse-8b-GGUF
+    http_link: https://huggingface.co/bartowski/aya-expanse-8b-GGUF
+    files:
+      Q4_K_M: aya-expanse-8b-Q4_K_M.gguf
+      Q5_K_M: aya-expanse-8b-Q5_K_M.gguf
+    size_Q4_K_M: 5.06GB
+    size_Q5_K_M: 5.80GB
+    destination: models/ayaExpanse8b
+    script: scripts/translate_new.py
+    description: Multilingual GGUF, 8B params, successor to Aya-23, VRAM 5-6GB. Better
+      quality than Aya-23 across all 23 languages. low+ tier.
+    min_tier: low
+    languages:
+    - 'ro'
+    - 'es'
+    - 'fr'
+    - 'de'
+    - 'it'
+    - 'pt'
+    - 'ru'
+    - 'tr'
+    - 'cs'
+    - 'pl'
+    - 'uk'
+    - 'bg'
+    - 'zh'
+    - 'ja'
+    - 'ko'
+    - 'vi'
+    - 'th'
+    - 'id'
+    - 'ar'
+    - 'he'
+    - 'hi'
+    - 'nl'
+    - 'fi'
+  euroLLM9b:
+    name: euroLLM9b
+    languages_supported: 35
+    params: 9B
+    format: GGUF
+    repo: QuantFactory/EuroLLM-9B-Instruct-GGUF
+    http_link: https://huggingface.co/QuantFactory/EuroLLM-9B-Instruct-GGUF
+    files:
+      Q4_K_M: EuroLLM-9B-Instruct.Q4_K_M.gguf
+      Q5_K_M: EuroLLM-9B-Instruct.Q5_K_M.gguf
+    size_Q4_K_M: 5.58GB
+    size_Q5_K_M: 6.52GB
+    destination: models/euroLLM9b
+    script: scripts/translate_new.py
+    description: EU-focused GGUF, 9B params, COMET 84.19 en→EU, best for Romanian
+      and all EU languages. Outperforms Gemma-2-9B. low+ tier.
+    min_tier: low
+    languages:
+    - 'ro'
+    - 'es'
+    - 'fr'
+    - 'de'
+    - 'it'
+    - 'pt'
+    - 'ru'
+    - 'cs'
+    - 'pl'
+    - 'uk'
+    - 'bg'
+    - 'nl'
+    - 'sv'
+    - 'no'
+    - 'da'
+    - 'fi'
+    - 'el'
+    - 'hu'
+  euroLLM22b:
+    name: euroLLM22b
+    languages_supported: 35
+    params: 22B
+    format: GGUF
+    repo: bartowski/utter-project_EuroLLM-22B-Instruct-2512-GGUF
+    http_link: https://huggingface.co/bartowski/utter-project_EuroLLM-22B-Instruct-2512-GGUF
+    files:
+      Q3_K_M: utter-project_EuroLLM-22B-Instruct-2512-Q3_K_M.gguf
+      Q4_K_M: utter-project_EuroLLM-22B-Instruct-2512-Q4_K_M.gguf
+    size_Q3_K_M: 11.12GB
+    size_Q4_K_M: 13.66GB
+    destination: models/euroLLM22b
+    script: scripts/translate_new.py
+    description: EU-focused GGUF, 22B params, matches Qwen-3-32B and Gemma-3-27B
+      quality. Requires high tier (16GB+ VRAM). Q4_K_M=13.7GB.
+    min_tier: high
+    languages:
+    - 'ro'
+    - 'es'
+    - 'fr'
+    - 'de'
+    - 'it'
+    - 'pt'
+    - 'ru'
+    - 'cs'
+    - 'pl'
+    - 'uk'
+    - 'bg'
+    - 'nl'
+    - 'sv'
+    - 'no'
+    - 'da'
+    - 'fi'
+    - 'el'
+    - 'hu'
   seamlessm96:
     name: seamless96
     params: 2.3B

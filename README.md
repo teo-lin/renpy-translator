@@ -1,6 +1,11 @@
-# Automated Batch Ren'Py Translation 
+# Automated Batch Ren'Py Translation
+
+## Goal
+
+Local LLM transtation from English to Romanian of visual ren'py novels, fully context-aware, gramattically correct, following the same tone and style as the original, absolutely no censorship, no profanity filtering, no adult language guardrails.
 
 ## Features
+
 Translate **any Ren'Py visual novel** into **400+ languages** using state-of-the-art local AI models on consumer grade laptop GPU (tested with RTX 3060, Windows)
 
 - **Automated model download** - interactive setup script
@@ -18,11 +23,12 @@ Translate **any Ren'Py visual novel** into **400+ languages** using state-of-the
 - **Git-Friendly** - Track translation changes with clean diffs
 - **Low spec requirements** - NVIDIA GPU with 6GB+ VRAM (CUDA 12.4) - tested with RTX3060 on Windows. Uses all available GPU layers.
 
-
 ## How to use (Setup & Translation Workflows)
 
 ### 0. **Automated Setup**
+
 First, run setup (once). Check models/SETUP.md for details on what it does and models/MODELS.md for a comparison of selectable LLMs.
+
 ```powershell
 .\0-setup.ps1 # select desired model(s), language(s) at the prompt
 ```
@@ -30,6 +36,7 @@ First, run setup (once). Check models/SETUP.md for details on what it does and m
 This app supports **three translation workflows**:
 
 ### 1. **All-in-One Workflow**
+
 Simple, automated translation in a single step. Best for quick translations.
 
 ```powershell
@@ -37,6 +44,7 @@ Simple, automated translation in a single step. Best for quick translations.
 ```
 
 ### 2. **Modular Workflow** (Recommended for Control)
+
 Three-phase pipeline with human review checkpoints. See Pipelines section below for more info..
 
 ```powershell
@@ -47,6 +55,7 @@ Three-phase pipeline with human review checkpoints. See Pipelines section below 
 .\4-correct.ps1 # optional. human readable format
 .\5-merge.ps1 # merge translation and tags back to .rpy
 ```
+
 ---
 
 ### 3. **Manual Mode** (Advanced)
@@ -54,6 +63,7 @@ Three-phase pipeline with human review checkpoints. See Pipelines section below 
 You can also call the Python scripts directly with specific arguments:
 
 **Example: Aya-23-8B (23 Languages, Higher Quality):**
+
 ```powershell
 python scripts\translate_with_aya23.py "Example\game\tl\<language>" --language <Language> # Translate entire game
 python scripts\translate_with_aya23.py "path\to\file.rpy" # Translate single file
@@ -74,6 +84,7 @@ python scripts\correct.py "path\to\game\game\tl\<language>"
 Benchmarks translation quality using BLEU scores by comparing model outputs to reference translations.
 
 **Features:**
+
 - Calculates BLEU scores for translation quality assessment
 - Auto-detects language from filename
 - Auto-detects matching glossary
@@ -81,6 +92,7 @@ Benchmarks translation quality using BLEU scores by comparing model outputs to r
 
 **Benchmark Data Format:**
 Create `data/<language>_benchmark.json` with reference translations:
+
 ```json
 [
   {
@@ -92,6 +104,7 @@ Create `data/<language>_benchmark.json` with reference translations:
 ```
 
 **Usage:**
+
 ```powershell
 # Run benchmark with auto-detected glossary
 .\8-compare.ps1 data\ro_benchmark.json
@@ -104,6 +117,7 @@ Create `data/<language>_benchmark.json` with reference translations:
 ```
 
 **Template Files:**
+
 - `data/ro_glossary.json` - Example glossary template
 - `data/ro_benchmark.json` - Example benchmark data template
 
@@ -112,10 +126,12 @@ Create `data/<language>_benchmark.json` with reference translations:
 ### Custom Prompts
 
 The translation and correction prompts can be customized by editing the template files in `data/prompts/`:
+
 - `data/prompts/translate.txt` - Translation prompt template
 - `data/prompts/correct.txt` - Grammar correction prompt template
 
 **Fallback hierarchy:**
+
 1. Try custom templates in `data/prompts/`
 2. Fall back to embedded template in code
 
@@ -138,6 +154,7 @@ Place in `data\<language_code>_glossary.json` (e.g., `data\ro_glossary.json`, `d
 **Template:** See `data/ro_glossary.json` for an example with UI elements, character stats, and common game terms.
 
 **Fallback Hierarchy:**
+
 1. `data\<code>_glossary.json` (language-specific glossary)
 2. No glossary (translation without term enforcement)
 
@@ -163,7 +180,6 @@ Create correction rules JSON file for pattern-based corrections:
 ```
 
 Place in `data\<language>_corrections.json`
-
 
 ## File Structure
 
@@ -227,14 +243,13 @@ Place in `data\<language>_corrections.json`
 MIT License - Use for any purpose, including commercial projects.
 
 Acknowledgments
+
 - **Models:**
   - [Aya-23-8B](https://huggingface.co/CohereForAI/aya-23-8B) by Cohere For AI
   - [MADLAD-400-3B](https://huggingface.co/google/madlad400-3b-mt) by Google Research
-- **Quantization:** 
-  - [bartowski's GGUF conversion](https://huggingface.co/bartowski/aya-23-8B-GGUF)
-  - [unsloth's 4-bit conversion](https://huggingface.co/unsloth/madlad400-3b-mt-4bit)
+- **Quantization:**
+  - [bartowski&#39;s GGUF conversion](https://huggingface.co/bartowski/aya-23-8B-GGUF)
+  - [unsloth&#39;s 4-bit conversion](https://huggingface.co/unsloth/madlad400-3b-mt-4bit)
 - **Frameworks:**
   - [llama-cpp-python](https://github.com/abetlen/llama-cpp-python) (Aya-23-8B)
   - [unsloth](https://github.com/unslothai/unsloth) (MADLAD-400-3B)
-
-

@@ -52,6 +52,8 @@ models/*
 !models/*.md
 !models/models_config.yaml
 !models/current_config.yaml
+!models/compute_profiles.yaml
+# models/compute_profile.yaml is machine-specific — gitignored via models/*
 
 # Data - ignore directory but track specific files
 data/**/*uncensored*

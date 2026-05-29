@@ -1,4 +1,4 @@
-import argparse
+﻿import argparse
 import os
 import platform
 import shutil
@@ -41,6 +41,7 @@ class ProjectSetup:
         self.all_languages = []
         self.available_models = []
         self.venv_python = self._get_venv_python_path()
+        self.tier = "low"
 
     def run(self):
         """Main method to run the setup process in sequence."""
@@ -48,6 +49,13 @@ class ProjectSetup:
         self._print_header()
 
         self._load_configs()
+        print()
+        print("=" * 70)
+        print("Detecting Hardware Tier [1/8]")
+        print("=" * 70)
+        print()
+        self.tier = self._detect_hardware_tier()
+        print(f"  Tier: {self.tier}")
 
         # Build all_languages list (needed for later steps)
         self._build_all_languages_list()
@@ -61,7 +69,7 @@ class ProjectSetup:
             # Skip model flow: load from config or use all languages
             print()
             print("=" * 70)
-            print("Skipping Model Selection [1/6]")
+            print("Skipping Model Selection [3/8]")
             print("=" * 70)
             print()
             if self.args.languages:
@@ -74,16 +82,16 @@ class ProjectSetup:
         else:
             print()
             print("=" * 70)
-            print("Skipping Python Setup [2/6]")
+            print("Skipping Python Setup [4/8]")
             print("=" * 70)
             print()
 
         if not self.args.skip_model and self.selected_models:
-            self._download_models()
+            self._download_models(self.tier)
         else:
             print()
             print("=" * 70)
-            print("Skipping Model Download [3/6]")
+            print("Skipping Model Download [5/8]")
             print("=" * 70)
             print()
 
@@ -92,17 +100,33 @@ class ProjectSetup:
         else:
             print()
             print("=" * 70)
-            print("Skipping Tools Download [4/6]")
+            print("Skipping Tools Download [6/8]")
             print("=" * 70)
             print()
 
         all_good = self._verify_installation()
+        self._detect_hardware()
         self._print_footer(all_good)
 
     def _set_hf_home(self):
         hf_home = ROOT_DIR / "models"
         os.environ["HF_HOME"] = str(hf_home)
+        os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
         print(f"Hugging Face cache set to: {hf_home}")
+
+        # HF_HOME is redirected to models/, but huggingface-cli login stores
+        # the token at the default cache path. Forward it as HF_TOKEN so the
+        # library sees it and rate-limit warnings disappear.
+        if not os.environ.get("HF_TOKEN"):
+            for candidate in [
+                Path.home() / ".cache" / "huggingface" / "token",
+                Path.home() / ".huggingface" / "token",
+            ]:
+                if candidate.exists():
+                    token = candidate.read_text(encoding="utf-8").strip()
+                    if token:
+                        os.environ["HF_TOKEN"] = token
+                    break
 
     def _print_header(self):
         print("=" * 70)
@@ -148,7 +172,7 @@ class ProjectSetup:
         if self.args.languages:
             print()
             print("=" * 70)
-            print("Select Languages to Work With [0/6]")
+            print("Select Languages to Work With [2/8]")
             print("=" * 70)
             print()
             if self.args.languages.lower() == 'all':
@@ -165,19 +189,26 @@ class ProjectSetup:
             return f"[{num:2d}] {lang['name']}"
 
         self.selected_languages = select_languages_single_row(
-            "Select Languages to Work With", self.all_languages, lang_formatter_func, "language", step_info="[0/6]"
+            "Select Languages to Work With", self.all_languages, lang_formatter_func, "language", step_info="[2/8]"
         )
 
     def _select_models(self):
         all_models_dict = self.models_config.get("available_models", {})
 
+        _tier_rank = {'cpu_only': 0, 'low': 1, 'medium': 2, 'high': 3}
+        current_rank = _tier_rank.get(self.tier, 1)
+
         selected_lang_codes = {lang['code'] for lang in self.selected_languages}
         self.available_models = []
         for key, value in all_models_dict.items():
             model_langs = set(value.get("languages", []))
-            if model_langs.intersection(selected_lang_codes):
-                 value['key'] = key
-                 self.available_models.append(value)
+            if not model_langs.intersection(selected_lang_codes):
+                continue
+            min_tier = value.get('min_tier', 'cpu_only')
+            if _tier_rank.get(min_tier, 0) > current_rank:
+                continue
+            value['key'] = key
+            self.available_models.append(value)
 
         if not self.available_models:
             print("\nError: No available models support the selected languages.")
@@ -186,7 +217,7 @@ class ProjectSetup:
         if self.args.models:
             print()
             print("=" * 70)
-            print("Select Translation Models to Install [1/6]")
+            print("Select Translation Models to Install [3/8]")
             print("=" * 70)
             print()
             if self.args.models.lower() == 'all':
@@ -204,15 +235,27 @@ class ProjectSetup:
 
         # Interactive selection
         def model_formatter_func(model, num):
+            import re
             supported_count = len(set(model['languages']).intersection(selected_lang_codes))
+            files = model.get('files', {})
+            if files:
+                quant = self._quant_for_tier(model, self.tier)
+                size = model.get(f'size_{quant}') or '?'
+                quant_label = f"{quant} Â· {size}"
+            else:
+                filename = model.get('file') or model.get('destination') or ''
+                m = re.search(r'Q\d+_K_[MS]', filename)
+                quant = m.group(0) if m else None
+                size = model.get('size') or '?'
+                quant_label = f"{quant} Â· {size}" if quant else size
             return (
-                f"  [{num:2d}] {model['name']} ({model['size']})\n"
+                f"  [{num:2d}] {model['name']}  [{quant_label}]\n"
                 f"      - Supports {supported_count}/{len(self.selected_languages)} of your languages\n"
                 f"      - {model.get('description', 'No description available.')}"
             )
 
         self.selected_models = select_multiple_items(
-            "Select Translation Models to Install", self.available_models, model_formatter_func, "model", step_info="[1/6]"
+            "Select Translation Models to Install", self.available_models, model_formatter_func, "model", step_info="[3/8]"
         )
 
     def _save_config(self):
@@ -264,7 +307,7 @@ class ProjectSetup:
     def _setup_python_env(self):
         print()
         print("=" * 70)
-        print("Setting up Python Environment [2/6]")
+        print("Setting up Python Environment [4/8]")
         print("=" * 70)
         print()
 
@@ -310,11 +353,12 @@ class ProjectSetup:
         needs_transformers = False
         needs_tiktoken = False
 
+        _llama_cpp_models = {'aya23', 'orion-14b', 'ayaExpanse8b', 'euroLLM9b', 'euroLLM22b'}
         for model in self.selected_models:
             model_key = model.get('key', '')
-            if model_key in ['aya23', 'orion-14b']:
+            if model_key in _llama_cpp_models:
                 needs_llama_cpp = True
-            if model_key in ['madlad-400-3b', 'seamlessm4t-v2']:
+            if model.get('huggingface_download'):
                 needs_transformers = True
             if model.get('requires_tiktoken'):
                 needs_tiktoken = True
@@ -349,7 +393,10 @@ class ProjectSetup:
                 print("  transformers already installed")
             else:
                 print("  Installing transformers...")
-                self._run_venv_pip(["install", "transformers"], quiet=True)
+                self._run_venv_pip(["install", "transformers", "sentencepiece"], quiet=True)
+            if not self._check_package_installed("sentencepiece"):
+                print("  Installing sentencepiece...")
+                self._run_venv_pip(["install", "sentencepiece"], quiet=True)
 
             # Install tiktoken and protobuf if needed
             if needs_tiktoken:
@@ -413,11 +460,60 @@ class ProjectSetup:
         except:
             return False
 
-    def _download_models(self):
+    def _quant_for_tier(self, model_config: dict, tier: str) -> str:
+        """Return the quant name (e.g. 'Q5_K_M') for this model at the given tier."""
+        try:
+            import yaml as _yaml
+            profiles_path = ROOT_DIR / "models" / "compute_profiles.yaml"
+            with open(profiles_path, "r", encoding="utf-8") as f:
+                profiles = _yaml.safe_load(f)
+            model_key = model_config.get('key', '')
+            quant = profiles.get("profiles", {}).get(tier, {}).get(model_key, {}).get("quant")
+            if quant and quant in model_config.get('files', {}):
+                return quant
+        except Exception:
+            pass
+        files = model_config.get('files', {})
+        return next((q for q in ('Q4_K_M', 'Q3_K_M') if q in files), next(iter(files), '?'))
+
+    def _pick_quant_for_tier(self, model_config: dict, tier: str) -> str | None:
+        """Return the filename to download for a multi-quant model given the current tier."""
+        files = model_config.get('files', {})
+        if not files:
+            return None
+        try:
+            sys.path.insert(0, str(ROOT_DIR / "src"))
+            import yaml as _yaml
+            profiles_path = ROOT_DIR / "models" / "compute_profiles.yaml"
+            with open(profiles_path, "r", encoding="utf-8") as f:
+                profiles = _yaml.safe_load(f)
+            model_key = model_config.get('key', '')
+            quant = profiles.get("profiles", {}).get(tier, {}).get(model_key, {}).get("quant")
+            if quant and quant in files:
+                return files[quant]
+        except Exception:
+            pass
+        # Fallback: smallest available quant
+        return files.get('Q4_K_M') or files.get('Q3_K_M') or next(iter(files.values()))
+
+    def _detect_hardware_tier(self) -> str:
+        """Detect hardware tier without writing the full profile. Returns tier string."""
+        try:
+            sys.path.insert(0, str(ROOT_DIR / "src"))
+            from hardware import _detect_tier
+            import yaml as _yaml
+            system_file = ROOT_DIR / "models" / "current_system.yaml"
+            with open(system_file, "r", encoding="utf-8") as f:
+                system = _yaml.safe_load(f)
+            return _detect_tier(system)
+        except Exception:
+            return "low"  # safe default
+
+    def _download_models(self, tier: str = "low"):
         from huggingface_hub import hf_hub_download
         print()
         print("=" * 70)
-        print("Downloading Selected Translation Models [3/6]")
+        print("Downloading Selected Translation Models [5/8]")
         print("=" * 70)
         print()
         for model in self.selected_models:
@@ -433,19 +529,33 @@ class ProjectSetup:
 
             repo_id = model_config['repo']
             if model_config.get('huggingface_download'):
-                 # Download both model and tokenizer for transformers models
-                 py_code = f"from transformers import AutoModelForSeq2SeqLM, AutoTokenizer; model = AutoModelForSeq2SeqLM.from_pretrained('{repo_id}'); tokenizer = AutoTokenizer.from_pretrained('{repo_id}'); model.save_pretrained('{dest_path.as_posix()}'); tokenizer.save_pretrained('{dest_path.as_posix()}')"
-                 subprocess.run([str(self.venv_python), "-c", py_code], check=True, capture_output=True)
+                model_class = model_config.get('model_class', 'AutoModelForSeq2SeqLM')
+                tokenizer_class = model_config.get('tokenizer_class', 'AutoTokenizer')
+                py_code = (
+                    f"from transformers import {model_class}, {tokenizer_class}; "
+                    f"model = {model_class}.from_pretrained('{repo_id}'); "
+                    f"tokenizer = {tokenizer_class}.from_pretrained('{repo_id}'); "
+                    f"model.save_pretrained('{dest_path.as_posix()}'); "
+                    f"tokenizer.save_pretrained('{dest_path.as_posix()}')"
+                )
+                subprocess.run([str(self.venv_python), "-c", py_code], check=True)
             else:
-                hf_hub_download(repo_id=repo_id, filename=model_config['file'], local_dir=str(dest_path.parent), local_dir_use_symlinks=False)
-                downloaded_file = dest_path.parent / model_config['file']
-                if downloaded_file.exists() and downloaded_file != dest_path:
-                    downloaded_file.rename(dest_path)
+                if 'file' in model_config:
+                    filename = model_config['file']
+                    hf_hub_download(repo_id=repo_id, filename=filename, local_dir=str(dest_path.parent))
+                    downloaded_file = dest_path.parent / filename
+                    if downloaded_file.exists() and downloaded_file != dest_path:
+                        downloaded_file.rename(dest_path)
+                else:
+                    filename = self._pick_quant_for_tier(model_config, tier)
+                    print(f"      Quant: {filename} (tier={tier})")
+                    dest_path.mkdir(parents=True, exist_ok=True)
+                    hf_hub_download(repo_id=repo_id, filename=filename, local_dir=str(dest_path))
 
     def _download_tools(self):
         print()
         print("=" * 70)
-        print("Downloading External Tools [4/6]")
+        print("Downloading External Tools [6/8]")
         print("=" * 70)
         print()
         renpy_config = self.tools_config['tools']['renpy']
@@ -486,7 +596,7 @@ class ProjectSetup:
     def _verify_installation(self):
         print()
         print("=" * 70)
-        print("Verifying Installation [5/6]")
+        print("Verifying Installation [7/8]")
         print("=" * 70)
         print()
 
@@ -503,9 +613,10 @@ class ProjectSetup:
             all_good = False
 
         # Check model-specific packages
+        _llama_cpp_models = {'aya23', 'orion-14b', 'ayaExpanse8b', 'euroLLM9b', 'euroLLM22b'}
         for model in self.selected_models:
             model_key = model.get('key', '')
-            if model_key in ['aya23', 'orion-14b']:
+            if model_key in _llama_cpp_models:
                 # Use pip check instead of import check for llama-cpp-python
                 # because import can fail due to CUDA/DLL issues even when installed
                 if self._check_package_in_pip("llama-cpp-python"):
@@ -521,7 +632,7 @@ class ProjectSetup:
 
         for model in self.selected_models:
             model_key = model.get('key', '')
-            if model_key in ['madlad-400-3b', 'seamlessm4t-v2']:
+            if model.get('huggingface_download'):
                 if self._check_package_installed("transformers"):
                     print("    - transformers: installed")
                 else:
@@ -560,14 +671,39 @@ class ProjectSetup:
                             print(f"    - {model['name']}: NOT FOUND")
                             all_good = False
                     else:
-                        # GGUF file model
-                        size_gb = dest_path.stat().st_size / (1024**3)
+                        # GGUF file model (file path or directory with gguf)
+                        if dest_path.is_dir():
+                            gguf_files = list(dest_path.glob('*.gguf'))
+                            size_gb = sum(f.stat().st_size for f in gguf_files) / (1024**3)
+                        else:
+                            size_gb = dest_path.stat().st_size / (1024**3)
                         print(f"    - {model['name']}: {size_gb:.2f} GB")
                 else:
                     print(f"    - {model['name']}: NOT FOUND")
                     all_good = False
 
         return all_good
+
+    def _detect_hardware(self):
+        print()
+        print("=" * 70)
+        print("Detecting Hardware & Writing Compute Profile [8/8]")
+        print("=" * 70)
+        print()
+
+        try:
+            sys.path.insert(0, str(ROOT_DIR / "src"))
+            from hardware import detect_and_write_profile
+            profile = detect_and_write_profile()
+            print(f"  Tier  : {profile['tier']}")
+            print(f"  GPU   : {profile['gpu']} ({profile['vram_gb']}GB VRAM)")
+            print("  Models available in this tier:")
+            for name, params in profile["models"].items():
+                print(f"    - {name}: n_ctx={params['n_ctx']}, quant={params['quant']}")
+            print(f"\n  Profile written to: models/compute_profile.yaml")
+        except Exception as e:
+            print(f"  WARNING: Hardware detection failed: {e}")
+            print("  Translation will still work via translate.py (existing flow)")
 
     def _print_footer(self, all_good):
         print("\n" + "=" * 70)
