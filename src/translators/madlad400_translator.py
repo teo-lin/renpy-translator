@@ -246,20 +246,31 @@ class MADLAD400Translator:
             print(f"[DEBUG] Device: {self.device}")
             print(f"[DEBUG] Model device: {next(self.model.parameters()).device}")
 
-        # Generate translation
-        with torch.no_grad():
-            # Generate with proper parameters
-            # NOTE: MADLAD requires explicit max_new_tokens and beam search for quality
-            outputs = self.model.generate(
-                **inputs,  # Pass all tokenizer outputs (input_ids, attention_mask, etc.)
+        def _generate(inputs_dict):
+            return self.model.generate(
+                **inputs_dict,
                 max_new_tokens=max_length,
                 num_beams=max(1, num_beams),
                 early_stopping=True,
-                do_sample=False,  # Use deterministic generation for better quality
-                no_repeat_ngram_size=4,  # Stronger prevention of repetition
-                repetition_penalty=1.2,  # Stronger penalty to prevent repetitions
-                length_penalty=1.0  # Neutral length penalty
+                do_sample=False,
+                no_repeat_ngram_size=4,
+                repetition_penalty=1.2,
+                length_penalty=1.0
             )
+
+        # Generate translation; fall back to CPU if CUDA kernel is incompatible
+        with torch.no_grad():
+            try:
+                outputs = _generate(inputs)
+            except RuntimeError as e:
+                if "cuda" in str(e).lower() and self.device != "cpu":
+                    print(f"  CUDA error during generate, retrying on CPU: {e}")
+                    self.model = self.model.to("cpu")
+                    self.device = "cpu"
+                    cpu_inputs = {k: v.to("cpu") for k, v in inputs.items()}
+                    outputs = _generate(cpu_inputs)
+                else:
+                    raise
 
         if os.getenv('DEBUG_MADLAD'):
             print(f"[DEBUG] Output tokens shape: {outputs.shape}")

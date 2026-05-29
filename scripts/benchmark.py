@@ -42,8 +42,10 @@ if sys.platform == "win32":
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from translators.aya23_translator import Aya23Translator
 from translators.helsinkyRo_translator import QuickMTTranslator
+from translators.llama_cpp_translator import LlamaCppTranslator
 from translators.madlad400_translator import MADLAD400Translator
 from translators.mbartRo_translator import MBARTTranslator
+from translators.nllb200_translator import NLLB200Translator
 from translators.seamless96_translator import SeamlessM4Tv2Translator
 
 
@@ -147,6 +149,46 @@ def detect_language_from_filename(filename: str) -> str:
     return 'Romanian'
 
 
+def _resolve_model_file(project_root: Path, model_key: str, model_info: dict) -> Path:
+    dest_path = project_root / model_info['destination']
+    if 'files' not in model_info:
+        return dest_path
+    profile_path = project_root / 'models' / 'compute_profile.yaml'
+    if profile_path.exists():
+        with open(profile_path, 'r', encoding='utf-8') as f:
+            profile = yaml.safe_load(f)
+        file_rel = profile.get('models', {}).get(model_key, {}).get('file')
+        if file_rel:
+            return project_root / file_rel
+    files = model_info['files']
+    filename = files.get('Q4_K_M') or files.get('Q3_K_M') or next(iter(files.values()))
+    return dest_path / filename
+
+
+def _load_profile_params(project_root: Path, model_key: str) -> dict:
+    profile_path = project_root / 'models' / 'compute_profile.yaml'
+    if profile_path.exists():
+        with open(profile_path, 'r', encoding='utf-8') as f:
+            profile = yaml.safe_load(f)
+        params = profile.get('models', {}).get(model_key, {})
+        if params:
+            return {
+                'n_gpu_layers': params.get('n_gpu_layers', -1),
+                'n_ctx': params.get('n_ctx', 8192),
+                'n_batch': params.get('n_batch', 256),
+            }
+    return {'n_gpu_layers': -1, 'n_ctx': 8192, 'n_batch': 256}
+
+
+def detect_lang_code_from_filename(filename: str) -> str:
+    for code in ['ro', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'tr', 'cs', 'pl',
+                 'uk', 'bg', 'zh', 'ja', 'ko', 'vi', 'th', 'id', 'ar', 'he',
+                 'fa', 'hi', 'bn', 'nl', 'sv', 'da', 'fi', 'el', 'hu']:
+        if filename.startswith(f'{code}_') or f'_{code}_' in filename:
+            return code
+    return 'ro'
+
+
 def run_benchmark(data_path: Path, glossary_path: Path = None, model_key: str = "aya23") -> Dict:
     """
     Run translation quality benchmark
@@ -190,18 +232,30 @@ def run_benchmark(data_path: Path, glossary_path: Path = None, model_key: str = 
     print(f"\nModel: {model_info['name']}")
     print(f"Initializing translator...")
 
+    lang_code = detect_lang_code_from_filename(data_path.name)
+
     # Create translator based on model type
     if model_key == "aya23":
-        model_path = project_root / model_info['file']
+        model_path = project_root / model_info['destination']
         translator = Aya23Translator(str(model_path), target_language=target_language)
-    elif model_key == "helsinkyRo":
-        translator = QuickMTTranslator()
+    elif model_key in ("helsinkyRo", "helsinkiRo"):
+        model_path = project_root / model_info['destination']
+        translator = QuickMTTranslator(model_path=str(model_path), target_language=target_language)
     elif model_key == "madlad400":
-        translator = MADLAD400Translator()
+        translator = MADLAD400Translator(target_language=target_language)
     elif model_key == "mbartRo":
-        translator = MBARTTranslator()
-    elif model_key == "seamless96":
-        translator = SeamlessM4Tv2Translator()
+        model_path = project_root / model_info['destination']
+        translator = MBARTTranslator(model_path=str(model_path), target_language=target_language)
+    elif model_key == "nllb200":
+        model_path = project_root / model_info['destination']
+        translator = NLLB200Translator(model_path=str(model_path), target_language=target_language, lang_code=lang_code)
+    elif model_key in ("seamlessm96", "seamless96"):
+        model_path = project_root / model_info['destination']
+        translator = SeamlessM4Tv2Translator(model_name=str(model_path), target_language=target_language)
+    elif model_key in ("ayaExpanse8b", "euroLLM9b"):
+        model_path = _resolve_model_file(project_root, model_key, model_info)
+        profile_params = _load_profile_params(project_root, model_key)
+        translator = LlamaCppTranslator(model_path=str(model_path), target_language=target_language, **profile_params)
     else:
         print(f"ERROR: Model '{model_key}' not supported for benchmarking")
         sys.exit(1)

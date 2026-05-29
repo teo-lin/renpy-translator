@@ -201,3 +201,25 @@ def setup_sys_path():
     parent_dir = str(get_project_root() / "src")
     if parent_dir not in sys.path:
         sys.path.insert(0, parent_dir)
+
+
+def probe_device() -> str:
+    """
+    Return 'cuda' if CUDA is available and kernels actually work, else 'cpu'.
+    Some systems report CUDA as available but fail at kernel execution
+    (driver/toolkit version mismatch). A cheap probe catches this early so
+    models are loaded on the right device from the start.
+    """
+    try:
+        import torch
+    except ImportError:
+        return "cpu"
+    if not torch.cuda.is_available():
+        return "cpu"
+    try:
+        t = torch.zeros(2, dtype=torch.float32, device="cuda")
+        torch.isin(t, t)
+        return "cuda"
+    except RuntimeError:
+        print("  CUDA available but kernels failed probe -- falling back to CPU")
+        return "cpu"

@@ -24,8 +24,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from models import ParsedBlock, is_separator_block, parse_block_id
 from translators.aya23_translator import Aya23Translator
 from translators.helsinkyRo_translator import QuickMTTranslator
+from translators.llama_cpp_translator import LlamaCppTranslator
 from translators.madlad400_translator import MADLAD400Translator
 from translators.mbartRo_translator import MBARTTranslator
+from translators.nllb200_translator import NLLB200Translator
 from translators.seamless96_translator import SeamlessM4Tv2Translator
 from renpy_utils import show_progress
 
@@ -343,7 +345,40 @@ def load_resources(project_root: Path, target_lang_code: str):
     return glossary, prompt_template
 
 
-def initialize_translator(model_key: str, model_path: Path, target_language: str, glossary: dict, prompt_template: str):
+def _resolve_model_file(project_root: Path, model_key: str, model_config: dict) -> Path:
+    """Resolve the actual file path for a model (handles multi-quant GGUF and directory models)."""
+    dest_path = project_root / model_config['destination']
+    if 'files' not in model_config:
+        return dest_path
+    profile_path = project_root / 'models' / 'compute_profile.yaml'
+    if profile_path.exists():
+        with open(profile_path, 'r', encoding='utf-8') as f:
+            profile = yaml.safe_load(f)
+        file_rel = profile.get('models', {}).get(model_key, {}).get('file')
+        if file_rel:
+            return project_root / file_rel
+    files = model_config['files']
+    filename = files.get('Q4_K_M') or files.get('Q3_K_M') or next(iter(files.values()))
+    return dest_path / filename
+
+
+def _load_profile_params(project_root: Path, model_key: str) -> dict:
+    """Load llama-cpp inference params from compute_profile.yaml."""
+    profile_path = project_root / 'models' / 'compute_profile.yaml'
+    if profile_path.exists():
+        with open(profile_path, 'r', encoding='utf-8') as f:
+            profile = yaml.safe_load(f)
+        params = profile.get('models', {}).get(model_key, {})
+        if params:
+            return {
+                'n_gpu_layers': params.get('n_gpu_layers', -1),
+                'n_ctx': params.get('n_ctx', 8192),
+                'n_batch': params.get('n_batch', 256),
+            }
+    return {'n_gpu_layers': -1, 'n_ctx': 8192, 'n_batch': 256}
+
+
+def initialize_translator(model_key: str, model_path: Path, target_language: str, glossary: dict, prompt_template: str, project_root: Path = None, lang_code: str = None):
     """Initialize the appropriate translator based on model key."""
     # Map model keys to translator classes
     translator_map = {
@@ -351,7 +386,10 @@ def initialize_translator(model_key: str, model_path: Path, target_language: str
         'helsinkiRo': QuickMTTranslator,
         'madlad400': MADLAD400Translator,
         'mbartRo': MBARTTranslator,
+        'nllb200': NLLB200Translator,
         'seamlessm96': SeamlessM4Tv2Translator,
+        'ayaExpanse8b': LlamaCppTranslator,
+        'euroLLM9b': LlamaCppTranslator,
     }
 
     translator_class = translator_map.get(model_key)
@@ -383,17 +421,29 @@ def initialize_translator(model_key: str, model_path: Path, target_language: str
             trust_remote_code=True
         )
     elif model_key == 'seamlessm96':
-        # SeamlessM4Tv2 uses model directory
         return translator_class(
             model_name=str(model_path),
             target_language=target_language,
             glossary=glossary
         )
-    else:
-        # Default initialization
+    elif model_key == 'nllb200':
         return translator_class(
-            target_language=target_language
+            model_path=str(model_path),
+            target_language=target_language,
+            lang_code=lang_code or 'ro',
+            glossary=glossary
         )
+    elif model_key in ('ayaExpanse8b', 'euroLLM9b'):
+        profile_params = _load_profile_params(project_root, model_key) if project_root else {}
+        return translator_class(
+            model_path=str(model_path),
+            target_language=target_language,
+            prompt_template=prompt_template,
+            glossary=glossary,
+            **profile_params
+        )
+    else:
+        return translator_class(target_language=target_language)
 
 
 def main():
@@ -441,15 +491,10 @@ def main():
         print(f"ERROR: Model '{args.model}' not found in models_config.yaml")
         sys.exit(1)
 
-    model_path = project_root / model_config['destination']
-    if model_config['file'] is None:  # Directory-based model
-        if not model_path.is_dir():
-            print(f"ERROR: Model directory not found: {model_path}")
-            sys.exit(1)
-    else:  # File-based model
-        if not model_path.is_file():
-            print(f"ERROR: Model file not found: {model_path}")
-            sys.exit(1)
+    model_path = _resolve_model_file(project_root, args.model, model_config)
+    if not model_path.exists():
+        print(f"ERROR: Model not found: {model_path}")
+        sys.exit(1)
 
     # Load resources
     print("\nLoading resources...")
@@ -475,7 +520,9 @@ def main():
         model_path,
         target_language_name.capitalize(),
         glossary,
-        prompt_template
+        prompt_template,
+        project_root=project_root,
+        lang_code=target_language_code,
     )
 
     # Initialize benchmark translator

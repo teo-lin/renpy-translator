@@ -118,6 +118,84 @@ class TestLlamaCppTranslatorIntegration(unittest.TestCase):
         del t
 
 
+@unittest.skipIf(
+    not (PROJECT_ROOT / "models/ayaExpanse8b").exists() or
+    not any((PROJECT_ROOT / "models/ayaExpanse8b").glob("*.gguf")),
+    "ayaExpanse8b model not downloaded"
+)
+class TestAyaExpanse8bIntegration(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        from translators.llama_cpp_translator import LlamaCppTranslator
+        gguf_files = list((PROJECT_ROOT / "models/ayaExpanse8b").glob("*.gguf"))
+        cls.translator = LlamaCppTranslator(
+            model_path=str(gguf_files[0]),
+            target_language="Romanian",
+            n_gpu_layers=-1,
+            n_ctx=2048,
+            n_batch=128,
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        del cls.translator
+
+    def test_translate_returns_nonempty_string(self):
+        result = self.translator.translate("Hello!")
+        self.assertIsInstance(result, str)
+        self.assertGreater(len(result.strip()), 0)
+
+    def test_translate_with_context(self):
+        result = self.translator.translate(
+            "How are you?",
+            context=["Alice: Hello!"],
+            speaker="Alice",
+        )
+        self.assertIsInstance(result, str)
+
+    def test_target_language_property(self):
+        self.assertEqual(self.translator.target_language, "Romanian")
+
+
+@unittest.skipIf(
+    not (PROJECT_ROOT / "models/euroLLM9b").exists() or
+    not any((PROJECT_ROOT / "models/euroLLM9b").glob("*.gguf")),
+    "euroLLM9b model not downloaded"
+)
+class TestEuroLLM9bIntegration(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        from translators.llama_cpp_translator import LlamaCppTranslator
+        gguf_files = list((PROJECT_ROOT / "models/euroLLM9b").glob("*.gguf"))
+        cls.translator = LlamaCppTranslator(
+            model_path=str(gguf_files[0]),
+            target_language="Romanian",
+            n_gpu_layers=-1,
+            n_ctx=2048,
+            n_batch=128,
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        del cls.translator
+
+    def test_translate_returns_nonempty_string(self):
+        result = self.translator.translate("Hello!")
+        self.assertIsInstance(result, str)
+        self.assertGreater(len(result.strip()), 0)
+
+    def test_translate_with_context(self):
+        result = self.translator.translate(
+            "How are you?",
+            context=["Alice: Hello!"],
+            speaker="Alice",
+        )
+        self.assertIsInstance(result, str)
+
+    def test_target_language_property(self):
+        self.assertEqual(self.translator.target_language, "Romanian")
+
+
 @unittest.skipIf(_MODEL_PATH is None, _SKIP_REASON)
 class TestAya23WrapperTranslatorIntegration(unittest.TestCase):
     """

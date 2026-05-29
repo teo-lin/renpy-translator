@@ -7,6 +7,7 @@ Lightweight model optimized for speed.
 
 import warnings
 from pathlib import Path
+from translators.translator_utils import probe_device
 
 # Try to import transformers dependencies
 try:
@@ -54,7 +55,7 @@ class QuickMTTranslator:
 
         # Auto-detect device
         if device is None:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
+            device = probe_device()
         self.device = device
 
         # Use local model path if not provided
@@ -82,9 +83,9 @@ class QuickMTTranslator:
         self.model = MarianMTModel.from_pretrained(
             str(model_path),
             low_cpu_mem_usage=True,
-            device_map="auto",
-            dtype=torch.float16 if device == "cuda" else torch.float32
+            torch_dtype=torch.float16 if device == "cuda" else torch.float32
         )
+        self.model = self.model.to(device)
 
         self.model.eval()
         print("Model loaded successfully!")
@@ -113,22 +114,29 @@ class QuickMTTranslator:
         inputs = self.tokenizer(text, return_tensors="pt")
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
-        # Generate translation
-        with torch.no_grad():
-            generated_tokens = self.model.generate(
-                **inputs,
+        def _generate(inputs_dict):
+            return self.model.generate(
+                **inputs_dict,
                 max_new_tokens=max_length,
                 num_beams=num_beams,
                 early_stopping=True
             )
 
-        # Decode translation
+        with torch.no_grad():
+            try:
+                generated_tokens = _generate(inputs)
+            except RuntimeError as e:
+                if "cuda" in str(e).lower() and self.device != "cpu":
+                    print(f"  CUDA error during generate, retrying on CPU: {e}")
+                    self.model = self.model.to("cpu")
+                    self.device = "cpu"
+                    cpu_inputs = {k: v.to("cpu") for k, v in inputs.items()}
+                    generated_tokens = _generate(cpu_inputs)
+                else:
+                    raise
+
         translation = self.tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
-
-        # Clean up translation
-        translation = translation.strip()
-
-        return translation
+        return translation.strip()
 
 
 if __name__ == "__main__":

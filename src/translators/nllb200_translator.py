@@ -5,6 +5,7 @@ Language codes use NLLB format: ron_Latn, eng_Latn, spa_Latn, etc.
 """
 
 from pathlib import Path
+from translators.translator_utils import probe_device
 
 try:
     import torch
@@ -79,7 +80,7 @@ class NLLB200Translator:
         self.glossary = glossary or {}
 
         if device is None:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
+            device = probe_device()
         self.device = device
 
         if model_path is None:
@@ -108,9 +109,9 @@ class NLLB200Translator:
         self.model = AutoModelForSeq2SeqLM.from_pretrained(
             self.model_path,
             low_cpu_mem_usage=True,
-            device_map="auto",
             torch_dtype=torch.float16 if device == "cuda" else torch.float32,
         )
+        self.model = self.model.to(device)
         self.model.eval()
 
         print("Model loaded successfully!")
@@ -131,15 +132,28 @@ class NLLB200Translator:
         inputs = self.tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
-        forced_bos = self.tokenizer.lang_code_to_id[self.nllb_tgt]
+        forced_bos = self.tokenizer.convert_tokens_to_ids(self.nllb_tgt)
 
-        with torch.no_grad():
-            tokens = self.model.generate(
-                **inputs,
+        def _generate(inputs_dict):
+            return self.model.generate(
+                **inputs_dict,
                 forced_bos_token_id=forced_bos,
                 max_new_tokens=max_new_tokens,
                 num_beams=num_beams,
                 early_stopping=True,
             )
+
+        with torch.no_grad():
+            try:
+                tokens = _generate(inputs)
+            except RuntimeError as e:
+                if "cuda" in str(e).lower() and self.device != "cpu":
+                    print(f"  CUDA error during generate, retrying on CPU: {e}")
+                    self.model = self.model.to("cpu")
+                    self.device = "cpu"
+                    cpu_inputs = {k: v.to("cpu") for k, v in inputs.items()}
+                    tokens = _generate(cpu_inputs)
+                else:
+                    raise
 
         return self.tokenizer.batch_decode(tokens, skip_special_tokens=True)[0].strip()

@@ -49,7 +49,7 @@ class TestMBARTIntegration(BaseTranslatorIntegrationTest):
         Tests translation of a simple phrase to Romanian.
         """
         english_text = "The quick brown fox jumps over the lazy dog."
-        expected_romanian = "fox-ul brun rapid sări repede peste câinele lejer."
+        expected_romanian = "fox-ul brun rapid sărit peste c\xe2inele lejer."
 
         self._assert_translation(english_text, expected_romanian)
 

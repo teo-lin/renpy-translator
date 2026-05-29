@@ -8,6 +8,7 @@ Optimized for high-quality text translation with nearly 100 languages supported.
 import warnings
 from pathlib import Path
 from contextlib import contextmanager
+from translators.translator_utils import probe_device
 
 # Suppress known non-critical warnings for this module
 warnings.filterwarnings("ignore", message=".*SwigPy.*", category=DeprecationWarning)
@@ -131,7 +132,7 @@ class SeamlessM4Tv2Translator:
 
         # Auto-detect device
         if device is None:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
+            device = probe_device()
         self.device = device
 
         # Use local model path
@@ -155,11 +156,11 @@ class SeamlessM4Tv2Translator:
         # Use memory-efficient loading to avoid paging file errors
         self.model = SeamlessM4Tv2Model.from_pretrained(
             str(model_path),
-            low_cpu_mem_usage=True,  # Reduces RAM usage during loading
-            device_map="auto",  # Automatically manages memory across CPU/GPU
-            dtype=torch.float16 if device == "cuda" else torch.float32,  # Use half precision on GPU
+            low_cpu_mem_usage=True,
+            torch_dtype=torch.float16 if device == "cuda" else torch.float32,
             local_files_only=True
-        ) # Missing closing parenthesis was here
+        )
+        self.model = self.model.to(device)
 
         self.model.eval()
 
@@ -232,17 +233,29 @@ class SeamlessM4Tv2Translator:
         if 'attention_mask' in text_inputs:
             text_inputs['attention_mask'] = text_inputs['attention_mask'].to(torch.long)
 
-        # Generate translation
-        with torch.no_grad():
-            output_tokens = self.model.generate(
-                **text_inputs,
+        def _generate(inputs_dict):
+            return self.model.generate(
+                **inputs_dict,
                 tgt_lang=self.lang_code_3letter,
                 max_new_tokens=max_length,
                 num_beams=num_beams,
                 early_stopping=True,
-                generate_speech=False,              # Explicitly disable speech generation
-                return_intermediate_token_ids=True, # Explicitly request text token IDs
+                generate_speech=False,
+                return_intermediate_token_ids=True,
             )
+
+        with torch.no_grad():
+            try:
+                output_tokens = _generate(text_inputs)
+            except RuntimeError as e:
+                if "cuda" in str(e).lower() and self.device != "cpu":
+                    print(f"  CUDA error during generate, retrying on CPU: {e}")
+                    self.model = self.model.to("cpu")
+                    self.device = "cpu"
+                    cpu_inputs = {k: v.to("cpu") for k, v in text_inputs.items()}
+                    output_tokens = _generate(cpu_inputs)
+                else:
+                    raise
 
         # When return_intermediate_token_ids=True and generate_speech=False,
         # output_tokens is a ModelOutput object with a 'sequences' attribute for text tokens.
