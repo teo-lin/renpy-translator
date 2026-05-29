@@ -29,6 +29,7 @@ from translators.madlad400_translator import MADLAD400Translator
 from translators.mbartRo_translator import MBARTTranslator
 from translators.nllb200_translator import NLLB200Translator
 from translators.seamless96_translator import SeamlessM4Tv2Translator
+from translators.translator_utils import load_prompt_template
 from renpy_utils import show_progress
 
 
@@ -337,15 +338,8 @@ def load_resources(project_root: Path, target_lang_code: str):
     if not glossary:
         glossary = None
 
-    # Load prompt template with fallback
-    prompt_template = None
-    for prompt_variant in ["translate_uncensored.txt", "translate.txt"]:
-        prompt_path = project_root / "data" / "prompts" / prompt_variant
-        if prompt_path.exists():
-            with open(prompt_path, 'r', encoding='utf-8') as f:
-                prompt_template = f.read()
-            print(f"[OK] Using prompt: {prompt_variant}")
-            break
+    # Load prompt template (per-language override -> generic fallback)
+    prompt_template = load_prompt_template(target_lang_code, project_root)
 
     return glossary, prompt_template
 

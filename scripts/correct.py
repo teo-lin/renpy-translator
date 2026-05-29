@@ -214,11 +214,25 @@ class LLMBasedCorrector:
     TAG_PATTERN = re.compile(r'\{[^}]+\}')
     VAR_PATTERN = re.compile(r'\[[^\]]+\]')
 
-    def __init__(self, model_path: str):
+    def __init__(self, model_path: str, target_language: str = "Romanian"):
         """Initialize LLM corrector with Aya-23-8B model"""
         from translators.aya23_translator import Aya23Translator
         print("Initializing LLM-based correction system...")
-        self.translator = Aya23Translator(model_path)
+        self.translator = Aya23Translator(model_path, target_language=target_language)
+        self.target_language = target_language
+
+        # Load correction prompt template (uncensored variant first, then base)
+        project_root = Path(__file__).parent.parent
+        self.prompt_template = None
+        for variant in ("correct_uncensored.txt", "correct.txt"):
+            tpl_path = project_root / "data" / "prompts" / variant
+            if tpl_path.exists():
+                self.prompt_template = tpl_path.read_text(encoding="utf-8")
+                print(f"[OK] Using correction prompt: {variant}")
+                break
+        if self.prompt_template is None:
+            print("[WARNING] No correction prompt template found, using inline default")
+
         print("[OK] Ready for LLM corrections\n")
 
     def extract_tags(self, text: str) -> Tuple[str, List[Tuple[int, str]]]:
@@ -316,30 +330,19 @@ class LLMBasedCorrector:
 
     def create_correction_prompt(self, romanian_text: str) -> str:
         """Create prompt for correcting Romanian text"""
-        prompt = f"""You are a Romanian grammar expert. Correct ONLY the grammatical errors in this Romanian text.
-
-CRITICAL RULES - YOU MUST FOLLOW THESE EXACTLY:
-1. Fix verb conjugations (especially subjunctive mood with "să")
-   Example: "să merge" → "să meargă" or "să vadă" instead of "să vede"
-2. Fix reflexive pronouns (te, se, mă, ne, vă) when grammatically required
-   Example: "Vreau să spăl" → "Vreau să mă spăl" (reflexive: to wash oneself)
-3. Fix gender/number agreement (adjectives must match nouns)
-4. Fix diacritics (adica → adică, etc.)
-5. Fix spelling errors (nici una → niciuna)
-
-ABSOLUTE PROHIBITIONS - NEVER DO THESE:
-1. NEVER change proper names (names of people, places) - keep capitalized words EXACTLY as-is
-2. NEVER change punctuation (keep ..., ?!?, !!, etc. exactly as written)
-3. NEVER remove or add words unless fixing grammar (keep meaning 100% identical)
-4. NEVER change sentence structure unless grammatically wrong
-5. NEVER add or remove spaces around ... or other punctuation
-6. If text is already grammatically correct, return it UNCHANGED
-7. Do NOT translate to English
-8. Do NOT add explanations
-
-Romanian text to correct: {romanian_text}
-Corrected Romanian:"""
-        return prompt
+        if self.prompt_template:
+            return self.prompt_template.format(
+                target_language=self.target_language,
+                text=romanian_text,
+            )
+        # Fallback if no template file was found at init.
+        return (
+            f"You are a {self.target_language} grammar expert. Correct ONLY the "
+            f"grammatical errors. Fix subjunctive after 'să' (e.g. 'să fute' → "
+            f"'să fută'). Keep meaning, punctuation and proper names unchanged.\n\n"
+            f"{self.target_language} text to correct: {romanian_text}\n"
+            f"Corrected {self.target_language}:"
+        )
 
     def correct_text(self, romanian_text: str) -> Tuple[str, bool]:
         """
@@ -801,27 +804,26 @@ def main():
         print("Error: Cannot use both --patterns-only and --llm-only")
         sys.exit(1)
 
-    # Determine language code
+    # Determine language code + name (both are needed downstream)
+    lang_code_map = {
+        'Romanian': 'ro',
+        'Spanish': 'es',
+        'French': 'fr',
+        'German': 'de',
+        'Italian': 'it',
+        'Portuguese': 'pt',
+        'Russian': 'ru',
+        'Turkish': 'tr',
+        'Czech': 'cs',
+        'Polish': 'pl',
+        'Ukrainian': 'uk',
+    }
+    code_to_name = {v: k for k, v in lang_code_map.items()}
     if args.language:
-        # Language code provided explicitly
         lang_code = args.language
+        target_language = code_to_name.get(lang_code, lang_code.capitalize())
     else:
-        # Detect language from path
         target_language = detect_language_from_path(input_path)
-        # Map language names to ISO codes
-        lang_code_map = {
-            'Romanian': 'ro',
-            'Spanish': 'es',
-            'French': 'fr',
-            'German': 'de',
-            'Italian': 'it',
-            'Portuguese': 'pt',
-            'Russian': 'ru',
-            'Turkish': 'tr',
-            'Czech': 'cs',
-            'Polish': 'pl',
-            'Ukrainian': 'uk'
-        }
         lang_code = lang_code_map.get(target_language, target_language.lower()[:2])
 
     # Setup paths
@@ -899,7 +901,7 @@ def main():
         if not model_path.exists():
             print(f"Error: Model not found at {model_path}")
             sys.exit(1)
-        llm_corrector = LLMBasedCorrector(str(model_path))
+        llm_corrector = LLMBasedCorrector(str(model_path), target_language=target_language)
 
     # Create combined corrector
     combined = CombinedCorrector(patterns_corrector, llm_corrector)

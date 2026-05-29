@@ -959,7 +959,7 @@ class TestRunner:
         if failed_count > 0:
             print("\033[91mSome tests failed!\033[0m")
             return 1
-        elif skipped_count == len(self.results):
+        elif all(r.all_skipped for r in self.results):
             print("\033[93mAll tests skipped (models not installed).\033[0m")
             return 0
         else:
