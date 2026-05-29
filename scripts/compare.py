@@ -632,6 +632,7 @@ def run_full_comparison(game_name: str, language: str) -> int:
     # Step 1: Load models configuration
     print("[1/5] Loading models configuration...")
     models_config_path = project_root / "models" / "models_config.yaml"
+    current_config_path = project_root / "models" / "current_config.yaml"
 
     if not models_config_path.exists():
         print(f"ERROR: Models configuration not found at {models_config_path}")
@@ -641,7 +642,12 @@ def run_full_comparison(game_name: str, language: str) -> int:
     with open(models_config_path, 'r', encoding='utf-8') as f:
         models_config = yaml.safe_load(f)
 
-    installed_models = models_config.get('installed_models', [])
+    if current_config_path.exists():
+        with open(current_config_path, 'r', encoding='utf-8') as f:
+            current_config = yaml.safe_load(f)
+        installed_models = current_config.get('installed_models', [])
+    else:
+        installed_models = models_config.get('installed_models', [])
 
     if not installed_models:
         print("ERROR: No models are installed!")

@@ -520,9 +520,17 @@ class ProjectSetup:
             model_config = model
             dest_path = ROOT_DIR / model_config['destination']
 
-            if dest_path.exists() and (not dest_path.is_dir() or any(dest_path.iterdir())):
-                 print(f"    Model '{model['name']}' already downloaded.")
-                 continue
+            if model_config.get('huggingface_download'):
+                already_done = dest_path.is_dir() and any(
+                    f for f in dest_path.iterdir() if f.suffix in ('.safetensors', '.bin', '.json')
+                )
+            elif dest_path.is_dir():
+                already_done = any(dest_path.glob('*.gguf'))
+            else:
+                already_done = dest_path.exists()
+            if already_done:
+                print(f"    Model '{model['name']}' already downloaded.")
+                continue
 
             print(f"    Downloading {model['name']}...")
             dest_path.parent.mkdir(parents=True, exist_ok=True)

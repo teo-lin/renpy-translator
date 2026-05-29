@@ -7,6 +7,7 @@ Optimized for broad language coverage including rare and low-resource languages.
 
 import warnings
 from pathlib import Path
+from translators.translator_utils import probe_device, safe_generate
 
 # Try to import transformers dependencies
 try:
@@ -107,7 +108,7 @@ class MADLAD400Translator:
 
         # Auto-detect device
         if device is None:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
+            device = probe_device()
         self.device = device
 
         print(f"Initializing MADLAD-400-3B Translation (EN->{target_language})...")
@@ -259,18 +260,7 @@ class MADLAD400Translator:
             )
 
         # Generate translation; fall back to CPU if CUDA kernel is incompatible
-        with torch.no_grad():
-            try:
-                outputs = _generate(inputs)
-            except RuntimeError as e:
-                if "cuda" in str(e).lower() and self.device != "cpu":
-                    print(f"  CUDA error during generate, retrying on CPU: {e}")
-                    self.model = self.model.to("cpu")
-                    self.device = "cpu"
-                    cpu_inputs = {k: v.to("cpu") for k, v in inputs.items()}
-                    outputs = _generate(cpu_inputs)
-                else:
-                    raise
+        outputs, self.model, self.device = safe_generate(self.model, inputs, self.device, _generate)
 
         if os.getenv('DEBUG_MADLAD'):
             print(f"[DEBUG] Output tokens shape: {outputs.shape}")

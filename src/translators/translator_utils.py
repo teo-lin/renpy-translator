@@ -203,6 +203,26 @@ def setup_sys_path():
         sys.path.insert(0, parent_dir)
 
 
+def safe_generate(model, inputs: dict, device: str, generate_fn):
+    """
+    Call generate_fn(inputs) inside torch.no_grad().
+    On a CUDA RuntimeError, moves model and inputs to CPU and retries once.
+    Returns (outputs, model, device) — caller should reassign self.model / self.device.
+    """
+    import torch
+    with torch.no_grad():
+        try:
+            return generate_fn(inputs), model, device
+        except RuntimeError as e:
+            if "cuda" in str(e).lower() and device != "cpu":
+                print(f"  CUDA error during generate, retrying on CPU: {e}")
+                model = model.to("cpu")
+                device = "cpu"
+                cpu_inputs = {k: v.to("cpu") for k, v in inputs.items()}
+                return generate_fn(cpu_inputs), model, device
+            raise
+
+
 def probe_device() -> str:
     """
     Return 'cuda' if CUDA is available and kernels actually work, else 'cpu'.
@@ -217,8 +237,8 @@ def probe_device() -> str:
     if not torch.cuda.is_available():
         return "cpu"
     try:
-        t = torch.zeros(2, dtype=torch.float32, device="cuda")
-        torch.isin(t, t)
+        t = torch.zeros(2, 2, dtype=torch.float32, device="cuda")
+        _ = torch.matmul(t, t)
         return "cuda"
     except RuntimeError:
         print("  CUDA available but kernels failed probe -- falling back to CPU")

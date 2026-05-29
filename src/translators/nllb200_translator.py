@@ -5,7 +5,7 @@ Language codes use NLLB format: ron_Latn, eng_Latn, spa_Latn, etc.
 """
 
 from pathlib import Path
-from translators.translator_utils import probe_device
+from translators.translator_utils import probe_device, safe_generate
 
 try:
     import torch
@@ -143,17 +143,6 @@ class NLLB200Translator:
                 early_stopping=True,
             )
 
-        with torch.no_grad():
-            try:
-                tokens = _generate(inputs)
-            except RuntimeError as e:
-                if "cuda" in str(e).lower() and self.device != "cpu":
-                    print(f"  CUDA error during generate, retrying on CPU: {e}")
-                    self.model = self.model.to("cpu")
-                    self.device = "cpu"
-                    cpu_inputs = {k: v.to("cpu") for k, v in inputs.items()}
-                    tokens = _generate(cpu_inputs)
-                else:
-                    raise
+        tokens, self.model, self.device = safe_generate(self.model, inputs, self.device, _generate)
 
         return self.tokenizer.batch_decode(tokens, skip_special_tokens=True)[0].strip()

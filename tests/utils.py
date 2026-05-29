@@ -448,6 +448,12 @@ class TestResult:
     duration: timedelta
     exit_code: int
     device: Optional[str] = None
+    n_passed: int = 0
+    n_skipped: int = 0
+
+    @property
+    def all_skipped(self) -> bool:
+        return self.passed and self.n_skipped > 0 and self.n_passed == 0
 
 
 class TestRunner:
@@ -701,8 +707,8 @@ class TestRunner:
 
         start_time = time.time()
 
-        # Build command
-        cmd = [str(self.python_exe), str(test_file)]
+        # Build command — run via pytest so @unittest.skipIf shows as SKIP not PASS
+        cmd = [str(self.python_exe), "-m", "pytest", str(test_file), "-v", "--tb=short", "--no-header"]
 
         # Add arguments for tests that need them
         if test_file.name in self.tests_needing_model_script and selected_model:
@@ -713,13 +719,24 @@ class TestRunner:
                 "--model_key", selected_model['key']
             ])
 
-        # Run test
+        # Run test, capture output so we can parse skip/pass counts
+        import re as _re
+        n_passed = 0
+        n_skipped = 0
         try:
-            print(f"[DEBUG] Launching test process: {test_file}", flush=True)
-            print(f"[DEBUG] Command: {' '.join(cmd)}", flush=True)  
-            result = subprocess.run(cmd, capture_output=False)
-            print(f"[DEBUG] Test process exited with code {result.returncode}", flush=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+            # Print output so user sees test details
+            if result.stdout:
+                print(result.stdout, end="")
+            if result.stderr:
+                print(result.stderr, end="")
             exit_code = result.returncode
+            # Parse pytest summary line, e.g. "2 passed, 3 skipped in 0.05s"
+            combined = result.stdout + result.stderr
+            if m := _re.search(r'(\d+) passed', combined):
+                n_passed = int(m.group(1))
+            if m := _re.search(r'(\d+) skipped', combined):
+                n_skipped = int(m.group(1))
         except Exception as e:
             print(f"Error running test: {e}")
             exit_code = 1
@@ -734,7 +751,9 @@ class TestRunner:
             passed=(exit_code == 0),
             duration=duration,
             exit_code=exit_code,
-            device=test_device if needs_device else None
+            device=test_device if needs_device else None,
+            n_passed=n_passed,
+            n_skipped=n_skipped,
         )
 
     def print_summary(self):
@@ -743,7 +762,8 @@ class TestRunner:
         print("TEST SUMMARY")
         print("=" * 70)
 
-        passed_count = sum(1 for r in self.results if r.passed)
+        passed_count = sum(1 for r in self.results if r.passed and not r.all_skipped)
+        skipped_count = sum(1 for r in self.results if r.all_skipped)
         failed_count = sum(1 for r in self.results if not r.passed)
         total_duration = sum((r.duration for r in self.results), timedelta())
 
@@ -752,8 +772,12 @@ class TestRunner:
         max_name_length = max(len(r.name) for r in self.results) if self.results else 0
 
         for result in self.results:
-            status = "PASS" if result.passed else "FAIL"
-            color_code = "\033[92m" if result.passed else "\033[91m"  # Green or Red
+            if not result.passed:
+                status, color_code = "FAIL", "\033[91m"
+            elif result.all_skipped:
+                status, color_code = "SKIP", "\033[93m"
+            else:
+                status, color_code = "PASS", "\033[92m"
             reset_code = "\033[0m"
 
             # Format duration
@@ -799,6 +823,7 @@ class TestRunner:
 
         print(f"Total: {len(self.results)} tests | ", end="")
         print(f"\033[92mPassed: {passed_count}\033[0m | ", end="")
+        print(f"\033[93mSkipped: {skipped_count}\033[0m | ", end="")
 
         if failed_count > 0:
             print(f"\033[91mFailed: {failed_count}\033[0m | ", end="")
@@ -932,6 +957,9 @@ class TestRunner:
         if failed_count > 0:
             print("\033[91mSome tests failed!\033[0m")
             return 1
+        elif skipped_count == len(self.results):
+            print("\033[93mAll tests skipped (models not installed).\033[0m")
+            return 0
         else:
             print("\033[92mAll tests passed!\033[0m")
             return 0

@@ -8,7 +8,7 @@ Optimized for high-quality text translation with nearly 100 languages supported.
 import warnings
 from pathlib import Path
 from contextlib import contextmanager
-from translators.translator_utils import probe_device
+from translators.translator_utils import probe_device, safe_generate
 
 # Suppress known non-critical warnings for this module
 warnings.filterwarnings("ignore", message=".*SwigPy.*", category=DeprecationWarning)
@@ -244,18 +244,7 @@ class SeamlessM4Tv2Translator:
                 return_intermediate_token_ids=True,
             )
 
-        with torch.no_grad():
-            try:
-                output_tokens = _generate(text_inputs)
-            except RuntimeError as e:
-                if "cuda" in str(e).lower() and self.device != "cpu":
-                    print(f"  CUDA error during generate, retrying on CPU: {e}")
-                    self.model = self.model.to("cpu")
-                    self.device = "cpu"
-                    cpu_inputs = {k: v.to("cpu") for k, v in text_inputs.items()}
-                    output_tokens = _generate(cpu_inputs)
-                else:
-                    raise
+        output_tokens, self.model, self.device = safe_generate(self.model, text_inputs, self.device, _generate)
 
         # When return_intermediate_token_ids=True and generate_speech=False,
         # output_tokens is a ModelOutput object with a 'sequences' attribute for text tokens.

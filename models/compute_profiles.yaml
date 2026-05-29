@@ -55,7 +55,7 @@ profiles:
       quant: Q5_K_M
     euroLLM9b:
       n_gpu_layers: -1
-      n_ctx: 16384
+      n_ctx: 4096
       n_batch: 512
       quant: Q5_K_M
     # euroLLM22b omitted: Q4_K_M=13.7GB, does not fit in 8GB VRAM
