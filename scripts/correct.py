@@ -80,12 +80,13 @@ def show_progress(current, total, start_time, prefix=""):
 class PatternBasedCorrector:
     """Fast, reliable corrections using predefined patterns"""
 
-    def __init__(self, corrections_file: str):
-        """Load correction patterns from YAML or JSON file"""
-        file_path = Path(corrections_file)
-
-        with open(corrections_file, 'r', encoding='utf-8') as f:
-            self.corrections = yaml.safe_load(f)
+    def __init__(self, corrections_file: str = None, corrections_dict: dict = None):
+        """Load correction patterns from YAML file or pre-merged dict"""
+        if corrections_dict is not None:
+            self.corrections = corrections_dict
+        else:
+            with open(corrections_file, 'r', encoding='utf-8') as f:
+                self.corrections = yaml.safe_load(f)
 
         self.protected_words = set(self.corrections.get('protected_words', []))
         print(f"[OK] Loaded pattern-based corrections")
@@ -852,31 +853,47 @@ def main():
 
     model_path = project_root / model_config['destination']
 
-    # Generic corrections fallback: uncensored → censored, YAML → JSON
-    corrections_file = None
-    for corrections_variant in [
-        f"{lang_code}_uncensored_corrections.yaml",
-        f"{lang_code}_corrections.yaml"
-    ]:
-        candidate = project_root / "data" / corrections_variant
-        if candidate.exists():
-            corrections_file = candidate
-            print(f"[OK] Using corrections: {corrections_variant}")
-            break
+    # Load corrections: merge base + uncensored when both exist
+    def _merge_corrections(base, overlay):
+        merged = dict(base)
+        for k, v in overlay.items():
+            if k in merged:
+                bv = merged[k]
+                if isinstance(bv, dict) and isinstance(v, dict):
+                    merged[k] = {**bv, **v}
+                elif isinstance(bv, list) and isinstance(v, list):
+                    merged[k] = bv + v
+                else:
+                    merged[k] = v
+            else:
+                merged[k] = v
+        return merged
+
+    corrections_dict = {}
+    base_corr = project_root / "data" / f"{lang_code}_corrections.yaml"
+    uncensored_corr = project_root / "data" / f"{lang_code}_uncensored_corrections.yaml"
+    if base_corr.exists():
+        with open(base_corr, 'r', encoding='utf-8') as f:
+            corrections_dict = yaml.safe_load(f) or {}
+        print(f"[OK] Using corrections: {lang_code}_corrections.yaml")
+    if uncensored_corr.exists():
+        with open(uncensored_corr, 'r', encoding='utf-8') as f:
+            corrections_dict = _merge_corrections(corrections_dict, yaml.safe_load(f) or {})
+        print(f"[OK] Using corrections: {lang_code}_uncensored_corrections.yaml")
 
     # Initialize correctors based on flags
     patterns_corrector = None
     llm_corrector = None
 
     if not llm_only:
-        if not corrections_file:
+        if not corrections_dict:
             print(f"[WARNING] No corrections file found for {target_language} ({lang_code})")
             if patterns_only:
                 print("Error: --patterns-only requires a corrections file")
                 sys.exit(1)
             print("[INFO] Skipping pattern-based corrections")
         else:
-            patterns_corrector = PatternBasedCorrector(str(corrections_file))
+            patterns_corrector = PatternBasedCorrector(corrections_dict=corrections_dict)
 
     if not patterns_only:
         if not model_path.exists():

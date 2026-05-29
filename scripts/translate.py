@@ -375,28 +375,51 @@ def load_resources(project_root: Path, game_config: Dict, target_lang_code: str)
 
     Returns: (glossary, corrections, prompt_template)
     """
-    # Load glossary with fallback (YAML-only)
-    glossary = None
-    for glossary_variant in [f"{target_lang_code}_uncensored_glossary.yaml", f"{target_lang_code}_glossary.yaml"]:
-        glossary_path = project_root / "data" / glossary_variant
-        if glossary_path.exists():
-            with open(glossary_path, 'r', encoding='utf-8-sig') as f:
-                glossary = yaml.safe_load(f)
-            print(f"[OK] Using glossary: {glossary_variant}")
-            break
-
+    # Load glossary: merge base + uncensored when both exist
+    glossary = {}
+    base_gloss_path = project_root / "data" / f"{target_lang_code}_glossary.yaml"
+    uncensored_gloss_path = project_root / "data" / f"{target_lang_code}_uncensored_glossary.yaml"
+    if base_gloss_path.exists():
+        with open(base_gloss_path, 'r', encoding='utf-8-sig') as f:
+            glossary = yaml.safe_load(f) or {}
+        print(f"[OK] Using glossary: {target_lang_code}_glossary.yaml")
+    if uncensored_gloss_path.exists():
+        with open(uncensored_gloss_path, 'r', encoding='utf-8-sig') as f:
+            glossary = {**glossary, **(yaml.safe_load(f) or {})}
+        print(f"[OK] Using glossary: {target_lang_code}_uncensored_glossary.yaml")
     if not glossary:
+        glossary = None
         print(f"[WARNING] No glossary found for language code '{target_lang_code}'")
 
-    # Load corrections with fallback (YAML-only, for future use)
-    corrections = None
-    for corrections_variant in [f"{target_lang_code}_uncensored_corrections.yaml", f"{target_lang_code}_corrections.yaml"]:
-        corrections_path = project_root / "data" / corrections_variant
-        if corrections_path.exists():
-            with open(corrections_path, 'r', encoding='utf-8-sig') as f:
-                corrections = yaml.safe_load(f)
-            print(f"[OK] Using corrections: {corrections_variant}")
-            break
+    # Load corrections: merge base + uncensored when both exist
+    def _merge_corrections(base, overlay):
+        merged = dict(base)
+        for k, v in overlay.items():
+            if k in merged:
+                bv = merged[k]
+                if isinstance(bv, dict) and isinstance(v, dict):
+                    merged[k] = {**bv, **v}
+                elif isinstance(bv, list) and isinstance(v, list):
+                    merged[k] = bv + v
+                else:
+                    merged[k] = v
+            else:
+                merged[k] = v
+        return merged
+
+    corrections = {}
+    base_corr_path = project_root / "data" / f"{target_lang_code}_corrections.yaml"
+    uncensored_corr_path = project_root / "data" / f"{target_lang_code}_uncensored_corrections.yaml"
+    if base_corr_path.exists():
+        with open(base_corr_path, 'r', encoding='utf-8-sig') as f:
+            corrections = yaml.safe_load(f) or {}
+        print(f"[OK] Using corrections: {target_lang_code}_corrections.yaml")
+    if uncensored_corr_path.exists():
+        with open(uncensored_corr_path, 'r', encoding='utf-8-sig') as f:
+            corrections = _merge_corrections(corrections, yaml.safe_load(f) or {})
+        print(f"[OK] Using corrections: {target_lang_code}_uncensored_corrections.yaml")
+    if not corrections:
+        corrections = None
 
     # Load prompt template with fallback
     prompt_template = None

@@ -7,7 +7,7 @@ Optimized for broad language coverage including rare and low-resource languages.
 
 import warnings
 from pathlib import Path
-from translators.translator_utils import probe_device, safe_generate
+from translators.translator_utils import probe_device, safe_generate, apply_glossary
 
 # Try to import transformers dependencies
 try:
@@ -106,7 +106,6 @@ class MADLAD400Translator:
 
         self.lang_code = lang_code
 
-        # Auto-detect device
         if device is None:
             device = probe_device()
         self.device = device
@@ -137,18 +136,21 @@ class MADLAD400Translator:
                 warnings.filterwarnings('ignore', message='.*incorrect regex pattern.*')
                 self.tokenizer = AutoTokenizer.from_pretrained(str(model_path), local_files_only=True)
 
-            # Use memory-efficient loading with float16 (like other models)
             # NOTE: We avoid device_map="auto" for MADLAD because the large vocabulary (400 languages)
             # causes it to incorrectly offload layers to CPU even when GPU has enough memory
             try:
                 self.model = AutoModelForSeq2SeqLM.from_pretrained(
                     str(model_path),
                     trust_remote_code=trust_remote_code,
-                    dtype=torch.bfloat16,
+                    torch_dtype=torch.bfloat16,
                     local_files_only=True
                 )
                 # Manually move to device (more reliable than device_map for this model)
                 self.model = self.model.to(self.device)
+                # Transformers 5.9+ refuses to tie shared.weight/decoder.embed_tokens.weight
+                # when the checkpoint stores both with slightly different values.
+                # Without tying, the decoder uses a wrong embedding matrix → garbage output.
+                self.model.decoder.embed_tokens.weight = self.model.shared.weight
             except (OSError, RuntimeError) as e:
                 error_msg = str(e).lower()
                 if "paging file" in error_msg or "1455" in error_msg:
@@ -185,32 +187,7 @@ class MADLAD400Translator:
         return self._target_language
 
     def _apply_glossary(self, text: str, translation: str) -> str:
-        """
-        Apply glossary terms to translation (basic implementation)
-
-        Args:
-            text: Original English text
-            translation: Translated text
-
-        Returns:
-            Translation with glossary terms applied
-        """
-        if not self.glossary:
-            return translation
-
-        # Find glossary terms that appear in the original text
-        for en_term, target_term in self.glossary.items():
-            # Skip comment entries
-            if en_term.startswith("_comment"):
-                continue
-
-            # Case-insensitive search in original
-            if en_term.lower() in text.lower():
-                # Try to replace in translation
-                # This is a simple approach - more sophisticated logic could be added
-                pass
-
-        return translation
+        return apply_glossary(text, translation, self.glossary)
 
     def translate(self, text: str, max_length: int = 256, num_beams: int = 4,
                   temperature: float = 1.0, context: list = None,
@@ -247,17 +224,24 @@ class MADLAD400Translator:
             print(f"[DEBUG] Device: {self.device}")
             print(f"[DEBUG] Model device: {next(self.model.parameters()).device}")
 
-        def _generate(inputs_dict):
+        def _generate(inputs_dict, beams=num_beams):
             return self.model.generate(
                 **inputs_dict,
                 max_new_tokens=max_length,
-                num_beams=max(1, num_beams),
+                num_beams=max(1, beams),
                 early_stopping=True,
                 do_sample=False,
                 no_repeat_ngram_size=4,
                 repetition_penalty=1.2,
                 length_penalty=1.0
             )
+
+        def _is_latin(s: str) -> bool:
+            alpha = [c for c in s if c.isalpha()]
+            if not alpha:
+                return False
+            latin = sum(1 for c in alpha if ord(c) < 0x0500)
+            return latin / len(alpha) >= 0.8
 
         # Generate translation; fall back to CPU if CUDA kernel is incompatible
         outputs, self.model, self.device = safe_generate(self.model, inputs, self.device, _generate)
@@ -268,6 +252,17 @@ class MADLAD400Translator:
 
         # Decode translation
         translation = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
+
+        # If output is non-Latin (e.g. Georgian/Arabic garbage), retry with greedy decoding
+        if not _is_latin(translation):
+            print(f"  [MADLAD] Non-Latin output detected, retrying with greedy decoding...")
+            def _generate_greedy(inputs_dict):
+                return _generate(inputs_dict, beams=1)
+            outputs, self.model, self.device = safe_generate(self.model, inputs, self.device, _generate_greedy)
+            translation = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
+            if not _is_latin(translation):
+                print(f"  [MADLAD] Greedy also non-Latin, skipping block.")
+                return ""
 
         # Apply glossary if available
         translation = self._apply_glossary(text, translation)

@@ -322,15 +322,20 @@ def load_config(project_root: Path, game_name: str) -> Dict:
 
 def load_resources(project_root: Path, target_lang_code: str):
     """Load glossary and prompt template."""
-    # Load glossary with fallback (YAML-only)
-    glossary = None
-    for glossary_variant in [f"{target_lang_code}_uncensored_glossary.yaml", f"{target_lang_code}_glossary.yaml"]:
-        glossary_path = project_root / "data" / glossary_variant
-        if glossary_path.exists():
-            with open(glossary_path, 'r', encoding='utf-8') as f:
-                glossary = yaml.safe_load(f)
-            print(f"[OK] Using glossary: {glossary_variant}")
-            break
+    # Load glossary: merge base + uncensored when both exist
+    glossary = {}
+    base_gloss = project_root / "data" / f"{target_lang_code}_glossary.yaml"
+    uncensored_gloss = project_root / "data" / f"{target_lang_code}_uncensored_glossary.yaml"
+    if base_gloss.exists():
+        with open(base_gloss, 'r', encoding='utf-8') as f:
+            glossary = yaml.safe_load(f) or {}
+        print(f"[OK] Using glossary: {target_lang_code}_glossary.yaml")
+    if uncensored_gloss.exists():
+        with open(uncensored_gloss, 'r', encoding='utf-8') as f:
+            glossary = {**glossary, **(yaml.safe_load(f) or {})}
+        print(f"[OK] Using glossary: {target_lang_code}_uncensored_glossary.yaml")
+    if not glossary:
+        glossary = None
 
     # Load prompt template with fallback
     prompt_template = None

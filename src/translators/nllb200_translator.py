@@ -5,7 +5,7 @@ Language codes use NLLB format: ron_Latn, eng_Latn, spa_Latn, etc.
 """
 
 from pathlib import Path
-from translators.translator_utils import probe_device, safe_generate
+from translators.translator_utils import probe_device, safe_generate, apply_glossary
 
 try:
     import torch
@@ -108,8 +108,7 @@ class NLLB200Translator:
         )
         self.model = AutoModelForSeq2SeqLM.from_pretrained(
             self.model_path,
-            low_cpu_mem_usage=True,
-            dtype=torch.float16 if device == "cuda" else torch.float32,
+            torch_dtype=torch.float16 if device == "cuda" else torch.float32,
         )
         self.model = self.model.to(device)
         self.model.eval()
@@ -145,4 +144,6 @@ class NLLB200Translator:
 
         tokens, self.model, self.device = safe_generate(self.model, inputs, self.device, _generate)
 
-        return self.tokenizer.batch_decode(tokens, skip_special_tokens=True)[0].strip()
+        translation = self.tokenizer.batch_decode(tokens, skip_special_tokens=True)[0]
+        translation = apply_glossary(text, translation, self.glossary)
+        return translation.strip()

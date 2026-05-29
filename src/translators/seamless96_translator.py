@@ -8,7 +8,7 @@ Optimized for high-quality text translation with nearly 100 languages supported.
 import warnings
 from pathlib import Path
 from contextlib import contextmanager
-from translators.translator_utils import probe_device, safe_generate
+from translators.translator_utils import probe_device, safe_generate, apply_glossary
 
 # Suppress known non-critical warnings for this module
 warnings.filterwarnings("ignore", message=".*SwigPy.*", category=DeprecationWarning)
@@ -156,8 +156,7 @@ class SeamlessM4Tv2Translator:
         # Use memory-efficient loading to avoid paging file errors
         self.model = SeamlessM4Tv2Model.from_pretrained(
             str(model_path),
-            low_cpu_mem_usage=True,
-            dtype=torch.float16 if device == "cuda" else torch.float32,
+            torch_dtype=torch.float16 if device == "cuda" else torch.float32,
             local_files_only=True
         )
         self.model = self.model.to(device)
@@ -173,32 +172,7 @@ class SeamlessM4Tv2Translator:
         return self._target_language
 
     def _apply_glossary(self, text: str, translation: str) -> str:
-        """
-        Apply glossary terms to translation (basic implementation)
-
-        Args:
-            text: Original English text
-            translation: Translated text
-
-        Returns:
-            Translation with glossary terms applied
-        """
-        if not self.glossary:
-            return translation
-
-        # Find glossary terms that appear in the original text
-        for en_term, target_term in self.glossary.items():
-            # Skip comment entries
-            if en_term.startswith("_comment"):
-                continue
-
-            # Case-insensitive search in original
-            if en_term.lower() in text.lower():
-                # Try to replace in translation
-                # This is a simple approach - more sophisticated logic could be added
-                pass
-
-        return translation
+        return apply_glossary(text, translation, self.glossary)
 
     def translate(self, text: str, max_length: int = 256, num_beams: int = 5,
                   context: list = None, speaker: str = None) -> str:

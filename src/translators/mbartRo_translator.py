@@ -6,12 +6,12 @@ Optimized for English to Romanian translation.
 """
 
 from pathlib import Path
-from translators.translator_utils import probe_device, safe_generate
+from translators.translator_utils import probe_device, safe_generate, apply_glossary
 
 # Try to import transformers dependencies
 try:
     import torch
-    from transformers import MBartForConditionalGeneration, MBartTokenizer
+    from transformers import MBartForConditionalGeneration, MBartTokenizer, AutoTokenizer
     TRANSFORMERS_AVAILABLE = True
     IMPORT_ERROR = None
 except ImportError as e:
@@ -73,13 +73,12 @@ class MBARTTranslator:
         print(f"  Loading model... This may take 30-60 seconds...")
 
         # Load tokenizer and model from local path
-        self.tokenizer = MBartTokenizer.from_pretrained(str(model_path))
+        self.tokenizer = AutoTokenizer.from_pretrained(str(model_path))
 
         # Use memory-efficient loading
         self.model = MBartForConditionalGeneration.from_pretrained(
             str(model_path),
-            low_cpu_mem_usage=True,
-            dtype=torch.float16 if device == "cuda" else torch.float32
+            torch_dtype=torch.float16 if device == "cuda" else torch.float32
         )
         self.model = self.model.to(device)
 
@@ -134,11 +133,8 @@ class MBARTTranslator:
         generated_tokens, self.model, self.device = safe_generate(self.model, inputs, self.device, _generate)
 
         translation = self.tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
-
-        # Clean up translation
-        translation = translation.strip()
-
-        return translation
+        translation = apply_glossary(text, translation, self.glossary)
+        return translation.strip()
 
 
 if __name__ == "__main__":

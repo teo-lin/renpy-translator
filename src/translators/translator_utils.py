@@ -20,38 +20,93 @@ def get_project_root() -> Path:
     return Path(__file__).parent.parent.parent
 
 
+def _merge_dicts(base: dict, overlay: dict) -> dict:
+    """Merge two dicts. Dicts recurse, lists concatenate (base first), scalars use overlay."""
+    merged = dict(base)
+    for key, overlay_val in overlay.items():
+        if key in merged:
+            base_val = merged[key]
+            if isinstance(base_val, dict) and isinstance(overlay_val, dict):
+                merged[key] = {**base_val, **overlay_val}
+            elif isinstance(base_val, list) and isinstance(overlay_val, list):
+                merged[key] = base_val + overlay_val
+            else:
+                merged[key] = overlay_val
+        else:
+            merged[key] = overlay_val
+    return merged
+
+
 def load_glossary(lang_code: str, project_root: Optional[Path] = None) -> Optional[Dict]:
     """
-    Load glossary for a language with fallback hierarchy.
+    Load glossary for a language, merging base + uncensored when both exist.
 
-    Tries to load in this order:
-    1. {lang_code}_uncensored_glossary.yaml
-    2. {lang_code}_glossary.yaml
+    If {lang_code}_uncensored_glossary.yaml exists, it is merged with
+    {lang_code}_glossary.yaml (uncensored entries take priority).
+    Falls back to just the base glossary when no uncensored file exists.
 
     Args:
         lang_code: Language code (e.g., 'ro', 'es', 'fr')
         project_root: Project root path (auto-detected if not provided)
 
     Returns:
-        Dictionary with glossary terms or None if no glossary found
+        Merged dictionary with glossary terms or None if no glossary found
     """
     if project_root is None:
         project_root = get_project_root()
 
-    glossary_variants = [
-        f"{lang_code}_uncensored_glossary.yaml",
-        f"{lang_code}_glossary.yaml"
-    ]
+    base_path = project_root / "data" / f"{lang_code}_glossary.yaml"
+    uncensored_path = project_root / "data" / f"{lang_code}_uncensored_glossary.yaml"
 
-    for glossary_variant in glossary_variants:
-        glossary_path = project_root / "data" / glossary_variant
-        if glossary_path.exists():
-            with open(glossary_path, 'r', encoding='utf-8') as f:
-                glossary = yaml.safe_load(f)
-            print(f"[OK] Using glossary: {glossary_variant}")
-            return glossary
+    base = {}
+    if base_path.exists():
+        with open(base_path, 'r', encoding='utf-8') as f:
+            base = yaml.safe_load(f) or {}
+        print(f"[OK] Using glossary: {lang_code}_glossary.yaml")
 
-    return None
+    if uncensored_path.exists():
+        with open(uncensored_path, 'r', encoding='utf-8') as f:
+            uncensored = yaml.safe_load(f) or {}
+        print(f"[OK] Using glossary: {lang_code}_uncensored_glossary.yaml")
+        return {**base, **uncensored}
+
+    return base if base else None
+
+
+def load_corrections(lang_code: str, project_root: Optional[Path] = None) -> Optional[Dict]:
+    """
+    Load corrections for a language, merging base + uncensored when both exist.
+
+    If {lang_code}_uncensored_corrections.yaml exists, its entries are merged with
+    {lang_code}_corrections.yaml (dicts merge with uncensored winning, lists concatenate).
+    Falls back to just the base corrections when no uncensored file exists.
+
+    Args:
+        lang_code: Language code (e.g., 'ro', 'es', 'fr')
+        project_root: Project root path (auto-detected if not provided)
+
+    Returns:
+        Merged corrections dict or None if no corrections found
+    """
+    if project_root is None:
+        project_root = get_project_root()
+
+    base_path = project_root / "data" / f"{lang_code}_corrections.yaml"
+    uncensored_path = project_root / "data" / f"{lang_code}_uncensored_corrections.yaml"
+
+    base = {}
+    if base_path.exists():
+        with open(base_path, 'r', encoding='utf-8') as f:
+            base = yaml.safe_load(f) or {}
+        print(f"[OK] Using corrections: {lang_code}_corrections.yaml")
+
+    if uncensored_path.exists():
+        with open(uncensored_path, 'r', encoding='utf-8') as f:
+            uncensored = yaml.safe_load(f) or {}
+        print(f"[OK] Using corrections: {lang_code}_uncensored_corrections.yaml")
+        return _merge_dicts(base, uncensored)
+
+    return base if base else None
 
 
 def get_language_code_map() -> Dict[str, str]:
@@ -221,6 +276,28 @@ def safe_generate(model, inputs: dict, device: str, generate_fn):
                 cpu_inputs = {k: v.to("cpu") for k, v in inputs.items()}
                 return generate_fn(cpu_inputs), model, device
             raise
+
+
+def apply_glossary(source_text: str, translation: str, glossary: dict) -> str:
+    """
+    Replace English terms left verbatim in translation with glossary targets.
+    Only substitutes when the term appears in the source AND as a whole word
+    in the translation (i.e. the model left it untranslated).
+    """
+    import re
+    if not glossary:
+        return translation
+    for en_term, target_term in glossary.items():
+        if en_term.startswith("_comment"):
+            continue
+        if not isinstance(target_term, str):
+            continue
+        if en_term.lower() not in source_text.lower():
+            continue
+        pattern = r'\b' + re.escape(en_term) + r'\b'
+        if re.search(pattern, translation, flags=re.IGNORECASE):
+            translation = re.sub(pattern, target_term, translation, flags=re.IGNORECASE)
+    return translation
 
 
 def probe_device() -> str:
