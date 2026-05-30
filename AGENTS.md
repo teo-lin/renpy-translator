@@ -6,6 +6,7 @@
 - Use only ASCII characters in code: `->` not `->` (U+2192), `>=` not `>=`, `...` not `...`, etc.
 - This project runs on Windows with cp1252 as the default console encoding. Non-ASCII characters in print/log output will raise UnicodeEncodeError at runtime.
 - The same rule applies to test files, scripts, config files, and any other text written to disk.
+- Never use `python -c "..."` inline code. Always write a temporary `.py` script file and run it instead.
 
 ## No emojis
 

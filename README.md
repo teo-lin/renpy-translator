@@ -2,7 +2,7 @@
 
 ## Goal
 
-Local LLM transtation from English to Romanian of visual ren'py novels, fully context-aware, gramattically correct, following the same tone and style as the original, absolutely no censorship, no profanity filtering, no adult language guardrails.
+Local LLM transtation from English to Romanian of visual ren'py novels, fully context-aware, gramattically correct, following the same tone and style as the original, no censorship/filtering with the best available models (12 tested, 10+ available)
 
 ## Features
 

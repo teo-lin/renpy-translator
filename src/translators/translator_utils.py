@@ -286,8 +286,7 @@ _GLOSSARY_PAREN_SUFFIX = None  # compiled lazily to avoid top-level import cost
 
 
 def _glossary_base_form(key: str) -> str:
-    """Strip a trailing parenthetical disambiguator from a glossary key.
-    'to fuck (subjunctive he/she)' -> 'to fuck'."""
+    """Strip a trailing parenthetical disambiguator from a glossary key."""
     import re
     global _GLOSSARY_PAREN_SUFFIX
     if _GLOSSARY_PAREN_SUFFIX is None:
@@ -298,9 +297,8 @@ def _glossary_base_form(key: str) -> str:
 def glossary_prompt_entries(glossary: dict, text: str, limit: int = 30) -> list:
     """Pick glossary entries to include in an LLM translation prompt.
 
-    Matches on the base form of each key (parenthetical disambiguators stripped),
-    so an entry like 'to fuck (subjunctive he/she)' is matched against a source
-    containing 'to fuck'. When a base matches, ALL variants sharing that base
+    Matches on the base form of each key (parenthetical disambiguators stripped).
+     When a base matches, ALL variants sharing that base
     are emitted together so the model sees the full conjugation table in context.
 
     Returns formatted '"en" = "target"' strings, capped at `limit` entries
@@ -361,8 +359,7 @@ def apply_source_conditioned(source_text: str, translation: str, replacements) -
     `right`. A replacement fires when `source_contains` appears anywhere in
     the source (case-insensitive) AND `wrong` appears as a whole word in the
     translation. Used to rescue HF translation models that never see the
-    prompt-injected glossary and emit wrong domain terms (e.g. 'cocoșul'
-    for 'cock', 'păsărica' for 'pussy').
+    prompt-injected glossary and emit wrong domain terms.
     """
     import re
     if not replacements:
@@ -376,7 +373,7 @@ def apply_source_conditioned(source_text: str, translation: str, replacements) -
         right = entry.get("right")
         if not (en and wrong and right):
             continue
-        # Use word-boundary prefix match so "cock" fires on "cocks", etc.
+        # Use word-boundary prefix match
         if not re.search(r'\b' + re.escape(en.lower()), src_lower):
             continue
         pattern = r'\b' + re.escape(wrong) + r'\b'
