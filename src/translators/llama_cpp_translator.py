@@ -17,7 +17,7 @@ if sys.platform == "win32":
 
 from llama_cpp import Llama
 
-from translators.translator_utils import glossary_prompt_entries
+from translators.translator_utils import glossary_prompt_entries, apply_ro_subjunctive, apply_source_conditioned, back_map_for
 
 
 class LlamaCppTranslator:
@@ -118,7 +118,10 @@ class LlamaCppTranslator:
         )
 
         raw = output["choices"][0]["text"].strip()
-        return self._clean_translation(raw)
+        translation = self._clean_translation(raw)
+        translation = apply_ro_subjunctive(translation)
+        translation = apply_source_conditioned(text, translation, back_map_for(self._target_language))
+        return translation
 
     def _clean_translation(self, text: str) -> str:
         if text.startswith("Translation:"):
@@ -127,6 +130,10 @@ class LlamaCppTranslator:
         lines = text.split("\n")
         if lines:
             text = lines[0].strip()
+
+        # Strip surrounding **bold** markdown (EuroLLM wraps output in **)
+        if text.startswith("**") and text.endswith("**") and len(text) > 4:
+            text = text[2:-2].strip()
 
         text = text.strip('"').strip("'")
 

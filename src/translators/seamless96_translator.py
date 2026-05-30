@@ -10,6 +10,7 @@ from pathlib import Path
 from contextlib import contextmanager
 from translators.translator_utils import (
     probe_device, safe_generate, apply_glossary, apply_source_conditioned, back_map_for,
+    apply_ro_subjunctive,
 )
 
 # Suppress known non-critical warnings for this module
@@ -176,6 +177,7 @@ class SeamlessM4Tv2Translator:
     def _apply_glossary(self, text: str, translation: str) -> str:
         translation = apply_glossary(text, translation, self.glossary)
         translation = apply_source_conditioned(text, translation, back_map_for(self.target_language))
+        translation = apply_ro_subjunctive(translation)
         return translation
 
     def translate(self, text: str, max_length: int = 256, num_beams: int = 5,
@@ -237,15 +239,16 @@ class SeamlessM4Tv2Translator:
         # The generated_sequences[0] is the 1D tensor of token IDs for the first (and only) batch item
         translation = self.processor.tokenizer.decode(generated_sequences[0], skip_special_tokens=True)
 
+        # Normalize Romanian diacritics BEFORE applying corrections so that
+        # cedilla-form characters (ş, ţ) don't prevent pattern matching.
+        if self.lang_code == 'ro':
+            translation = translation.replace('ş', 'ș').replace('ţ', 'ț')
+
         # Apply glossary if available
         translation = self._apply_glossary(text, translation)
 
         # Clean up translation
         translation = translation.strip()
-
-        # Fix for Romanian diacritics (s-cedilla to s-comma, t-cedilla to t-comma)
-        if self.lang_code == 'ro':
-            translation = translation.replace('ş', 'ș').replace('ţ', 'ț')
 
         return translation
 

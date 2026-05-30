@@ -197,9 +197,9 @@ class TestEuroLLM9bIntegration(unittest.TestCase):
 
 
 @unittest.skipIf(_MODEL_PATH is None, _SKIP_REASON)
-class TestAya23WrapperTranslatorIntegration(unittest.TestCase):
+class TestAya23TranslatorIntegration(unittest.TestCase):
     """
-    Integration test for Aya23WrapperTranslator using the aya23 model specifically.
+    Integration test for Aya23Translator using the aya23 model specifically.
     Only runs when aya23 is the discovered model.
     """
 
@@ -207,12 +207,12 @@ class TestAya23WrapperTranslatorIntegration(unittest.TestCase):
     def setUpClass(cls):
         aya23_path = PROJECT_ROOT / "models/aya23/aya-23-8B-Q4_K_M.gguf"
         if not aya23_path.exists():
-            raise unittest.SkipTest("aya23 model not found; skipping wrapper-specific test")
+            raise unittest.SkipTest("aya23 model not found; skipping aya23-specific test")
 
-        from translators.aya23_wrapper_translator import Aya23WrapperTranslator
+        from translators.aya23_translator import Aya23Translator
 
-        print(f"\nIntegration test: loading Aya23WrapperTranslator from {aya23_path}")
-        cls.translator = Aya23WrapperTranslator(
+        print(f"\nIntegration test: loading Aya23Translator from {aya23_path}")
+        cls.translator = Aya23Translator(
             n_ctx=2048,
             n_batch=128,
         )

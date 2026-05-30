@@ -7,6 +7,7 @@ Language codes use NLLB format: ron_Latn, eng_Latn, spa_Latn, etc.
 from pathlib import Path
 from translators.translator_utils import (
     probe_device, safe_generate, apply_glossary, apply_source_conditioned, back_map_for,
+    apply_ro_subjunctive,
 )
 
 try:
@@ -149,4 +150,5 @@ class NLLB200Translator:
         translation = self.tokenizer.batch_decode(tokens, skip_special_tokens=True)[0]
         translation = apply_glossary(text, translation, self.glossary)
         translation = apply_source_conditioned(text, translation, back_map_for(self.target_language))
+        translation = apply_ro_subjunctive(translation)
         return translation.strip()

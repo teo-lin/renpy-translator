@@ -1,5 +1,5 @@
 """
-Unit tests for LlamaCppTranslator and Aya23WrapperTranslator.
+Unit tests for LlamaCppTranslator and Aya23Translator.
 llama_cpp is mocked in sys.modules so no real GGUF model is required.
 """
 
@@ -17,7 +17,7 @@ sys.modules["llama_cpp"] = _mock_llama_module
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from translators.llama_cpp_translator import LlamaCppTranslator
-from translators.aya23_wrapper_translator import Aya23WrapperTranslator, _DEFAULT_MODEL_PATH
+from translators.aya23_translator import Aya23Translator, _DEFAULT_MODEL_PATH
 
 
 def _reset_llama_mock():
@@ -237,11 +237,11 @@ class TestTranslate:
         assert kwargs["echo"] is False
 
 
-# ── Aya23WrapperTranslator ────────────────────────────────────────────────────
+# ── Aya23Translator ────────────────────────────────────────────────────
 
-class TestAya23WrapperTranslator:
+class TestAya23Translator:
     def test_uses_default_model_path(self):
-        Aya23WrapperTranslator()
+        Aya23Translator()
         called_path = _mock_llama_module.Llama.call_args[1]["model_path"]
         assert "aya-23-8B-Q4_K_M.gguf" in called_path
 
@@ -250,41 +250,41 @@ class TestAya23WrapperTranslator:
         assert "aya23" in str(_DEFAULT_MODEL_PATH)
 
     def test_custom_model_path_overrides_default(self):
-        Aya23WrapperTranslator(model_path="/custom/model.gguf")
+        Aya23Translator(model_path="/custom/model.gguf")
         called_path = _mock_llama_module.Llama.call_args[1]["model_path"]
         assert called_path == "/custom/model.gguf"
 
     def test_default_target_language_is_romanian(self):
-        t = Aya23WrapperTranslator()
+        t = Aya23Translator()
         assert t.target_language == "Romanian"
 
     def test_custom_target_language(self):
-        t = Aya23WrapperTranslator(target_language="Spanish")
+        t = Aya23Translator(target_language="Spanish")
         assert t.target_language == "Spanish"
 
     def test_inherits_translate_method(self):
-        t = Aya23WrapperTranslator()
+        t = Aya23Translator()
         assert hasattr(t, "translate")
         assert callable(t.translate)
 
     def test_inherits_clean_translation_method(self):
-        t = Aya23WrapperTranslator()
+        t = Aya23Translator()
         assert hasattr(t, "_clean_translation")
 
     def test_default_n_ctx_is_8192(self):
-        Aya23WrapperTranslator()
+        Aya23Translator()
         kwargs = _mock_llama_module.Llama.call_args[1]
         assert kwargs["n_ctx"] == 8192
 
     def test_default_n_batch_is_256(self):
-        Aya23WrapperTranslator()
+        Aya23Translator()
         kwargs = _mock_llama_module.Llama.call_args[1]
         assert kwargs["n_batch"] == 256
 
     def test_default_n_gpu_layers_is_minus_one(self):
-        Aya23WrapperTranslator()
+        Aya23Translator()
         kwargs = _mock_llama_module.Llama.call_args[1]
         assert kwargs["n_gpu_layers"] == -1
 
     def test_is_subclass_of_llama_cpp_translator(self):
-        assert issubclass(Aya23WrapperTranslator, LlamaCppTranslator)
+        assert issubclass(Aya23Translator, LlamaCppTranslator)

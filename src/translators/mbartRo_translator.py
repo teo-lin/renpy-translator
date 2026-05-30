@@ -8,6 +8,7 @@ Optimized for English to Romanian translation.
 from pathlib import Path
 from translators.translator_utils import (
     probe_device, safe_generate, apply_glossary, apply_source_conditioned, back_map_for,
+    apply_ro_subjunctive,
 )
 
 # Try to import transformers dependencies
@@ -137,6 +138,7 @@ class MBARTTranslator:
         translation = self.tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
         translation = apply_glossary(text, translation, self.glossary)
         translation = apply_source_conditioned(text, translation, back_map_for(self.target_language))
+        translation = apply_ro_subjunctive(translation)
         return translation.strip()
 
 

@@ -376,11 +376,55 @@ def apply_source_conditioned(source_text: str, translation: str, replacements) -
         right = entry.get("right")
         if not (en and wrong and right):
             continue
-        if en.lower() not in src_lower:
+        # Use word-boundary prefix match so "cock" fires on "cocks", etc.
+        if not re.search(r'\b' + re.escape(en.lower()), src_lower):
             continue
         pattern = r'\b' + re.escape(wrong) + r'\b'
         if re.search(pattern, translation, flags=re.IGNORECASE):
             translation = re.sub(pattern, right, translation, flags=re.IGNORECASE)
+    return translation
+
+
+# Romanian class-III verbs: indicative 3sg → subjunctive 3sg (infinitive ends in -e)
+_RO_SUBJ_PAIRS = [
+    ('fute', 'fută'), ('suge', 'sugă'), ('linge', 'lingă'),
+    ('merge', 'meargă'), ('vede', 'vadă'), ('spune', 'spună'),
+    ('vine', 'vină'), ('face', 'facă'), ('bate', 'bată'),
+    ('trage', 'tragă'), ('pune', 'pună'), ('împinge', 'împingă'),
+    ('înghite', 'înghită'), ('strânge', 'strângă'), ('atinge', 'atingă'),
+    ('prinde', 'prindă'), ('scoate', 'scoată'), ('înfinge', 'înfingă'),
+]
+
+# Optional clitic group between "să" and verb:
+#   hyphenated (să-mi, să-l, să-și) or space-separated (să mă, să te, să mi-o)
+_RO_CLITIC_OPT = (
+    r'(?:'
+    r'(?:-(?:mi|ți|i|l|o|ne|vă|le|și|mă|te))'
+    r'|(?:\s+(?:mă|te|se|îl|o|îi|ne|vă|le|îmi|îți))'
+    r'|(?:\s+(?:mi|ți|i|ni|vi|li)-(?:l|o|i))'
+    r')?'
+)
+
+_RO_SUBJ_COMPILED: list = []
+
+
+def apply_ro_subjunctive(translation: str) -> str:
+    """Fix Romanian class-III indicative forms after 'să' to subjunctive.
+    Handles clitics: 'să mă fute' → 'să mă fută', 'să-ți suge' → 'să-ți sugă'.
+    """
+    import re
+    if not _RO_SUBJ_COMPILED:
+        for ind, subj in _RO_SUBJ_PAIRS:
+            pat = re.compile(
+                rf'\b(?:să{_RO_CLITIC_OPT}|s-[oi])\s+{re.escape(ind)}\b',
+                re.IGNORECASE
+            )
+            _RO_SUBJ_COMPILED.append((pat, len(ind), subj))
+    for pat, ind_len, subj in _RO_SUBJ_COMPILED:
+        translation = pat.sub(
+            lambda m, n=ind_len, s=subj: m.group(0)[:-n] + s,
+            translation
+        )
     return translation
 
 
