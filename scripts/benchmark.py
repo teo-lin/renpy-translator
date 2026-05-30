@@ -465,16 +465,12 @@ def run_orchestrate():
         models_config = yaml.safe_load(f)
     available_models = models_config.get('available_models', {})
 
-    # Source of truth for installed_models is current_config.yaml (written by setup.py).
-    # Fall back to models_config.yaml.installed_models if current_config is missing.
     current_config_path = project_root / "models" / "current_config.yaml"
     installed_models = []
     if current_config_path.exists():
         with open(current_config_path, 'r', encoding='utf-8') as f:
             current_config = yaml.safe_load(f) or {}
         installed_models = current_config.get('installed_models', [])
-    if not installed_models:
-        installed_models = models_config.get('installed_models', [])
     if not installed_models:
         print("ERROR: No models are installed!")
         sys.exit(1)

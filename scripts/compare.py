@@ -452,9 +452,13 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description='Benchmark translation - translate ALL blocks')
-    parser.add_argument('--game', type=str, required=True, help='Game name')
+    parser.add_argument('--game', type=str, default=None, help='Game name (not needed with --tl-dir)')
     parser.add_argument('--model', type=str, required=True, help='Model key (e.g., aya23, helsinkiRo)')
     parser.add_argument('--key', type=str, required=True, help='Save key (e.g., r0, r1, r2)')
+    parser.add_argument('--tl-dir', type=str, default=None,
+                        help='Direct path to directory with .parsed.yaml files (bypasses config lookup)')
+    parser.add_argument('--lang-code', type=str, default='ro')
+    parser.add_argument('--lang-name', type=str, default='Romanian')
     args = parser.parse_args()
 
     # Setup paths
@@ -464,23 +468,32 @@ def main():
     print("\n" + "=" * 70)
     print(f"  Benchmark Translation - Model: {args.model}, Key: {args.key}")
     print("=" * 70)
-    print("\nLoading configuration...")
-    game_config = load_config(project_root, args.game)
 
-    game_name = game_config['name']
-    game_path = Path(game_config['path'])
-    target_language_obj = game_config['target_language']
-    context_before = game_config.get('context_before', 3)
-    context_after = game_config.get('context_after', 1)
-
-    # Language data always uses lowercase keys
-    target_language_code = target_language_obj['code']
-    target_language_name = target_language_obj['name']
-
-    print(f"  Game: {game_name}")
-    print(f"  Language: {target_language_name} ({target_language_code})")
-    print(f"  Model: {args.model}")
-    print(f"  Save key: {args.key}")
+    if args.tl_dir:
+        tl_dir = Path(args.tl_dir)
+        target_language_code = args.lang_code
+        target_language_name = args.lang_name
+        context_before = 3
+        context_after = 1
+        print(f"\n  Language: {target_language_name} ({target_language_code})")
+        print(f"  Model: {args.model}")
+        print(f"  Save key: {args.key}")
+    else:
+        if not args.game:
+            parser.error("--game is required when --tl-dir is not specified")
+        print("\nLoading configuration...")
+        game_config = load_config(project_root, args.game)
+        game_path = Path(game_config['path'])
+        target_language_obj = game_config['target_language']
+        context_before = game_config.get('context_before', 3)
+        context_after = game_config.get('context_after', 1)
+        target_language_code = target_language_obj['code']
+        target_language_name = target_language_obj['name']
+        tl_dir = game_path / "game" / "tl" / target_language_name.lower()
+        print(f"  Game: {game_config['name']}")
+        print(f"  Language: {target_language_name} ({target_language_code})")
+        print(f"  Model: {args.model}")
+        print(f"  Save key: {args.key}")
 
     # Load model configuration
     models_config_path = project_root / "models" / "models_config.yaml"
@@ -502,7 +515,6 @@ def main():
     glossary, prompt_template = load_resources(project_root, target_language_code)
 
     # Load characters.yaml
-    tl_dir = game_path / "game" / "tl" / target_language_name.lower()
     characters_file = tl_dir / "characters.yaml"
 
     characters = {}
@@ -675,7 +687,7 @@ def run_full_comparison(game_name: str, language: str) -> int:
             current_config = yaml.safe_load(f)
         installed_models = current_config.get('installed_models', [])
     else:
-        installed_models = models_config.get('installed_models', [])
+        installed_models = []
 
     if not installed_models:
         print("ERROR: No models are installed!")

@@ -29,6 +29,16 @@ def models_config(project_root):
 
 
 @pytest.fixture
+def current_config(project_root):
+    """Load current install configuration"""
+    config_path = project_root / "models" / "current_config.yaml"
+    assert config_path.exists(), "current_config.yaml not found — run 0-setup.ps1 first"
+
+    with open(config_path, 'r', encoding='utf-8') as f:
+        return yaml.safe_load(f)
+
+
+@pytest.fixture
 def game_config(project_root):
     """Load current game configuration"""
     config_path = project_root / "models" / "current_config.yaml"
@@ -44,11 +54,12 @@ def game_config(project_root):
     return config['games'][current_game]
 
 
-def test_models_config_exists(models_config):
+def test_models_config_exists(models_config, current_config):
     """Test that models configuration exists and has installed models"""
-    assert 'installed_models' in models_config
-    assert len(models_config['installed_models']) > 0
-    print(f"\nFound {len(models_config['installed_models'])} installed models")
+    assert 'available_models' in models_config
+    installed_models = current_config.get('installed_models', [])
+    assert len(installed_models) > 0
+    print(f"\nFound {len(installed_models)} installed models")
 
 
 def test_benchmark_script_exists(project_root):
@@ -61,7 +72,7 @@ def test_benchmark_script_exists(project_root):
     print(f"\n[OK] Benchmark scripts found")
 
 
-def test_parsed_files_have_numbered_keys(project_root, game_config, models_config):
+def test_parsed_files_have_numbered_keys(project_root, game_config, models_config, current_config):
     """
     Test that parsed files contain numbered keys (r0, r1, r2, etc.)
     This test assumes benchmark has been run at least once.
@@ -88,7 +99,7 @@ def test_parsed_files_have_numbered_keys(project_root, game_config, models_confi
         parsed_data = yaml.safe_load(content)
 
     # Expected number of model keys
-    expected_keys = len(models_config['installed_models'])
+    expected_keys = len(current_config.get('installed_models', []))
     print(f"Expected {expected_keys} model keys")
 
     # Check for numbered keys

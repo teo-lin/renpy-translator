@@ -20,6 +20,15 @@ def load_models_config() -> Dict[str, Any]:
     with open(models_config_path, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f)
 
+def load_current_config() -> Dict[str, Any]:
+    """Load current_config.yaml (written by 0-setup.ps1)."""
+    current_config_path = get_project_root() / "models" / "current_config.yaml"
+    if not current_config_path.exists():
+        print("ERROR: current_config.yaml not found. Please run 0-setup.ps1 first.", file=sys.stderr)
+        sys.exit(1)
+    with open(current_config_path, 'r', encoding='utf-8') as f:
+        return yaml.safe_load(f)
+
 def get_available_correction_modes() -> List[Dict[str, Any]]:
     """Define available correction modes."""
     return [
@@ -43,9 +52,9 @@ def get_available_correction_modes() -> List[Dict[str, Any]]:
         }
     ]
 
-def get_available_languages(models_config: Dict[str, Any]) -> List[Dict[str, str]]:
-    """Load available languages from models_config."""
-    languages_section = models_config.get('installed_languages', [])
+def get_available_languages(current_config: Dict[str, Any]) -> List[Dict[str, str]]:
+    """Load available languages from current_config."""
+    languages_section = current_config.get('installed_languages', [])
     # Ensure 'code' is a string, as YAML can parse 'no' as False
     for lang in languages_section:
         if isinstance(lang.get('code'), bool):
@@ -102,7 +111,8 @@ def get_correction_arguments(args_from_ps: Dict[str, Any]) -> None:
     print("DEBUG: args_from_ps:", args_from_ps, file=sys.stderr)
     display_banner()
 
-    models_config = load_models_config()
+    load_models_config()  # validate models_config.yaml exists
+    current_config = load_current_config()
 
     # Step 1: Select Mode
     modes = get_available_correction_modes()
@@ -135,9 +145,9 @@ def get_correction_arguments(args_from_ps: Dict[str, Any]) -> None:
         )
 
     # Step 2: Select Language
-    languages = get_available_languages(models_config)
+    languages = get_available_languages(current_config)
     if not languages:
-        print("ERROR: No languages found in models_config.yaml installed_languages section. Please run 0-setup.ps1.", file=sys.stderr)
+        print("ERROR: No languages configured. Please run 0-setup.ps1.", file=sys.stderr)
         sys.exit(1)
     
     selected_language = None

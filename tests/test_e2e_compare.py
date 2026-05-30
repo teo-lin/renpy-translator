@@ -95,7 +95,13 @@ def test_compare_workflow():
         print("  [FAIL] Could not load models configuration")
         return False
 
-    installed_models = models_config.get('installed_models', [])
+    current_config_path = project_root / "models" / "current_config.yaml"
+    if not current_config_path.exists():
+        print("  [FAIL] current_config.yaml not found - please run 0-setup.ps1 first")
+        return False
+    with open(current_config_path, 'r', encoding='utf-8') as f:
+        current_config = yaml.safe_load(f)
+    installed_models = current_config.get('installed_models', [])
     expected_model_count = len(installed_models)
 
     if expected_model_count == 0:

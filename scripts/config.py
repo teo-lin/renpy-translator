@@ -99,10 +99,15 @@ def select_language(current_language: Optional[Dict[str, str]] = None) -> Dict[s
 
     models_config = load_yaml_config(models_config_path)
 
-    installed_languages = models_config.get('installed_languages', [])
+    current_config_path = get_project_root() / "models" / "current_config.yaml"
+    if not current_config_path.exists():
+        print("No languages configured. Please run 0-setup.ps1 and select languages.")
+        sys.exit(1)
+    current_config_languages = load_yaml_config(current_config_path)
+    installed_languages = current_config_languages.get('installed_languages', [])
 
     if not installed_languages:
-        print("No languages configured in models_config.yaml. Please run 0-setup.ps1 and select languages.")
+        print("No languages configured. Please run 0-setup.ps1 and select languages.")
         sys.exit(1)
 
     def language_formatter(lang, index):
@@ -138,8 +143,6 @@ def select_model(current_model: Optional[str] = None) -> str:
     if current_config_path.exists():
         current_config = load_yaml_config(current_config_path)
         installed_models = current_config.get('installed_models', [])
-    if not installed_models:
-        installed_models = models_config.get('installed_models', [])
 
     if not installed_models:
         print("[ERROR] No models are installed!")
@@ -417,9 +420,9 @@ def main():
     # Step 2: Select Language
     if args.language:
         # Find language object by code
-        models_config_path = get_project_root() / "models" / "models_config.yaml"
-        models_config = load_yaml_config(models_config_path)
-        installed_languages = models_config.get('installed_languages', [])
+        current_config_path = get_project_root() / "models" / "current_config.yaml"
+        current_config_for_lang = load_yaml_config(current_config_path)
+        installed_languages = current_config_for_lang.get('installed_languages', [])
 
         selected_language = None
         for lang in installed_languages:

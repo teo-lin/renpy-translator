@@ -77,6 +77,8 @@ def detect_and_write_profile() -> dict:
 
     resolved_models = {}
     for model_key, params in tier_params.items():
+        if not isinstance(params, dict):
+            continue
         quant = params.get("quant", "Q4_K_M")
         file_path = _resolve_model_path(model_key, quant, models_config)
         if file_path:
@@ -86,6 +88,16 @@ def detect_and_write_profile() -> dict:
                 "n_ctx": params.get("n_ctx", 8192),
                 "n_batch": params.get("n_batch", 256),
                 "quant": quant,
+            }
+
+    # Add HF models (no hardware params — just destination for display/reference)
+    for model_key, model_cfg in models_config.get("available_models", {}).items():
+        if model_key in resolved_models:
+            continue
+        if model_cfg.get("huggingface_download"):
+            resolved_models[model_key] = {
+                "destination": model_cfg.get("destination", ""),
+                "type": "hf",
             }
 
     gpu = system.get("gpu_primary", {})
@@ -119,4 +131,7 @@ if __name__ == "__main__":
     print(f"GPU   : {profile['gpu']} ({profile['vram_gb']}GB)")
     print("Models available in this tier:")
     for name, params in profile["models"].items():
-        print(f"  {name:20s} n_ctx={params['n_ctx']:6d}  quant={params['quant']}  file={params['file']}")
+        if params.get("type") == "hf":
+            print(f"  {name:20s} HF safetensors  dest={params['destination']}")
+        else:
+            print(f"  {name:20s} n_ctx={params['n_ctx']:6d}  quant={params['quant']}  file={params['file']}")

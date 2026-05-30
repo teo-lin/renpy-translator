@@ -443,12 +443,3 @@ available_models:
     - 'hu'
     huggingface_download: true
     requires_tiktoken: true
-installed_models:
-- aya23
-- helsinkiRo
-- madlad400
-- mbartRo
-- seamlessm96
-installed_languages:
-- code: ro
-  name: Romanian

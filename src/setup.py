@@ -628,8 +628,8 @@ class ProjectSetup:
                 # Use pip check instead of import check for llama-cpp-python
                 # because import can fail due to CUDA/DLL issues even when installed
                 if self._check_package_in_pip("llama-cpp-python"):
-                    # Double-check if it can be imported
-                    if self._check_package_installed("llama_cpp"):
+                    # Double-check if it can be imported (add torch lib path so CUDA DLLs are found)
+                    if self._check_package_installed("llama_cpp", extra_path=self._get_torch_lib_path()):
                         print("    - llama-cpp-python: installed")
                     else:
                         print("    - llama-cpp-python: installed (warning: import test failed, may have runtime issues)")
@@ -707,7 +707,10 @@ class ProjectSetup:
             print(f"  GPU   : {profile['gpu']} ({profile['vram_gb']}GB VRAM)")
             print("  Models available in this tier:")
             for name, params in profile["models"].items():
-                print(f"    - {name}: n_ctx={params['n_ctx']}, quant={params['quant']}")
+                if params.get("type") == "hf":
+                    print(f"    - {name}: HF safetensors")
+                else:
+                    print(f"    - {name}: n_ctx={params['n_ctx']}, quant={params['quant']}")
             print(f"\n  Profile written to: models/compute_profile.yaml")
         except Exception as e:
             print(f"  WARNING: Hardware detection failed: {e}")
