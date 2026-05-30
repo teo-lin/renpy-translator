@@ -475,4 +475,104 @@ def test_language_agnostic():
         temp_tags_yaml.unlink(missing_ok=True)
 
 
+# ── helpers for Stage 2 batch-path tests ──────────────────────────────────────
+
+class MockBatchTranslator(MockTranslator):
+    """MockTranslator that also exposes translate_batch(), tracking which path was used."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.batch_calls = []   # texts lists passed to translate_batch
+        self.single_calls = []  # individual texts passed to translate (via super)
+
+    def translate(self, text: str, context=None, speaker=None, **kwargs) -> str:
+        self.single_calls.append(text)
+        return super().translate(text, context=context, speaker=speaker, **kwargs)
+
+    def translate_batch(self, texts: list) -> list:
+        self.batch_calls.append(list(texts))
+        return [f"[BATCH] {t}" for t in texts]
+
+
+def _make_simple_fixture(n_blocks=4):
+    """Return (parsed_blocks, tags_file) with n_blocks untranslated dialogue lines."""
+    parsed_blocks = {f"{i}-Char": {"en": f"Line {i}", "ro": ""} for i in range(1, n_blocks + 1)}
+    tags_file = {
+        "metadata": {
+            "file_structure_type": "DIALOGUE_ONLY",
+            "source_file": "test.rpy",
+            "target_language": "romanian",
+            "source_language": "english",
+            "extracted_at": "2026-01-01 00:00:00",
+            "total_blocks": n_blocks,
+            "untranslated_blocks": n_blocks,
+        },
+        "structure": {
+            "block_order": [f"{i}-Char" for i in range(1, n_blocks + 1)],
+            "separator_positions": [],
+        },
+        "blocks": {},
+        "character_map": {"c": "Char"},
+    }
+    return parsed_blocks, tags_file
+
+
+def _write_fixtures(parsed_blocks, tags_file):
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".parsed.yaml", delete=False, encoding="utf-8") as f:
+        yaml.dump(parsed_blocks, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        parsed_path = Path(f.name)
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".tags.yaml", delete=False, encoding="utf-8") as f:
+        yaml.dump(tags_file, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        tags_path = Path(f.name)
+    return parsed_path, tags_path
+
+
+# ── Stage 2 tests ──────────────────────────────────────────────────────────────
+
+def test_batch_mode_uses_translate_batch_not_translate():
+    """translate_file uses translate_batch() when hf_batch_size > 1 and the method exists."""
+    parsed_blocks, tags_file = _make_simple_fixture(n_blocks=4)
+    parsed_path, tags_path = _write_fixtures(parsed_blocks, tags_file)
+    try:
+        translator = MockBatchTranslator(target_language="Romanian")
+        bt = ModularBatchTranslator(
+            translator=translator,
+            characters={},
+            target_lang_code="ro",
+            hf_batch_size=2,
+        )
+        stats = bt.translate_file(parsed_path, tags_path)
+
+        assert stats["translated"] == 4
+        assert stats["failed"] == 0
+        # translate_batch received all texts split into batches of 2
+        assert translator.batch_calls == [["Line 1", "Line 2"], ["Line 3", "Line 4"]]
+        # translate() must not have been called directly
+        assert translator.single_calls == []
+    finally:
+        parsed_path.unlink(missing_ok=True)
+        tags_path.unlink(missing_ok=True)
+
+
+def test_hf_batch_size_1_uses_single_translate_even_when_translate_batch_exists():
+    """hf_batch_size=1 forces single-item translate() even if translate_batch is present."""
+    parsed_blocks, tags_file = _make_simple_fixture(n_blocks=3)
+    parsed_path, tags_path = _write_fixtures(parsed_blocks, tags_file)
+    try:
+        translator = MockBatchTranslator(target_language="Romanian")
+        bt = ModularBatchTranslator(
+            translator=translator,
+            characters={},
+            target_lang_code="ro",
+            hf_batch_size=1,
+        )
+        stats = bt.translate_file(parsed_path, tags_path)
+
+        assert stats["translated"] == 3
+        assert translator.batch_calls == []          # batch path never entered
+        assert len(translator.single_calls) == 3    # one call per block
+    finally:
+        parsed_path.unlink(missing_ok=True)
+        tags_path.unlink(missing_ok=True)
 

@@ -9,6 +9,7 @@ version: 1.0.0
 
 profiles:
   cpu_only:
+    hf_batch_size: 4
     aya23:
       n_gpu_layers: 0
       n_ctx: 4096
@@ -26,6 +27,7 @@ profiles:
       quant: Q4_K_M
 
   low:
+    hf_batch_size: 8
     aya23:
       n_gpu_layers: -1
       n_ctx: 8192
@@ -43,6 +45,7 @@ profiles:
       quant: Q4_K_M
 
   medium:
+    hf_batch_size: 16
     aya23:
       n_gpu_layers: -1
       n_ctx: 16384
@@ -61,6 +64,7 @@ profiles:
     # euroLLM22b omitted: Q4_K_M=13.7GB, does not fit in 8GB VRAM
 
   high:
+    hf_batch_size: 32
     aya23:
       n_gpu_layers: -1
       n_ctx: 32768

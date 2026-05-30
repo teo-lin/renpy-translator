@@ -57,7 +57,7 @@ class TestLlamaCppTranslatorIntegration(unittest.TestCase):
             model_path=str(_MODEL_PATH),
             target_language="Romanian",
             n_gpu_layers=-1,
-            n_ctx=2048,   # small context to keep the test fast
+            n_ctx=8192,
             n_batch=128,
         )
 
@@ -109,7 +109,7 @@ class TestLlamaCppTranslatorIntegration(unittest.TestCase):
             model_path=str(_MODEL_PATH),
             target_language="Romanian",
             n_gpu_layers=-1,
-            n_ctx=2048,
+            n_ctx=8192,
             n_batch=128,
             glossary={"protagonist": "protagonist"},
         )
@@ -132,7 +132,7 @@ class TestAyaExpanse8bIntegration(unittest.TestCase):
             model_path=str(gguf_files[0]),
             target_language="Romanian",
             n_gpu_layers=-1,
-            n_ctx=2048,
+            n_ctx=8192,
             n_batch=128,
         )
 
@@ -171,7 +171,7 @@ class TestEuroLLM9bIntegration(unittest.TestCase):
             model_path=str(gguf_files[0]),
             target_language="Romanian",
             n_gpu_layers=-1,
-            n_ctx=2048,
+            n_ctx=4096,
             n_batch=128,
         )
 
@@ -213,7 +213,7 @@ class TestAya23TranslatorIntegration(unittest.TestCase):
 
         print(f"\nIntegration test: loading Aya23Translator from {aya23_path}")
         cls.translator = Aya23Translator(
-            n_ctx=2048,
+            n_ctx=8192,
             n_batch=128,
         )
 

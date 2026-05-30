@@ -1,9 +1,10 @@
 """
-Modular Translation Pipeline Script
+Modular Translation Pipeline — Hardware-Aware Version
 
-Translates .parsed.yaml files using batch translation with context awareness.
-Uses configuration from current_config.yaml and characters.yaml files.
-Supports glossary and custom prompts with fallback hierarchy.
+Reads models/compute_profile.yaml (written by 0-setup.ps1) for tier-resolved
+model params (n_ctx, n_batch, n_gpu_layers, quant, file path).
+Supports llama models (aya23, ayaExpanse8b, euroLLM9b, euroLLM22b) and HF
+seq2seq models (nllb200, madlad400, seamlessm96, helsinkiRo, mbartRo).
 
 Usage:
     python translate.py --game <game_name>
@@ -11,18 +12,27 @@ Usage:
 """
 
 import sys
+import importlib
 import yaml
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
-# Add src directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from models import ParsedBlock, is_separator_block, parse_block_id
-from translators.aya23_translator import Aya23Translator
 from translators.translator_utils import load_prompt_template
+from hardware import load_profile
 from renpy_utils import show_progress
+
+_HF_TRANSLATORS = {
+    'nllb200':    ('translators.nllb200_translator',    'NLLB200Translator'),
+    'madlad400':  ('translators.madlad400_translator',  'MADLAD400Translator'),
+    'seamlessm96':('translators.seamless96_translator', 'SeamlessM4Tv2Translator'),
+    'helsinkiRo': ('translators.helsinkyRo_translator', 'QuickMTTranslator'),
+    'mbartRo':    ('translators.mbartRo_translator',    'MBARTTranslator'),
+}
+_LLAMA_MODELS = {'aya23', 'ayaExpanse8b', 'euroLLM9b', 'euroLLM22b'}
 
 
 class ModularBatchTranslator:
@@ -39,23 +49,15 @@ class ModularBatchTranslator:
         characters: Dict,
         target_lang_code: str,
         context_before: int = 3,
-        context_after: int = 1
+        context_after: int = 1,
+        hf_batch_size: int = 1,
     ):
-        """
-        Initialize modular batch translator.
-
-        Args:
-            translator: Translation backend (Aya23Translator or MADLAD400Translator)
-            characters: Character mapping from characters.yaml
-            target_lang_code: Target language code (e.g., 'ro', 'es')
-            context_before: Number of lines of context before current block (for dialogue)
-            context_after: Number of lines of context after current block (for dialogue)
-        """
         self.translator = translator
         self.characters = characters
         self.target_lang_code = target_lang_code
         self.context_before = context_before
         self.context_after = context_after
+        self.hf_batch_size = hf_batch_size
 
     def translate_file(
         self,
@@ -63,23 +65,11 @@ class ModularBatchTranslator:
         tags_yaml_path: Path,
         output_yaml_path: Optional[Path] = None
     ) -> Dict[str, int]:
-        """
-        Translate untranslated blocks in a parsed YAML file.
-
-        Args:
-            parsed_yaml_path: Path to .parsed.yaml file
-            tags_yaml_path: Path to .tags.yaml file
-            output_yaml_path: Path to output YAML (default: overwrite input)
-
-        Returns:
-            Dict with statistics: {'total', 'translated', 'skipped', 'failed'}
-        """
         if output_yaml_path is None:
             output_yaml_path = parsed_yaml_path
 
         print(f"\n  Processing: {parsed_yaml_path.name}")
 
-        # Load files
         with open(parsed_yaml_path, 'r', encoding='utf-8') as f:
             parsed_blocks: Dict[str, ParsedBlock] = yaml.safe_load(f)
 
@@ -90,7 +80,6 @@ class ModularBatchTranslator:
         structure = tags_file['structure']
         block_order = structure['block_order']
 
-        # Identify untranslated blocks
         untranslated_ids = self._identify_untranslated(parsed_blocks, self.target_lang_code)
         total_blocks = len([bid for bid in parsed_blocks if not is_separator_block(bid, parsed_blocks[bid])])
 
@@ -100,109 +89,93 @@ class ModularBatchTranslator:
 
         if not untranslated_ids:
             print("    [OK] All blocks already translated!")
-            return {
-                'total': total_blocks,
-                'translated': 0,
-                'skipped': total_blocks,
-                'failed': 0
-            }
+            return {'total': total_blocks, 'translated': 0, 'skipped': total_blocks, 'failed': 0}
 
-        # Extract context for each untranslated block
-        contexts = self._extract_contexts(
-            untranslated_ids,
-            parsed_blocks,
-            block_order
+        contexts = self._extract_contexts(untranslated_ids, parsed_blocks, block_order)
+
+        has_batch = (
+            self.hf_batch_size > 1
+            and callable(getattr(self.translator, 'translate_batch', None))
         )
-
-        # Translate blocks with progress tracking
-        print(f"    Translating {len(contexts)} blocks...")
+        if has_batch:
+            print(f"    Translating {len(contexts)} blocks... (batch_size={self.hf_batch_size})")
+        else:
+            print(f"    Translating {len(contexts)} blocks...")
         translated_count = 0
         failed_count = 0
         start_time = time.time()
 
-        for idx, context_item in enumerate(contexts, start=1):
-            block_id = context_item['block_id']
-            char_name = context_item['character_name']
-            text_to_translate = context_item['text']
-            context_list = context_item['context']
-            is_choice = context_item['is_choice']
+        if has_batch:
+            for batch_start in range(0, len(contexts), self.hf_batch_size):
+                batch = contexts[batch_start:batch_start + self.hf_batch_size]
+                texts = [item['text'] for item in batch]
+                show_progress(batch_start + len(batch), len(contexts), start_time, prefix="    ")
+                try:
+                    translations = self.translator.translate_batch(texts)
+                    for item, translation in zip(batch, translations):
+                        block_id = item['block_id']
+                        if translated_count < 3:
+                            print(f"\n    [DEBUG] Block {block_id}")
+                            print(f"            EN: {item['text'][:40]}...")
+                            print(f"            RO: {translation[:40]}...")
+                        parsed_blocks[block_id][self.target_lang_code] = translation
+                        translated_count += 1
+                except Exception as e:
+                    print(f"\n    [ERROR] Batch failed at {batch_start}: {e}")
+                    failed_count += len(batch)
+        else:
+            for idx, context_item in enumerate(contexts, start=1):
+                block_id = context_item['block_id']
+                char_name = context_item['character_name']
+                text_to_translate = context_item['text']
+                context_list = context_item['context']
+                show_progress(idx, len(contexts), start_time, prefix="    ")
+                speaker = None if char_name in ['Narrator', 'Choice'] else char_name
+                try:
+                    translation = self.translator.translate(
+                        text=text_to_translate,
+                        context=context_list if context_list else None,
+                        speaker=speaker
+                    )
+                    if translated_count < 3:
+                        print(f"\n    [DEBUG] Block {block_id}")
+                        print(f"            EN: {text_to_translate[:40]}...")
+                        print(f"            RO: {translation[:40]}...")
+                    parsed_blocks[block_id][self.target_lang_code] = translation
+                    translated_count += 1
+                except Exception as e:
+                    print(f"\n    [ERROR] Translation failed for {block_id}: {e}")
+                    failed_count += 1
 
-            # Show progress
-            show_progress(idx, len(contexts), start_time, prefix="    ")
-
-            # Get speaker for context
-            speaker = None if char_name in ['Narrator', 'Choice'] else char_name
-
-            try:
-                # Translate
-                translation = self.translator.translate(
-                    text=text_to_translate,
-                    context=context_list if context_list else None,
-                    speaker=speaker
-                )
-
-                # Debug: Log first 3 translations to verify assignment
-                if translated_count < 3:
-                    print(f"\n    [DEBUG] Block {block_id}")
-                    print(f"            EN: {text_to_translate[:40]}...")
-                    print(f"            RO: {translation[:40]}...")
-
-                # Update block
-                parsed_blocks[block_id][self.target_lang_code] = translation
-                translated_count += 1
-
-            except Exception as e:
-                print(f"\n    [ERROR] Translation failed for {block_id}: {e}")
-                failed_count += 1
-
-        # Clear progress line
         print()
 
-        # Save updated YAML
         try:
             self._save_yaml(parsed_blocks, output_yaml_path, metadata)
             print(f"    [OK] Saved to: {output_yaml_path.name}")
-
         except Exception as e:
             print(f"    [ERROR] Failed to save YAML file: {e}")
             import traceback
             traceback.print_exc()
-            # Mark all translations as failed since they weren't saved
             failed_count += translated_count
             translated_count = 0
 
-        # Return statistics
         stats = {
             'total': total_blocks,
             'translated': translated_count,
             'skipped': total_blocks - len(untranslated_ids),
             'failed': failed_count
         }
-
         print(f"    [OK] Translated: {stats['translated']}, Failed: {stats['failed']}")
-
         return stats
 
     def _identify_untranslated(self, parsed_blocks: Dict[str, ParsedBlock], lang_code: str) -> List[str]:
-        """
-        Identify blocks that need translation.
-
-        A block needs translation if:
-        - It's not a separator
-        - The target language field is empty or whitespace-only
-        """
         untranslated = []
-
         for block_id, block in parsed_blocks.items():
-            # Skip separators
             if is_separator_block(block_id, block):
                 continue
-
-            # Check if translation is missing
             target_text = block.get(lang_code, '')
             if not target_text or not target_text.strip():
                 untranslated.append(block_id)
-
         return untranslated
 
     def _extract_contexts(
@@ -211,16 +184,7 @@ class ModularBatchTranslator:
         parsed_blocks: Dict[str, ParsedBlock],
         block_order: List[str]
     ) -> List[Dict]:
-        """
-        Extract context for each untranslated block.
-
-        Context strategy:
-        - DIALOGUE blocks: N lines before + M lines after
-        - CHOICE blocks: No dialogue context (only character info from characters.yaml)
-        """
         contexts: List[Dict] = []
-
-        # Build index map: block_id -> position in order
         block_index = {block_id: idx for idx, block_id in enumerate(block_order)}
 
         for block_id in untranslated_ids:
@@ -228,25 +192,14 @@ class ModularBatchTranslator:
             if idx is None:
                 continue
 
-            # Parse block ID to get character name
             _, char_name = parse_block_id(block_id)
-
-            # Check if this is a CHOICE block
             is_choice = char_name == 'Choice' or block_id.endswith('-Choice')
-
-            # Get text to translate
             text_to_translate = parsed_blocks[block_id]['en']
 
-            # Extract context based on block type
             if is_choice:
-                # CHOICE blocks: No dialogue context
-                # Only character info is used (passed via translator's character knowledge)
                 context_list = []
             else:
-                # DIALOGUE blocks: Use context from surrounding blocks
-                context_list = self._extract_dialogue_context(
-                    block_id, idx, parsed_blocks, block_order
-                )
+                context_list = self._extract_dialogue_context(block_id, idx, parsed_blocks, block_order)
 
             contexts.append({
                 'block_id': block_id,
@@ -265,39 +218,28 @@ class ModularBatchTranslator:
         parsed_blocks: Dict[str, ParsedBlock],
         block_order: List[str]
     ) -> List[str]:
-        """Extract dialogue context from surrounding blocks."""
         context_before: List[str] = []
         context_after: List[str] = []
 
-        # Extract context before
         for i in range(idx - 1, max(-1, idx - self.context_before - 10), -1):
             if len(context_before) >= self.context_before:
                 break
-
             prev_id = block_order[i]
             prev_block = parsed_blocks.get(prev_id)
-
             if not prev_block or is_separator_block(prev_id, prev_block):
                 continue
-
-            # Prefer translated context, fall back to English
             prev_text = prev_block.get(self.target_lang_code, '') or prev_block.get('en', '')
             if prev_text.strip():
                 prev_char = parse_block_id(prev_id)[1]
                 context_before.insert(0, f"{prev_char}: {prev_text}")
 
-        # Extract context after
         for i in range(idx + 1, min(len(block_order), idx + self.context_after + 10)):
             if len(context_after) >= self.context_after:
                 break
-
             next_id = block_order[i]
             next_block = parsed_blocks.get(next_id)
-
             if not next_block or is_separator_block(next_id, next_block):
                 continue
-
-            # Prefer translated context, fall back to English
             next_text = next_block.get(self.target_lang_code, '') or next_block.get('en', '')
             if next_text.strip():
                 next_char = parse_block_id(next_id)[1]
@@ -305,19 +247,11 @@ class ModularBatchTranslator:
 
         return context_before + context_after
 
-    def _save_yaml(
-        self,
-        parsed_blocks: Dict[str, ParsedBlock],
-        output_path: Path,
-        metadata: dict
-    ):
-        """Save parsed blocks to YAML file with header."""
+    def _save_yaml(self, parsed_blocks: Dict[str, ParsedBlock], output_path: Path, metadata: dict):
         from datetime import datetime
 
-        # Ensure parent directory exists
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Create header
         header = (
             f"# {output_path.stem} - Parsed Translations\n"
             f"# Original extraction: {metadata.get('extracted_at', 'unknown')}\n"
@@ -325,23 +259,18 @@ class ModularBatchTranslator:
             "\n"
         )
 
-        # Write to file
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(header)
             yaml.dump(parsed_blocks, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
-            f.flush()  # Ensure data is written to disk
+            f.flush()
 
-        # Verify file was created and has content
         if not output_path.exists():
             raise IOError(f"File was not created: {output_path}")
-
-        file_size = output_path.stat().st_size
-        if file_size == 0:
+        if output_path.stat().st_size == 0:
             raise IOError(f"File was created but is empty: {output_path}")
 
 
 def load_config(project_root: Path, game_name: Optional[str] = None) -> Dict:
-    """Load game configuration from current_config.yaml."""
     config_file = project_root / "models" / "current_config.yaml"
 
     if not config_file.exists():
@@ -352,7 +281,6 @@ def load_config(project_root: Path, game_name: Optional[str] = None) -> Dict:
     with open(config_file, 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
 
-    # Determine which game to use
     if game_name:
         if game_name not in config.get('games', {}):
             print(f"ERROR: Game '{game_name}' not found in configuration.")
@@ -371,12 +299,8 @@ def load_config(project_root: Path, game_name: Optional[str] = None) -> Dict:
 
 
 def load_resources(project_root: Path, game_config: Dict, target_lang_code: str):
-    """
-    Load glossary, corrections, and prompt template with fallback hierarchy.
-
-    Returns: (glossary, corrections, prompt_template)
-    """
-    # Load glossary: merge base + uncensored when both exist
+    """Load glossary, corrections, and prompt template with merge fallback hierarchy."""
+    # Glossary: load base first, then overlay uncensored on top (both merged)
     glossary = {}
     base_gloss_path = project_root / "data" / f"{target_lang_code}_glossary.yaml"
     uncensored_gloss_path = project_root / "data" / f"{target_lang_code}_uncensored_glossary.yaml"
@@ -392,7 +316,7 @@ def load_resources(project_root: Path, game_config: Dict, target_lang_code: str)
         glossary = None
         print(f"[WARNING] No glossary found for language code '{target_lang_code}'")
 
-    # Load corrections: merge base + uncensored when both exist
+    # Corrections: load base first, then deep-merge uncensored on top
     def _merge_corrections(base, overlay):
         merged = dict(base)
         for k, v in overlay.items():
@@ -422,7 +346,7 @@ def load_resources(project_root: Path, game_config: Dict, target_lang_code: str)
     if not corrections:
         corrections = None
 
-    # Load prompt template (per-language override -> generic fallback)
+    # Prompt template: 4-variant fallback via translator_utils
     prompt_template = load_prompt_template(target_lang_code, project_root)
     if not prompt_template:
         print("[WARNING] No prompt template found, using default")
@@ -431,47 +355,94 @@ def load_resources(project_root: Path, game_config: Dict, target_lang_code: str)
 
 
 def main():
-    """CLI entry point"""
     import argparse
 
-    parser = argparse.ArgumentParser(description='Translate parsed YAML files using modular pipeline')
+    parser = argparse.ArgumentParser(description='Translate parsed YAML files — hardware-aware pipeline')
     parser.add_argument('--game', type=str, help='Game name (uses current_game from config if not specified)')
     args = parser.parse_args()
 
-    # Setup paths
     project_root = Path(__file__).parent.parent
 
-    # Load configuration
     print("\n" + "=" * 70)
-    print("  Modular Translation Pipeline")
+    print("  Modular Translation Pipeline (hardware-aware)")
     print("=" * 70)
+
+    print("\nLoading compute profile...")
+    try:
+        compute_profile = load_profile()
+    except FileNotFoundError as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
+
+    print(f"  Tier : {compute_profile['tier']}")
+    print(f"  GPU  : {compute_profile.get('gpu', 'unknown')} ({compute_profile.get('vram_gb', 0)}GB)")
+
     print("\nLoading configuration...")
     game_config = load_config(project_root, args.game)
 
     game_name = game_config['name']
     game_path = Path(game_config['path'])
-    target_language_obj = game_config['target_language'] # This is the full language object
+    target_language_obj = game_config['target_language']
     model_name = game_config['model']
     context_before = game_config.get('context_before', 3)
     context_after = game_config.get('context_after', 1)
 
-    # Language data always uses lowercase keys
     target_language_code = target_language_obj['code']
     target_language_name = target_language_obj['name']
-
-    print(f"  Game: {game_name}")
-    print(f"  Language: {target_language_name} ({target_language_code})")
-    print(f"  Model: {model_name}")
-    print(f"  Context: {context_before} before, {context_after} after")
-
-    # Use language code for directory path
     target_lang_code = target_language_code
 
-    # Load resources (glossary, corrections, prompts)
+    print(f"  Game    : {game_name}")
+    print(f"  Language: {target_language_name} ({target_language_code})")
+    print(f"  Model   : {model_name}")
+    print(f"  Context : {context_before} before, {context_after} after")
+
+    # Determine hf_batch_size from tier profile
+    hf_batch_size = 8  # fallback default
+    tier = compute_profile.get('tier', 'medium')
+    compute_profiles_path = project_root / "models" / "compute_profiles.yaml"
+    if compute_profiles_path.exists():
+        with open(compute_profiles_path, 'r', encoding='utf-8') as f:
+            compute_profiles = yaml.safe_load(f) or {}
+        hf_batch_size = compute_profiles.get('profiles', {}).get(tier, {}).get('hf_batch_size', hf_batch_size)
+
+    # Resolve model path and hw params — LLAMA from compute_profile.yaml, HF from models_config.yaml
+    if model_name in _LLAMA_MODELS:
+        model_profile = compute_profile.get("models", {}).get(model_name)
+        if not model_profile:
+            available = ', '.join(compute_profile.get("models", {}).keys())
+            print(f"\nERROR: Model '{model_name}' is not available for tier '{compute_profile['tier']}'.")
+            print(f"Available models in this tier: {available}")
+            print("Check models/compute_profile.yaml or re-run 0-setup.ps1.")
+            sys.exit(1)
+        print(f"\n  n_ctx   : {model_profile['n_ctx']}")
+        print(f"  n_batch : {model_profile['n_batch']}")
+        print(f"  quant   : {model_profile['quant']}")
+        model_path = project_root / model_profile["file"]
+
+    elif model_name in _HF_TRANSLATORS:
+        models_config_path = project_root / "models" / "models_config.yaml"
+        with open(models_config_path, 'r', encoding='utf-8') as f:
+            all_models_config = yaml.safe_load(f)['available_models']
+        hf_model_config = all_models_config.get(model_name)
+        if not hf_model_config:
+            print(f"ERROR: Model '{model_name}' not found in models_config.yaml")
+            sys.exit(1)
+        model_path = project_root / hf_model_config['destination']
+
+    else:
+        print(f"ERROR: Model '{model_name}' is not a recognized LLAMA or HF model.")
+        print(f"  LLAMA models : {sorted(_LLAMA_MODELS)}")
+        print(f"  HF models    : {sorted(_HF_TRANSLATORS)}")
+        sys.exit(1)
+
+    if not model_path.exists():
+        print(f"\nERROR: Model file not found: {model_path}")
+        print("Please run 0-setup.ps1 to download the model.")
+        sys.exit(1)
+
     print("\nLoading resources...")
     glossary, corrections, prompt_template = load_resources(project_root, game_config, target_lang_code)
 
-    # Load characters.yaml
     tl_dir = game_path / "game" / "tl" / target_language_name.lower()
     characters_file = tl_dir / "characters.yaml"
 
@@ -483,46 +454,48 @@ def main():
     else:
         print(f"[WARNING] No characters.yaml found at {characters_file}")
 
-    # Determine model path based on model name
-    # Load model configuration from models_config.yaml
-    models_config_path = project_root / "models" / "models_config.yaml"
-    with open(models_config_path, 'r', encoding='utf-8') as f:
-        all_models_config = yaml.safe_load(f)['available_models']
-
-    model_config = all_models_config.get(model_name)
-
-    if not model_config:
-        print(f"ERROR: Model '{model_name}' not found in models_config.yaml")
-        sys.exit(1)
-
-    model_path = project_root / model_config['destination']
-
-    if not model_path.exists():
-        print(f"ERROR: Model file not found: {model_path}")
-        sys.exit(1)
-
-    # Initialize translator
     print("\n" + "=" * 70)
     print("  Initializing Translator")
     print("=" * 70)
 
-    translator = Aya23Translator(
-        model_path=str(model_path),
-        target_language=target_language_name.capitalize(),
-        prompt_template=prompt_template,
-        glossary=glossary
-    )
+    if model_name in _LLAMA_MODELS:
+        from translators.llama_cpp_translator import LlamaCppTranslator
+        translator = LlamaCppTranslator(
+            model_path=str(model_path),
+            target_language=target_language_name.capitalize(),
+            n_gpu_layers=model_profile["n_gpu_layers"],
+            n_ctx=model_profile["n_ctx"],
+            n_batch=model_profile["n_batch"],
+            prompt_template=prompt_template,
+            glossary=glossary,
+        )
+        hf_batch_size = 1  # llama models use single-item translate()
 
-    # Initialize batch translator
+    else:  # _HF_TRANSLATORS
+        module_path, class_name = _HF_TRANSLATORS[model_name]
+        module = importlib.import_module(module_path)
+        cls = getattr(module, class_name)
+        kwargs = dict(
+            target_language=target_language_name.capitalize(),
+            lang_code=target_lang_code,
+            glossary=glossary,
+        )
+        if model_name == 'seamlessm96':
+            kwargs['model_name'] = str(model_path)
+        elif model_name != 'madlad400':
+            kwargs['model_path'] = str(model_path)
+        translator = cls(**kwargs)
+        print(f"  Batch size: {hf_batch_size}")
+
     batch_translator = ModularBatchTranslator(
         translator=translator,
         characters=characters,
         target_lang_code=target_lang_code,
         context_before=context_before,
-        context_after=context_after
+        context_after=context_after,
+        hf_batch_size=hf_batch_size,
     )
 
-    # Find all .parsed.yaml files
     print("\n" + "=" * 70)
     print("  Scanning for Files")
     print("=" * 70)
@@ -536,7 +509,6 @@ def main():
 
     print(f"\nFound {len(parsed_files)} file(s) to process")
 
-    # Translate all files
     print("\n" + "=" * 70)
     print("  Translating Files")
     print("=" * 70)
@@ -552,14 +524,11 @@ def main():
     overall_start = time.time()
 
     for file_idx, parsed_file in enumerate(parsed_files, 1):
-        # Show overall progress
         if len(parsed_files) > 1:
             print()
             show_progress(file_idx - 1, len(parsed_files), overall_start, prefix="Overall: ")
             print(f"\n[File {file_idx}/{len(parsed_files)}]")
 
-        # Find corresponding tags.yaml file
-        # Remove .parsed.yaml and replace with .tags.yaml
         base_name = parsed_file.name.removesuffix('.parsed.yaml')
         tags_file = parsed_file.parent / f"{base_name}.tags.yaml"
         if not tags_file.exists():
@@ -567,11 +536,10 @@ def main():
             print(f"             Expected: {tags_file.name}")
             continue
 
-        # Translate file
         stats = batch_translator.translate_file(
             parsed_yaml_path=parsed_file,
             tags_yaml_path=tags_file,
-            output_yaml_path=None  # Overwrite in place
+            output_yaml_path=None
         )
 
         total_stats['files'] += 1
@@ -580,7 +548,6 @@ def main():
         total_stats['skipped_blocks'] += stats['skipped']
         total_stats['failed_blocks'] += stats['failed']
 
-    # Final summary
     print("\n" + "=" * 70)
     print("  TRANSLATION COMPLETE")
     print("=" * 70)

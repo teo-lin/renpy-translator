@@ -234,7 +234,7 @@ available_models:
     size_Q4_K_M: 5.06GB
     size_Q5_K_M: 5.80GB
     destination: models/ayaExpanse8b
-    script: scripts/translate_new.py
+    script: scripts/translate.py
     description: Multilingual GGUF, 8B params, successor to Aya-23, VRAM 5-6GB. Better
       quality than Aya-23 across all 23 languages. low+ tier.
     min_tier: low
@@ -275,7 +275,7 @@ available_models:
     size_Q4_K_M: 5.58GB
     size_Q5_K_M: 6.52GB
     destination: models/euroLLM9b
-    script: scripts/translate_new.py
+    script: scripts/translate.py
     description: EU-focused GGUF, 9B params, COMET 84.19 en→EU, best for Romanian
       and all EU languages. Outperforms Gemma-2-9B. low+ tier.
     min_tier: low
@@ -311,7 +311,7 @@ available_models:
     size_Q3_K_M: 11.12GB
     size_Q4_K_M: 13.66GB
     destination: models/euroLLM22b
-    script: scripts/translate_new.py
+    script: scripts/translate.py
     description: EU-focused GGUF, 22B params, matches Qwen-3-32B and Gemma-3-27B
       quality. Requires high tier (16GB+ VRAM). Q4_K_M=13.7GB.
     min_tier: high

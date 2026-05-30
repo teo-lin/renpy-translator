@@ -31,7 +31,7 @@ class TestAyaExpanse8bIntegration(unittest.TestCase):
             model_path=str(_MODEL_PATH),
             target_language="Romanian",
             n_gpu_layers=-1,
-            n_ctx=2048,
+            n_ctx=8192,
             n_batch=128,
         )
 

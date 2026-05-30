@@ -1,5 +1,5 @@
 """
-Unit tests for scripts/translate_new.py.
+Unit tests for scripts/translate.py.
 llama_cpp and renpy_utils are mocked — no real model or Ren'Py install needed.
 """
 
@@ -9,7 +9,7 @@ import yaml
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-# ── module-level mocks (must precede any translate_new import) ────────────────
+# ── module-level mocks (must precede any translate import) ────────────────────
 sys.modules.setdefault("llama_cpp", MagicMock())
 sys.modules.setdefault("renpy_utils", MagicMock())
 
@@ -19,7 +19,7 @@ sys.modules["renpy_utils"].show_progress = _mock_show_progress
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
-from translate_new import ModularBatchTranslator, load_config, load_resources
+from translate import ModularBatchTranslator, load_config, load_resources
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -90,6 +90,11 @@ class TestLoadConfig:
 # ── load_resources ────────────────────────────────────────────────────────────
 
 class TestLoadResources:
+    @pytest.fixture(autouse=True)
+    def _suppress(self):
+        with patch('builtins.print'):
+            yield
+
     def test_finds_uncensored_glossary_first(self, tmp_path):
         data_dir = tmp_path / "data"
         data_dir.mkdir()
@@ -98,7 +103,8 @@ class TestLoadResources:
 
         glossary, _, _ = load_resources(tmp_path, {}, "ro")
 
-        assert glossary == {"hello": "salut"}
+        # Both files are merged; uncensored overlays base
+        assert glossary == {"bye": "pa", "hello": "salut"}
 
     def test_falls_back_to_regular_glossary(self, tmp_path):
         data_dir = tmp_path / "data"
@@ -122,7 +128,8 @@ class TestLoadResources:
 
         _, corrections, _ = load_resources(tmp_path, {}, "ro")
 
-        assert corrections == {"a": "b"}
+        # Both files are merged; uncensored overlays base
+        assert corrections == {"a": "b", "c": "d"}
 
     def test_falls_back_to_regular_corrections(self, tmp_path):
         data_dir = tmp_path / "data"
@@ -265,6 +272,11 @@ class TestExtractContexts:
 
 
 class TestTranslateFile:
+    @pytest.fixture(autouse=True)
+    def _suppress(self):
+        with patch('builtins.print'):
+            yield
+
     def test_all_translated_returns_zero_translated(self, tmp_path):
         blocks = {
             "1-Amelia": {"en": "Hello!", "ro": "Salut!"},
@@ -395,34 +407,39 @@ _GOOD_GAME_CONFIG = {
 
 
 class TestMain:
+    @pytest.fixture(autouse=True)
+    def _suppress(self):
+        with patch('builtins.print'):
+            yield
+
     def test_exits_when_no_compute_profile(self):
-        import translate_new
+        import translate
         with (
-            patch("translate_new.load_profile", side_effect=FileNotFoundError("no profile")),
-            patch.object(sys, "argv", ["translate_new.py"]),
+            patch("translate.load_profile", side_effect=FileNotFoundError("no profile")),
+            patch.object(sys, "argv", ["translate.py"]),
             pytest.raises(SystemExit),
         ):
-            translate_new.main()
+            translate.main()
 
     def test_exits_when_model_not_in_profile(self):
         profile_without_model = {**_GOOD_PROFILE, "models": {}}  # euroLLM9b absent
-        import translate_new
+        import translate
         with (
-            patch("translate_new.load_profile", return_value=profile_without_model),
-            patch("translate_new.load_config", return_value=_GOOD_GAME_CONFIG),
-            patch.object(sys, "argv", ["translate_new.py"]),
+            patch("translate.load_profile", return_value=profile_without_model),
+            patch("translate.load_config", return_value=_GOOD_GAME_CONFIG),
+            patch.object(sys, "argv", ["translate.py"]),
             pytest.raises(SystemExit),
         ):
-            translate_new.main()
+            translate.main()
 
     def test_exits_when_model_file_missing(self, tmp_path):
         # Profile points at a file that doesn't exist on disk
-        import translate_new
+        import translate
         with (
-            patch("translate_new.load_profile", return_value=_GOOD_PROFILE),
-            patch("translate_new.load_config", return_value=_GOOD_GAME_CONFIG),
-            patch("translate_new.load_resources", return_value=(None, None, None)),
-            patch.object(sys, "argv", ["translate_new.py"]),
+            patch("translate.load_profile", return_value=_GOOD_PROFILE),
+            patch("translate.load_config", return_value=_GOOD_GAME_CONFIG),
+            patch("translate.load_resources", return_value=(None, None, None)),
+            patch.object(sys, "argv", ["translate.py"]),
             pytest.raises(SystemExit),
         ):
-            translate_new.main()
+            translate.main()
