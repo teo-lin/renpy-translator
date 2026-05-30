@@ -352,6 +352,48 @@ class BaseTranslatorIntegrationTest(unittest.TestCase):
         self.assertEqual(translation, expected_romanian)
 
 
+# --- translate_batch() Test Mixin ---
+
+class TranslateBatchTestMixin:
+    """
+    Test mixin for translators that implement translate_batch(texts) -> list.
+
+    Provides three checks usable by any integration test class that exposes
+    `self.translator`:
+      - empty input returns empty list
+      - N inputs return a list of N non-empty strings
+      - single-item batch matches translate(text) output
+
+    Override `BATCH_TEXTS` / `SINGLE_TEXT` to use different samples, or override
+    `_assert_batched_matches_single()` to relax the equality check for models
+    where beam-search padding causes minor divergence (e.g. MADLAD).
+    """
+    BATCH_TEXTS = ["Hello!", "Good morning.", "Thank you."]
+    SINGLE_TEXT = "Hello!"
+
+    def test_translate_batch_empty_input(self):
+        self.assertEqual(self.translator.translate_batch([]), [])
+
+    def test_translate_batch_returns_list(self):
+        results = self.translator.translate_batch(list(self.BATCH_TEXTS))
+        self.assertIsInstance(results, list)
+        self.assertEqual(len(results), len(self.BATCH_TEXTS))
+        for r in results:
+            self.assertIsInstance(r, str)
+            self.assertGreater(len(r.strip()), 0)
+
+    def test_translate_batch_single_matches_translate(self):
+        single = self.translator.translate(self.SINGLE_TEXT)
+        batched = self.translator.translate_batch([self.SINGLE_TEXT])
+        self.assertEqual(len(batched), 1)
+        self._assert_batched_matches_single(batched[0], single)
+
+    def _assert_batched_matches_single(self, batched, single):
+        """Default: strict equality. Override for translators where beam search
+        diverges between padded batch and unpadded single inputs."""
+        self.assertEqual(batched, single)
+
+
 # --- Integration Test Helper Functions ---
 
 def get_test_device() -> str:

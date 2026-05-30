@@ -195,19 +195,22 @@ class SeamlessM4Tv2Translator:
         Returns:
             Translated text
         """
-        # SeamlessM4T uses processor to prepare inputs
-        # tgt_lang specifies target language using 3-letter codes
+        return self.translate_batch([text], max_length=max_length, num_beams=num_beams)[0]
+
+    def translate_batch(self, texts: list, max_length: int = 256,
+                        num_beams: int = 5) -> list:
+        if not texts:
+            return []
+
         text_inputs = self.processor(
-            text=text,
-            src_lang="eng",  # Source is always English
-            return_tensors="pt"
+            text=texts,
+            src_lang="eng",
+            return_tensors="pt",
+            padding=True,
         )
 
-        # Move inputs to device
         text_inputs = {k: v.to(self.device) for k, v in text_inputs.items()}
 
-        # Ensure input_ids and attention_mask are of type long
-        # This addresses the 'float object cannot be interpreted as an integer' error
         if 'input_ids' in text_inputs:
             text_inputs['input_ids'] = text_inputs['input_ids'].to(torch.long)
         if 'attention_mask' in text_inputs:
@@ -226,31 +229,20 @@ class SeamlessM4Tv2Translator:
 
         output_tokens, self.model, self.device = safe_generate(self.model, text_inputs, self.device, _generate)
 
-        # When return_intermediate_token_ids=True and generate_speech=False,
-        # output_tokens is a ModelOutput object with a 'sequences' attribute for text tokens.
         generated_sequences = output_tokens.sequences
-
-        # Explicitly ensure generated_sequences are integers before decoding
-        # This addresses the 'float object cannot be interpreted as an integer' error that might appear
         if generated_sequences.dtype != torch.long:
             generated_sequences = generated_sequences.to(torch.long)
 
-        # Decode translation using the tokenizer directly
-        # The generated_sequences[0] is the 1D tensor of token IDs for the first (and only) batch item
-        translation = self.processor.tokenizer.decode(generated_sequences[0], skip_special_tokens=True)
-
-        # Normalize Romanian diacritics BEFORE applying corrections so that
-        # cedilla-form characters (ş, ţ) don't prevent pattern matching.
-        if self.lang_code == 'ro':
-            translation = translation.replace('ş', 'ș').replace('ţ', 'ț')
-
-        # Apply glossary if available
-        translation = self._apply_glossary(text, translation)
-
-        # Clean up translation
-        translation = translation.strip()
-
-        return translation
+        results = []
+        for i, src in enumerate(texts):
+            translation = self.processor.tokenizer.decode(
+                generated_sequences[i], skip_special_tokens=True
+            )
+            if self.lang_code == 'ro':
+                translation = translation.replace('ş', 'ș').replace('ţ', 'ț')
+            translation = self._apply_glossary(src, translation)
+            results.append(translation.strip())
+        return results
 
 
 if __name__ == "__main__":

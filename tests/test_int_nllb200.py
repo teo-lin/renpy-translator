@@ -7,15 +7,18 @@ import sys
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
 PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+
+from tests.utils import TranslateBatchTestMixin
+
 _MODEL_PATH = PROJECT_ROOT / "models" / "nllb200"
 _SKIP_REASON = "nllb200 model not downloaded (run 0-setup.ps1)"
 
 
 @unittest.skipIf(not _MODEL_PATH.exists() or not any(_MODEL_PATH.iterdir()), _SKIP_REASON)
-class TestNLLB200TranslatorIntegration(unittest.TestCase):
+class TestNLLB200TranslatorIntegration(TranslateBatchTestMixin, unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         from translators.nllb200_translator import NLLB200Translator
@@ -75,6 +78,7 @@ class TestNLLB200TranslatorIntegration(unittest.TestCase):
         result = t.translate("The protagonist walks forward.")
         self.assertIsInstance(result, str)
         del t
+
 
 
 if __name__ == "__main__":

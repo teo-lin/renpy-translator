@@ -130,8 +130,21 @@ class NLLB200Translator:
         max_new_tokens: int = 256,
         num_beams: int = 4,
     ) -> str:
+        return self.translate_batch([text], max_new_tokens=max_new_tokens, num_beams=num_beams)[0]
+
+    def translate_batch(
+        self,
+        texts: list,
+        max_new_tokens: int = 256,
+        num_beams: int = 4,
+    ) -> list:
+        if not texts:
+            return []
+
         self.tokenizer.src_lang = self.nllb_src
-        inputs = self.tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
+        inputs = self.tokenizer(
+            texts, return_tensors="pt", padding=True, truncation=True, max_length=512
+        )
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
         forced_bos = self.tokenizer.convert_tokens_to_ids(self.nllb_tgt)
@@ -147,8 +160,12 @@ class NLLB200Translator:
 
         tokens, self.model, self.device = safe_generate(self.model, inputs, self.device, _generate)
 
-        translation = self.tokenizer.batch_decode(tokens, skip_special_tokens=True)[0]
-        translation = apply_glossary(text, translation, self.glossary)
-        translation = apply_source_conditioned(text, translation, back_map_for(self.target_language))
-        translation = apply_ro_subjunctive(translation)
-        return translation.strip()
+        translations = self.tokenizer.batch_decode(tokens, skip_special_tokens=True)
+        results = []
+        back_map = back_map_for(self.target_language)
+        for src, t in zip(texts, translations):
+            t = apply_glossary(src, t, self.glossary)
+            t = apply_source_conditioned(src, t, back_map)
+            t = apply_ro_subjunctive(t)
+            results.append(t.strip())
+        return results

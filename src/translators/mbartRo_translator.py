@@ -115,11 +115,16 @@ class MBARTTranslator:
         Returns:
             Translated text
         """
-        # Set source language before tokenization (important for MBART50)
+        return self.translate_batch([text], max_length=max_length, num_beams=num_beams)[0]
+
+    def translate_batch(self, texts: list, max_length: int = 256,
+                        num_beams: int = 5) -> list:
+        if not texts:
+            return []
+
         self.tokenizer.src_lang = self.src_lang
 
-        # Tokenize input
-        inputs = self.tokenizer(text, return_tensors="pt")
+        inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True)
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
         forced_bos = self.tokenizer.lang_code_to_id[self.tgt_lang]
@@ -135,11 +140,15 @@ class MBARTTranslator:
 
         generated_tokens, self.model, self.device = safe_generate(self.model, inputs, self.device, _generate)
 
-        translation = self.tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
-        translation = apply_glossary(text, translation, self.glossary)
-        translation = apply_source_conditioned(text, translation, back_map_for(self.target_language))
-        translation = apply_ro_subjunctive(translation)
-        return translation.strip()
+        translations = self.tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)
+        results = []
+        back_map = back_map_for(self.target_language)
+        for src, t in zip(texts, translations):
+            t = apply_glossary(src, t, self.glossary)
+            t = apply_source_conditioned(src, t, back_map)
+            t = apply_ro_subjunctive(t)
+            results.append(t.strip())
+        return results
 
 
 if __name__ == "__main__":

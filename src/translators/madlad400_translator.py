@@ -195,6 +195,29 @@ class MADLAD400Translator:
         translation = apply_ro_subjunctive(translation)
         return translation
 
+    @staticmethod
+    def _is_latin(s: str) -> bool:
+        alpha = [c for c in s if c.isalpha()]
+        if not alpha:
+            return False
+        latin = sum(1 for c in alpha if ord(c) < 0x0500)
+        return latin / len(alpha) >= 0.8
+
+    def _generate_for_inputs(self, inputs, max_length, num_beams):
+        def _generate(inputs_dict):
+            return self.model.generate(
+                **inputs_dict,
+                max_new_tokens=max_length,
+                num_beams=max(1, num_beams),
+                early_stopping=True,
+                do_sample=False,
+                no_repeat_ngram_size=4,
+                repetition_penalty=1.2,
+                length_penalty=1.0
+            )
+        outputs, self.model, self.device = safe_generate(self.model, inputs, self.device, _generate)
+        return outputs
+
     def translate(self, text: str, max_length: int = 256, num_beams: int = 4,
                   temperature: float = 1.0, context: list = None,
                   speaker: str = None) -> str:
@@ -214,15 +237,11 @@ class MADLAD400Translator:
         """
         # MADLAD uses language tags like <2ro> for Romanian, <2es> for Spanish
         lang_tag = f"<2{self.lang_code}>"
-
-        # Prepare input with language tag
         input_text = f"{lang_tag} {text}"
 
-        # Tokenize (no padding for single input - padding causes translation artifacts)
         inputs = self.tokenizer(input_text, return_tensors="pt")
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
-        # Debug: Print first translation attempt
         import os
         if os.getenv('DEBUG_MADLAD'):
             print(f"[DEBUG] Input text: {input_text}")
@@ -230,53 +249,45 @@ class MADLAD400Translator:
             print(f"[DEBUG] Device: {self.device}")
             print(f"[DEBUG] Model device: {next(self.model.parameters()).device}")
 
-        def _generate(inputs_dict, beams=num_beams):
-            return self.model.generate(
-                **inputs_dict,
-                max_new_tokens=max_length,
-                num_beams=max(1, beams),
-                early_stopping=True,
-                do_sample=False,
-                no_repeat_ngram_size=4,
-                repetition_penalty=1.2,
-                length_penalty=1.0
-            )
-
-        def _is_latin(s: str) -> bool:
-            alpha = [c for c in s if c.isalpha()]
-            if not alpha:
-                return False
-            latin = sum(1 for c in alpha if ord(c) < 0x0500)
-            return latin / len(alpha) >= 0.8
-
-        # Generate translation; fall back to CPU if CUDA kernel is incompatible
-        outputs, self.model, self.device = safe_generate(self.model, inputs, self.device, _generate)
-
-        if os.getenv('DEBUG_MADLAD'):
-            print(f"[DEBUG] Output tokens shape: {outputs.shape}")
-            print(f"[DEBUG] Output tokens: {outputs[0][:20]}")  # First 20 tokens
-
-        # Decode translation
+        outputs = self._generate_for_inputs(inputs, max_length, num_beams)
         translation = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
 
-        # If output is non-Latin (e.g. Georgian/Arabic garbage), retry with greedy decoding
-        if not _is_latin(translation):
+        if not self._is_latin(translation):
             print(f"  [MADLAD] Non-Latin output detected, retrying with greedy decoding...")
-            def _generate_greedy(inputs_dict):
-                return _generate(inputs_dict, beams=1)
-            outputs, self.model, self.device = safe_generate(self.model, inputs, self.device, _generate_greedy)
+            outputs = self._generate_for_inputs(inputs, max_length, num_beams=1)
             translation = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
-            if not _is_latin(translation):
+            if not self._is_latin(translation):
                 print(f"  [MADLAD] Greedy also non-Latin, skipping block.")
                 return ""
 
-        # Apply glossary if available
         translation = self._apply_glossary(text, translation)
+        return translation.strip()
 
-        # Clean up translation
-        translation = translation.strip()
+    def translate_batch(self, texts: list, max_length: int = 256,
+                        num_beams: int = 4) -> list:
+        if not texts:
+            return []
 
-        return translation
+        lang_tag = f"<2{self.lang_code}>"
+        input_texts = [f"{lang_tag} {t}" for t in texts]
+
+        inputs = self.tokenizer(
+            input_texts, return_tensors="pt", padding=True, truncation=True
+        )
+        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+
+        outputs = self._generate_for_inputs(inputs, max_length, num_beams)
+        translations = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
+
+        results = []
+        for src, t in zip(texts, translations):
+            if not self._is_latin(t):
+                # Fall back to per-item translate() for non-Latin retry path
+                t = self.translate(src, max_length=max_length, num_beams=num_beams)
+            else:
+                t = self._apply_glossary(src, t).strip()
+            results.append(t)
+        return results
 
 
 if __name__ == "__main__":

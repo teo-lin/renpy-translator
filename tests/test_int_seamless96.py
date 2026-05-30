@@ -18,14 +18,15 @@ sys.path.insert(0, str(project_root / "src" / "translators"))
 import unittest
 
 # Import the base test class and utility functions
-from tests.utils import (BaseTranslatorIntegrationTest, get_test_device,
-                         skip_if_transformers_unavailable, safe_init_translator)
+from tests.utils import (BaseTranslatorIntegrationTest, TranslateBatchTestMixin,
+                         get_test_device, skip_if_transformers_unavailable,
+                         safe_init_translator)
 
 # Import the specific translator and its related flags
 from seamless96_translator import SeamlessM4Tv2Translator, TRANSFORMERS_AVAILABLE, IMPORT_ERROR
 
 
-class TestSeamlessM4TIntegration(BaseTranslatorIntegrationTest):
+class TestSeamlessM4TIntegration(TranslateBatchTestMixin, BaseTranslatorIntegrationTest):
 
     @classmethod
     def setUpClass(cls):

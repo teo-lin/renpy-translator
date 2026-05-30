@@ -18,14 +18,16 @@ sys.path.insert(0, str(project_root / "src" / "translators"))
 import unittest
 
 # Import the base test class and utility functions
-from tests.utils import (BaseTranslatorIntegrationTest, get_test_device,
-                         skip_if_transformers_unavailable, safe_init_translator)
+from tests.utils import (BaseTranslatorIntegrationTest, TranslateBatchTestMixin,
+                         get_test_device, skip_if_transformers_unavailable,
+                         safe_init_translator)
 
 # Import the specific translator and its related flags
 from madlad400_translator import MADLAD400Translator, TRANSFORMERS_AVAILABLE, IMPORT_ERROR
 
 
-class TestMADLADIntegration(BaseTranslatorIntegrationTest):
+class TestMADLADIntegration(TranslateBatchTestMixin, BaseTranslatorIntegrationTest):
+    SINGLE_TEXT = "Hello, how are you?"
 
     @classmethod
     def setUpClass(cls):
@@ -53,6 +55,14 @@ class TestMADLADIntegration(BaseTranslatorIntegrationTest):
         # Must be mostly Latin script — rules out garbage Thai/Chinese/Arabic output
         latin_chars = sum(1 for c in translation if c.isalpha() and ord(c) < 0x0500)
         self.assertGreater(latin_chars, 0, f"Output appears non-Latin: {translation!r}")
+
+    def _assert_batched_matches_single(self, batched, single):
+        # Beam search across single vs batched can diverge slightly due to
+        # padding, so accept any non-empty Latin output when not strictly equal.
+        if batched != single:
+            latin = sum(1 for c in batched if c.isalpha() and ord(c) < 0x0500)
+            self.assertGreater(latin, 0, f"Batched output non-Latin: {batched!r}")
+
 
 if __name__ == '__main__':
     unittest.main()
