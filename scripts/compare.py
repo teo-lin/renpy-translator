@@ -383,9 +383,11 @@ def initialize_translator(model_key: str, model_path: Path, target_language: str
     translator_map = {
         'aya23': Aya23Translator,
         'helsinkiRo': QuickMTTranslator,
+        'opusTCBig': QuickMTTranslator,
         'madlad400': MADLAD400Translator,
         'mbartRo': MBARTTranslator,
         'nllb200': NLLB200Translator,
+        'nllb1300': NLLB200Translator,
         'seamlessm96': SeamlessM4Tv2Translator,
         'ayaExpanse8b': LlamaCppTranslator,
         'euroLLM9b': LlamaCppTranslator,
@@ -405,7 +407,7 @@ def initialize_translator(model_key: str, model_path: Path, target_language: str
             prompt_template=prompt_template,
             glossary=glossary
         )
-    elif model_key in ['helsinkiRo', 'mbartRo']:
+    elif model_key in ['helsinkiRo', 'opusTCBig', 'mbartRo']:
         # HuggingFace models - use model directory, not file
         return translator_class(
             model_path=str(model_path),
@@ -425,7 +427,7 @@ def initialize_translator(model_key: str, model_path: Path, target_language: str
             target_language=target_language,
             glossary=glossary
         )
-    elif model_key == 'nllb200':
+    elif model_key in ('nllb200', 'nllb1300'):
         return translator_class(
             model_path=str(model_path),
             target_language=target_language,
@@ -754,9 +756,10 @@ def run_full_comparison(game_name: str, language: str) -> int:
 
     # Explicit key overrides to avoid collisions (e.g. aya23 and ayaExpanse8b both start with "ay")
     _KEY_OVERRIDES = {
-        'ayaExpanse8b': 'ae',
-        'euroLLM9b':    'eu',
-        'euroLLM22b':   'e2',
+        'ayaExpanse8b':   'ae',
+        'euroLLM9b':      'eu',
+        'euroLLM22b':     'e2',
+        'nllb1300':       'n3',
         'seamlessm96':  'se',
     }
 

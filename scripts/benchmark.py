@@ -249,7 +249,7 @@ def run_benchmark(data_path: Path, glossary_path: Path = None, model_key: str = 
         from translators.aya23_translator import Aya23Translator
         model_path = project_root / model_info['destination']
         translator = Aya23Translator(str(model_path), target_language=target_language, glossary=glossary)
-    elif model_key in ("helsinkyRo", "helsinkiRo"):
+    elif model_key in ("helsinkyRo", "helsinkiRo", "opusTCBig"):
         from translators.helsinkyRo_translator import QuickMTTranslator
         model_path = project_root / model_info['destination']
         translator = QuickMTTranslator(model_path=str(model_path), target_language=target_language, glossary=glossary)
@@ -260,7 +260,7 @@ def run_benchmark(data_path: Path, glossary_path: Path = None, model_key: str = 
         from translators.mbartRo_translator import MBARTTranslator
         model_path = project_root / model_info['destination']
         translator = MBARTTranslator(model_path=str(model_path), target_language=target_language, glossary=glossary)
-    elif model_key == "nllb200":
+    elif model_key in ("nllb200", "nllb1300"):
         from translators.nllb200_translator import NLLB200Translator
         model_path = project_root / model_info['destination']
         translator = NLLB200Translator(model_path=str(model_path), target_language=target_language, lang_code=lang_code, glossary=glossary)

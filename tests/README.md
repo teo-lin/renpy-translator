@@ -1,24 +1,24 @@
 # Test Suite
 
-| Test | Config | Extract | Translate | Correct | Merge | Pipeline |
-|------|--------|---------|-----------|---------|-------|----------|
-| `test_e2e_aya23.py` | ✅ | ✅ | ✅ Aya-23 | | ✅ | ✅ Mod |
-| `test_e2e_madlad.py` | ✅ | ✅ | ✅ Madlad | | ✅ | ✅ Mod |
-| `test_e2e_seamlessm4t.py`| ✅ | ✅ | ✅ Seamless | | ✅ | ✅ Mod |
-| `test_e2e_mbart.py` | ✅ | ✅ | ✅ MBART | | ✅ | ✅ Mod |
-| `test_e2e_quickmt.py` | ✅ | ✅ | ✅ QuickMT | | ✅ | ✅ Mod |
-| `test_e2e_example_game.py` | ✅ | ✅ | ✅ Any | | ✅ | ⚠️ Mod (PS) |
-| `test_e2e_translate_aio.py` | | | ✅ Any | | | ⚠️ AIO |
-| `test_e2e_translate_aio_uncensored.py`| | | ✅ Any | | | ⚠️ AIO |
-| `test_unit_extract_merge.py` | | ✅ | | | ✅ | ✅ Mod |
-| `test_unit_renpy_tags.py` | | ⚠️ Unit | | | ⚠️ Unit | ✅ Mod |
-| `test_unit_config.py` | ✅ | | | | | ⚠️ Mod (PS) |
-| `test_unit_setup.py` | ✅ | | | | | ✅ Python |
-| `test_unit_config_selector.py` | ✅ | | | | | ✅ Python |
-| `test_unit_extract.py`| | ✅ | | | | ✅ Mod |
-| `test_unit_translate.py` | | | ⚠️ Mock | | | ✅ Mod |
-| `test_unit_correct.py` | | | | ✅ | | ✅ Mod |
-| `test_unit_merge.py` | | | | | ✅ | ✅ Mod |
+| Test                                     | Config | Extract   | Translate   | Correct | Merge     | Pipeline      |
+| ---------------------------------------- | ------ | --------- | ----------- | ------- | --------- | ------------- |
+| `test_e2e_aya23.py`                    | ✅     | ✅        | ✅ Aya-23   |         | ✅        | ✅ Mod        |
+| `test_e2e_madlad.py`                   | ✅     | ✅        | ✅ Madlad   |         | ✅        | ✅ Mod        |
+| `test_e2e_seamlessm4t.py`              | ✅     | ✅        | ✅ Seamless |         | ✅        | ✅ Mod        |
+| `test_e2e_mbart.py`                    | ✅     | ✅        | ✅ MBART    |         | ✅        | ✅ Mod        |
+| `test_e2e_quickmt.py`                  | ✅     | ✅        | ✅ QuickMT  |         | ✅        | ✅ Mod        |
+| `test_e2e_example_game.py`             | ✅     | ✅        | ✅ Any      |         | ✅        | ⚠️ Mod (PS) |
+| `test_e2e_translate_aio.py`            |        |           | ✅ Any      |         |           | ⚠️ AIO      |
+| `test_e2e_translate_aio_uncensored.py` |        |           | ✅ Any      |         |           | ⚠️ AIO      |
+| `test_unit_extract_merge.py`           |        | ✅        |             |         | ✅        | ✅ Mod        |
+| `test_unit_renpy_tags.py`              |        | ⚠️ Unit |             |         | ⚠️ Unit | ✅ Mod        |
+| `test_unit_config.py`                  | ✅     |           |             |         |           | ⚠️ Mod (PS) |
+| `test_unit_setup.py`                   | ✅     |           |             |         |           | ✅ Python     |
+| `test_unit_config_selector.py`         | ✅     |           |             |         |           | ✅ Python     |
+| `test_unit_extract.py`                 |        | ✅        |             |         |           | ✅ Mod        |
+| `test_unit_translate.py`               |        |           | ⚠️ Mock   |         |           | ✅ Mod        |
+| `test_unit_correct.py`                 |        |           |             | ✅      |           | ✅ Mod        |
+| `test_unit_merge.py`                   |        |           |             |         | ✅        | ✅ Mod        |
 
 ---
 
@@ -29,11 +29,12 @@
 **Two approaches available:**
 
 1. **Standalone Python** (Simple, no dependencies)
+
    - Run test files directly with Python
    - Matches existing test pattern
    - Works immediately without additional setup
-
 2. **pytest** (Industry standard, already installed in requirements.txt)
+
    - Modern Python testing framework (~90% of projects use it)
    - Auto-discovers all tests
    - Better failure output, fixtures, parallel execution
@@ -44,6 +45,7 @@
 ---
 
 ### Run All Tests
+
 ```powershell
 # Run all tests with model selection prompt
 .\2-test.ps1
@@ -53,6 +55,7 @@
 ```
 
 ### Run Individual Tests (Standalone Python)
+
 ```powershell
 # Run unit tests directly (no model needed)
 .\venv\Scripts\python.exe .\tests\test_unit_config.py
@@ -71,6 +74,7 @@
 ```
 
 ### Run Tests with pytest (Recommended)
+
 ```powershell
 # Run all tests
 .\venv\Scripts\pytest.exe tests/
@@ -99,6 +103,7 @@
 ### Common Issues
 
 **Import errors with triton/torch/torchao** ✅ **FIXED**:
+
 - **Problem**: E2E tests failed with `ImportError: cannot import name 'AttrsDescriptor'` due to package incompatibility
 - **Solution**: Implemented lazy loading in `src/translators/__init__.py` and protected imports in translator modules
 - **Result**: Tests now fail gracefully with helpful error messages instead of crashing
@@ -122,6 +127,7 @@
 ## Shared Utilities
 
 **`utils.py`** - Common functions used across tests:
+
 - `discover_characters()` - Auto-discover characters from .rpy
 - `count_translations()` - Count translations in .rpy
 - `backup_file()`, `restore_file()`, `cleanup_files()` - File operations
@@ -129,6 +135,7 @@
 - `get_rpy_files()` - Get .rpy files in directory
 
 **`conftest.py`** - Pytest configuration and fixtures:
+
 - `project_root` - Fixture providing project root path
 - `mock_models_config` - Fixture with mock model configuration
 - `mock_tools_config` - Fixture with mock tools configuration
@@ -139,7 +146,9 @@
 ## New Python Migration Tests
 
 ### `test_unit_setup.py`
+
 Tests for the new `src/setup.py` Python implementation:
+
 - ✅ Configuration loading and language list building
 - ✅ Language selection (all, specific, auto-selection)
 - ✅ Model selection with language filtering
@@ -152,7 +161,9 @@ Tests for the new `src/setup.py` Python implementation:
 **15 tests** covering all major `ProjectSetup` class methods with mocking.
 
 ### `test_unit_config_selector.py`
+
 Tests for the new `scripts/config_selector.py` utility functions:
+
 - ✅ Single item selection with auto-selection
 - ✅ Multiple item selection
 - ✅ Language selection with single-row display
@@ -162,5 +173,40 @@ Tests for the new `scripts/config_selector.py` utility functions:
 - ✅ Empty list error handling
 
 **12 tests** covering all three selection functions (`select_item`, `select_multiple_items`, `select_languages_single_row`).
+
+
+
+======================================================================
+TEST SUMMARY
+============
+
+  [PASS] test_e2e_benchmark.py             took   0.44s on CUDA
+  [PASS] test_e2e_compare.py               took 4m 52s on CUDA
+  [PASS] test_e2e_example.py               took  53.06s on CUDA
+  [PASS] test_int_aya23.py                 took  11.46s on CUDA
+  [PASS] test_int_ayaExpanse8b.py          took   8.85s on CUDA
+  [PASS] test_int_helsinkyRo.py            took   7.10s on CUDA
+  [PASS] test_int_llama_cpp.py             took  49.18s on CUDA
+  [PASS] test_int_madlad400.py             took  34.01s on CUDA
+  [PASS] test_int_mbartRo.py               took  21.04s on CUDA
+  [PASS] test_int_nllb200.py               took  36.74s on CUDA
+  [PASS] test_int_seamless96.py            took  51.02s on CUDA
+  [PASS] test_unit_compare.py              took   5.22s
+  [PASS] test_unit_config.py               took   0.52s
+  [PASS] test_unit_config_selector.py      took   0.40s
+  [PASS] test_unit_correct.py              took   0.44s
+  [PASS] test_unit_extract.py              took   0.68s
+  [PASS] test_unit_hardware.py             took   0.65s
+  [PASS] test_unit_llama_cpp_translator.py took   0.45s
+  [PASS] test_unit_merge.py                took   0.45s
+  [PASS] test_unit_renpy_tags.py           took   0.41s
+  [PASS] test_unit_setup.py                took   0.47s
+  [PASS] test_unit_translate.py            took   0.55s
+  [PASS] test_unit_translate_batch.py      took   2.51s
+  [PASS] test_unit_translate_new.py        took   0.63s
+
+======================================================================
+Total: 24 tests | Passed: 24 | Skipped: 0 | Failed: 0 | Total Time: 9m 38s
+==========================================================================
 
 ---

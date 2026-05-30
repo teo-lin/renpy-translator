@@ -27,9 +27,11 @@ from renpy_utils import show_progress
 
 _HF_TRANSLATORS = {
     'nllb200':    ('translators.nllb200_translator',    'NLLB200Translator'),
+    'nllb1300':   ('translators.nllb200_translator',    'NLLB200Translator'),
     'madlad400':  ('translators.madlad400_translator',  'MADLAD400Translator'),
     'seamlessm96':('translators.seamless96_translator', 'SeamlessM4Tv2Translator'),
     'helsinkiRo': ('translators.helsinkyRo_translator', 'QuickMTTranslator'),
+    'opusTCBig':  ('translators.helsinkyRo_translator', 'QuickMTTranslator'),
     'mbartRo':    ('translators.mbartRo_translator',    'MBARTTranslator'),
 }
 _LLAMA_MODELS = {'aya23', 'ayaExpanse8b', 'euroLLM9b', 'euroLLM22b'}

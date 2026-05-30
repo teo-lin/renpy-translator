@@ -334,6 +334,69 @@ available_models:
     - 'fi'
     - 'el'
     - 'hu'
+  opusTCBig:
+    name: opusTCBig
+    params: 0.2B
+    format: safetensors
+    languages_supported: 1
+    repo: Helsinki-NLP/opus-mt-tc-big-en-ro
+    http_link: https://huggingface.co/Helsinki-NLP/opus-mt-tc-big-en-ro
+    file: null
+    size: ~1GB
+    destination: models/opusTCBig
+    script: scripts/translate.py
+    description: Large OPUS safetensors, 200M params, Tatoeba 48.6, Flores 40.4, VRAM
+      1GB. Better quality than helsinkiRo at 3x the weight.
+    languages:
+    - 'ro'
+    huggingface_download: true
+    model_class: MarianMTModel
+    tokenizer_class: MarianTokenizer
+  nllb1300:
+    name: nllb1300
+    params: 1.3B
+    format: safetensors
+    languages_supported: 200
+    repo: facebook/nllb-200-distilled-1.3B
+    http_link: https://huggingface.co/facebook/nllb-200-distilled-1.3B
+    file: null
+    size: ~2.5GB
+    destination: models/nllb1300
+    script: scripts/translate.py
+    description: Multilingual seq2seq, 1.3B params distilled, higher Flores than nllb200,
+      VRAM 2.5GB. Same architecture as nllb200, 2x params.
+    languages:
+    - 'ro'
+    - 'es'
+    - 'fr'
+    - 'de'
+    - 'it'
+    - 'pt'
+    - 'ru'
+    - 'tr'
+    - 'cs'
+    - 'pl'
+    - 'uk'
+    - 'bg'
+    - 'zh'
+    - 'ja'
+    - 'ko'
+    - 'vi'
+    - 'th'
+    - 'id'
+    - 'ar'
+    - 'he'
+    - 'fa'
+    - 'hi'
+    - 'bn'
+    - 'nl'
+    - 'sv'
+    - 'no'
+    - 'da'
+    - 'fi'
+    - 'el'
+    - 'hu'
+    huggingface_download: true
   seamlessm96:
     name: seamless96
     params: 2.3B
