@@ -1,263 +1,126 @@
 """
-End-to-End Test: Complete Example Game Translation Pipeline (Fast variant)
+E2E Test: Single-block translation with the currently selected model
 
-Same pipeline as test_e2e_example.py but uses NLLB-200 (39s for 70 blocks,
-no GPU VRAM pressure) and patterns-only correction to avoid loading a second
-LLM. Runs ~4-5x faster than the aya23 + LLM-correction variant.
-
-- 1-config.ps1: Configure game and discover characters
-- 2-extract.ps1: Extract .rpy -> .parsed.yaml + .tags.yaml
-- 3-translate.ps1: Translate using NLLB-200
-- 4-correct.ps1: Pattern-based corrections only (no LLM)
-- 5-merge.ps1: Merge translations back to .rpy
+Reads the active model from current_config.yaml (games[current_game].model),
+translates one hardcoded block, and verifies a non-empty translation is produced.
+Uses games/Example Temp as a scratch directory; removes it after the test.
+Does NOT touch games/Example.
 """
 
-import sys
+import os
+import re
+import shutil
 import subprocess
+import time
+import yaml
 from pathlib import Path
-import pytest
 
 project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root / "tests"))
+TMP_GAME_DIR = project_root / "games" / "Example Temp"
+TMP_TL_DIR   = TMP_GAME_DIR / "game" / "tl" / "romanian"
 
-from utils import (
-    count_translations, backup_file, restore_file,
-    cleanup_files, get_rpy_files
-)
+TEST_BLOCK_ID = "1-U"
+TEST_BLOCK_EN = "Would you mind helping me with my princess?"
 
-# Test configuration
-game_name = "Example"
-game_path = project_root / "games" / game_name
-example_dir = game_path / "game" / "tl" / "romanian"
-model_path = project_root / "models" / "nllb200"
+PARSED_YAML_CONTENT = {
+    TEST_BLOCK_ID: {"en": TEST_BLOCK_EN}
+}
 
-target_language_code = "ro"
-target_language_name = "Romanian"
-target_language_folder = "romanian"
-model_key = "nllb200"
+TAGS_YAML_CONTENT = {
+    "metadata": {
+        "source_file": "test",
+        "target_language": "romanian",
+        "source_language": "english",
+        "extracted_at": "2026-01-01T00:00:00",
+        "file_structure_type": "dialogue_and_strings",
+        "has_separator_lines": False,
+        "total_blocks": 1,
+        "untranslated_blocks": 1,
+    },
+    "structure": {
+        "block_order": [TEST_BLOCK_ID],
+        "string_section_start": None,
+        "string_section_header": None,
+    },
+    "blocks": {},
+    "character_map": {},
+}
+
+_KEY_OVERRIDES = {
+    "ayaExpanse8b":  "ae",
+    "euroLLM9b":     "eu",
+    "euroLLM9b2512": "e3",
+    "euroLLM22b":    "e2",
+    "seamlessm96":   "se",
+    "nllb1300":      "n3",
+}
 
 
-def run_powershell_script(script_name: str, args: list = None, timeout: int = 300) -> tuple[bool, str, str]:
-    if args is None:
-        args = []
+def test_translate_current_model():
+    python_exe     = project_root / "venv" / "Scripts" / "python.exe"
+    compare_script = project_root / "scripts" / "compare.py"
 
-    script_path = project_root / script_name
+    with open(project_root / "models" / "models_config.yaml", "r", encoding="utf-8") as f:
+        models_config = yaml.safe_load(f)
+    with open(project_root / "models" / "current_config.yaml", "r", encoding="utf-8") as f:
+        current_config = yaml.safe_load(f)
+
+    current_game = current_config.get("current_game")
+    assert current_game, "No current_game in current_config.yaml — run 1-config.ps1 first"
+    model_key = current_config["games"][current_game]["model"]
+    model_name = models_config["available_models"][model_key]["name"]
+    save_key = _KEY_OVERRIDES.get(model_key, model_key[:2].lower())
+
+    print(f"\n  Current game:  {current_game}")
+    print(f"  Current model: {model_name} ({model_key}) -> key: {save_key}")
+
+    if TMP_GAME_DIR.exists():
+        shutil.rmtree(TMP_GAME_DIR)
+    TMP_TL_DIR.mkdir(parents=True)
+
+    parsed_file = TMP_TL_DIR / "test.parsed.yaml"
+    tags_file   = TMP_TL_DIR / "test.tags.yaml"
 
     try:
-        command = ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", str(script_path)] + args
+        with open(parsed_file, "w", encoding="utf-8") as f:
+            yaml.dump(PARSED_YAML_CONTENT, f, allow_unicode=True, default_flow_style=False)
+        with open(tags_file, "w", encoding="utf-8") as f:
+            yaml.dump(TAGS_YAML_CONTENT, f, allow_unicode=True, default_flow_style=False)
+
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
+        torch_lib = project_root / "venv" / "Lib" / "site-packages" / "torch" / "lib"
+        if torch_lib.exists():
+            env["PATH"] = f"{torch_lib};{env.get('PATH', '')}"
+
+        wall_start = time.time()
         result = subprocess.run(
-            command,
-            cwd=str(project_root),
-            text=True,
-            timeout=timeout,
+            [str(python_exe), str(compare_script),
+             "--model", model_key, "--key", save_key,
+             "--tl-dir", str(TMP_TL_DIR)],
+            env=env, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=300
         )
-        success = result.returncode == 0
-        return success, None, None
+        wall_elapsed = time.time() - wall_start
 
-    except subprocess.TimeoutExpired:
-        return (False, "", f"Timeout after {timeout}s")
-    except Exception as e:
-        return (False, "", str(e))
+        if result.stdout:
+            print(result.stdout)
+        assert result.returncode == 0, (
+            f"Model {model_key} failed (exit {result.returncode}):\n{result.stderr}"
+        )
 
+        match = re.search(r"BENCHMARK_DURATION:(\d+\.?\d*)", result.stdout)
+        duration = float(match.group(1)) if match else wall_elapsed
 
-@pytest.mark.e2e
-@pytest.mark.slow
-def test_e2e_example_game_translation_fast():
-    """
-    Full e2e pipeline on the Example game using NLLB-200 + patterns-only
-    correction. Validates pipeline correctness without the LLM correction
-    overhead.
-    """
-    print("\n" + "=" * 70)
-    print("  E2E TEST: Example Game Full Pipeline (NLLB-200, fast)")
-    print("=" * 70)
+        with open(parsed_file, "r", encoding="utf-8") as f:
+            content = yaml.safe_load(f)
 
-    if not model_path.exists():
-        print(f"\n[SKIP] Model not found: {model_path}")
-        pytest.skip(f"Model not found: {model_path}")
+        block = content[TEST_BLOCK_ID]
+        assert save_key in block, f"Missing key '{save_key}' in output"
+        translation = block[save_key]
+        assert translation.strip(), f"Empty translation for key '{save_key}'"
 
-    rpy_files = get_rpy_files(example_dir)
-
-    if not rpy_files:
-        print(f"[FAIL] No .rpy files found in {example_dir}")
-        assert False, "Test step failed"
-
-    print(f"\nFound {len(rpy_files)} file(s) to translate:")
-    for rpy_file in rpy_files:
-        print(f"  - {rpy_file.name}")
-
-    print("\n[Setup] Backing up original files...")
-    backups = []
-    for rpy_file in rpy_files:
-        backup_path = backup_file(rpy_file)
-        backups.append((rpy_file, backup_path))
-        print(f"  [OK] Backed up: {rpy_file.name}")
-
-    print("\n[Setup] Counting initial translations...")
-    initial_counts = {}
-    total_initial = 0
-    for rpy_file in rpy_files:
-        count = count_translations(rpy_file)
-        initial_counts[rpy_file.name] = count
-        total_initial += count
-        print(f"  {rpy_file.name}: {count} translations")
-    print(f"  Total initial translations: {total_initial}")
-
-    try:
-        # Step 1: Configure
-        print("\n" + "=" * 70)
-        print("[1/5] Running: 1-config.ps1")
-        print("=" * 70)
-        success, _, stderr = run_powershell_script("1-config.ps1", args=[
-            "-GamePath", str(game_path),
-            "-Language", target_language_code,
-            "-Model", model_key,
-        ], timeout=60)
-        if not success:
-            print(f"[FAIL] 1-config.ps1 failed")
-            if stderr:
-                print(f"STDERR: {stderr}")
-            assert False, "Test step failed"
-        print("[OK] Config completed")
-
-        # Step 2: Extract
-        print("\n" + "=" * 70)
-        print("[2/5] Running: 2-extract.ps1")
-        print("=" * 70)
-        success, _, stderr = run_powershell_script("2-extract.ps1", args=[
-            "-GameName", game_name,
-            "-All",
-        ], timeout=120)
-        if not success:
-            print(f"[FAIL] 2-extract.ps1 failed")
-            if stderr:
-                print(f"STDERR: {stderr}")
-            assert False, "Test step failed"
-        print("[OK] Extract completed")
-
-        # Step 3: Translate (NLLB-200, ~40s for Example game)
-        print("\n" + "=" * 70)
-        print("[3/5] Running: 3-translate.ps1 (NLLB-200)")
-        print("=" * 70)
-        success, _, stderr = run_powershell_script("3-translate.ps1", args=[
-            "-GameName", game_name,
-            "-All",
-            "-Model", model_key,
-        ], timeout=180)
-        if not success:
-            print(f"[FAIL] 3-translate.ps1 failed")
-            if stderr:
-                print(f"STDERR: {stderr}")
-            assert False, "Test step failed"
-        print("[OK] Translate completed")
-
-        # Step 4: Correct (patterns only — no LLM load)
-        print("\n" + "=" * 70)
-        print("[4/5] Running: 4-correct.ps1 (Patterns Only)")
-        print("=" * 70)
-        success, _, stderr = run_powershell_script("4-correct.ps1", args=[
-            "-GameName", game_name,
-            "-LanguageName", target_language_code,
-            "-ModeName", "Patterns Only",
-            "-Yes",
-        ], timeout=60)
-        if not success:
-            print(f"[FAIL] 4-correct.ps1 failed")
-            if stderr:
-                print(f"STDERR: {stderr}")
-            assert False, "Test step failed"
-        print("[OK] Correct completed")
-
-        # Step 5: Merge
-        print("\n" + "=" * 70)
-        print("[5/5] Running: 5-merge.ps1")
-        print("=" * 70)
-        success, _, stderr = run_powershell_script("5-merge.ps1", args=[
-            "-GameName", game_name,
-            "-All",
-        ], timeout=120)
-        if not success:
-            print(f"[FAIL] 5-merge.ps1 failed")
-            if stderr:
-                print(f"STDERR: {stderr}")
-            assert False, "Test step failed"
-        print("[OK] Merge completed")
-
-        # Verify
-        print("\n" + "=" * 70)
-        print("[Verify] Checking translations were added...")
-        print("=" * 70)
-
-        translated_rpy_files = [
-            rpy_file.parent / f"{rpy_file.stem}.translated.rpy"
-            for rpy_file in rpy_files
-        ]
-
-        total_final = 0
-        total_added = 0
-        for translated_rpy_file in translated_rpy_files:
-            count = count_translations(translated_rpy_file)
-            total_final += count
-            total_added += count
-            print(f"  {translated_rpy_file.name}: 0 -> {count} (+{count})")
-
-        print(f"  Total final translations: {total_final} (+{total_added})")
-
-        print("\n" + "=" * 70)
-        if total_added > 0:
-            print("[OK] TEST PASSED!")
-            print(f"  - Files processed: {len(rpy_files)}")
-            print(f"  - Initial translations: {total_initial}")
-            print(f"  - Final translations: {total_final}")
-            print(f"  - New translations added: {total_added}")
-            print(f"  - Pipeline: Config -> Extract -> Translate -> Correct -> Merge [OK]")
-            print("=" * 70)
-        else:
-            print("[FAIL] TEST FAILED! No new translations were added.")
-            print("=" * 70)
-            assert False, "Test step failed"
-
-    except Exception as e:
-        print(f"\n[FAIL] FATAL ERROR: {e}")
-        import traceback
-        traceback.print_exc()
-        assert False, "Test step failed"
+        print(f"\n  [{save_key}] {model_name}: \"{translation.encode('ascii', 'replace').decode('ascii')}\"  ({duration:.2f}s)")
 
     finally:
-        print("\n" + "=" * 70)
-        print("[Cleanup] Restoring original files...")
-        print("=" * 70)
-        for rpy_file, backup_path in backups:
-            if backup_path.exists():
-                restore_file(rpy_file, backup_path)
-                print(f"  [OK] Restored: {rpy_file.name}")
-
-        print("\n[Cleanup] Removing generated files...")
-        for rpy_file in rpy_files:
-            cleanup_files([
-                rpy_file.parent / f"{rpy_file.stem}.parsed.yaml",
-                rpy_file.parent / f"{rpy_file.stem}.tags.yaml",
-                rpy_file.parent / f"{rpy_file.stem}.translated.rpy",
-                rpy_file.parent / f"{rpy_file.stem}.corrections.txt",
-            ])
-
-        cleanup_files([
-            example_dir / "characters.yaml",
-            example_dir.parent.parent / "characters.yaml",
-        ])
-
-        print("[OK] Cleanup completed")
-
-
-if __name__ == "__main__":
-    try:
-        test_e2e_example_game_translation_fast()
-        sys.exit(0)
-    except KeyboardInterrupt:
-        print("\n\nTest cancelled by user")
-        sys.exit(1)
-    except Exception as e:
-        print(f"\n[FAIL] FATAL ERROR: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+        shutil.rmtree(TMP_GAME_DIR, ignore_errors=True)

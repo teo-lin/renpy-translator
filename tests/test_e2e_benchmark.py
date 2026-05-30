@@ -187,9 +187,9 @@ def test_benchmark_translation_structure(project_root, game_config, models_confi
     print(f"\n[OK] Block structure is correct")
 
 
-def test_all_models_have_unique_keys(models_config):
+def test_all_models_have_unique_keys(current_config):
     """Test that each model gets a unique numbered key"""
-    installed_models = models_config['installed_models']
+    installed_models = current_config['installed_models']
 
     # Generate expected keys (r0, r1, r2, etc.)
     expected_keys = {f"r{i}" for i in range(len(installed_models))}

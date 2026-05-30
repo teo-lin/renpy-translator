@@ -1,264 +1,134 @@
 """
-Integration Test: Model Comparison (9-compare.ps1)
+E2E Test: Model Comparison — fast variant
 
-This test verifies that the model comparison workflow works correctly:
-1. Runs 9-compare.ps1 with Example game
-2. Verifies parsed files are created
-3. Checks that translations are stored under numbered keys (r0, r1, r2, etc.)
-4. Validates that ALL installed models produced translations
-5. Checks output format and statistics
-
-This is a full end-to-end test that requires all installed models.
+Translates a single hardcoded block through every installed model.
+Uses games/Example Temp as a scratch directory; removes it after the test.
+Does NOT touch games/Example.
 """
 
-import sys
-import yaml
-import subprocess
-from pathlib import Path
+import os
 import re
+import shutil
+import subprocess
+import time
+import yaml
+from pathlib import Path
 
-# Project paths
 project_root = Path(__file__).parent.parent
-compare_script = project_root / "8-compare.ps1"
-models_config_path = project_root / "models" / "models_config.yaml"
-test_game = "Example"
-test_language = "ro"
-test_dir = project_root / "games" / test_game / "game" / "tl" / "romanian"
+TMP_GAME_DIR = project_root / "games" / "Example Temp"
+TMP_TL_DIR   = TMP_GAME_DIR / "game" / "tl" / "romanian"
+
+TEST_BLOCK_ID = "1-U"
+TEST_BLOCK_EN = "Would you mind helping me with my princess?"
+
+PARSED_YAML_CONTENT = {
+    TEST_BLOCK_ID: {"en": TEST_BLOCK_EN}
+}
+
+TAGS_YAML_CONTENT = {
+    "metadata": {
+        "source_file": "test",
+        "target_language": "romanian",
+        "source_language": "english",
+        "extracted_at": "2026-01-01T00:00:00",
+        "file_structure_type": "dialogue_and_strings",
+        "has_separator_lines": False,
+        "total_blocks": 1,
+        "untranslated_blocks": 1,
+    },
+    "structure": {
+        "block_order": [TEST_BLOCK_ID],
+        "string_section_start": None,
+        "string_section_header": None,
+    },
+    "blocks": {},
+    "character_map": {},
+}
+
+_KEY_OVERRIDES = {
+    "ayaExpanse8b":  "ae",
+    "euroLLM9b":     "eu",
+    "euroLLM9b2512": "e3",
+    "euroLLM22b":    "e2",
+    "seamlessm96":   "se",
+    "nllb1300":      "n3",
+}
 
 
-def load_models_config():
-    """Load models configuration to know expected model count"""
-    if not models_config_path.exists():
-        print(f"ERROR: Models configuration not found at {models_config_path}")
-        return None
+def test_compare_all_models():
+    python_exe     = project_root / "venv" / "Scripts" / "python.exe"
+    compare_script = project_root / "scripts" / "compare.py"
 
-    with open(models_config_path, 'r', encoding='utf-8') as f:
-        config = yaml.safe_load(f)
+    with open(project_root / "models" / "models_config.yaml", "r", encoding="utf-8") as f:
+        models_config = yaml.safe_load(f)
+    with open(project_root / "models" / "current_config.yaml", "r", encoding="utf-8") as f:
+        current_config = yaml.safe_load(f)
+    installed_models = current_config.get("installed_models", [])
+    assert installed_models, "No models installed — run 0-setup.ps1 first"
 
-    return config
+    if TMP_GAME_DIR.exists():
+        shutil.rmtree(TMP_GAME_DIR)
+    TMP_TL_DIR.mkdir(parents=True)
 
-
-def cleanup_parsed_files():
-    """Remove any existing parsed files before test"""
-    if not test_dir.exists():
-        print(f"  Test directory doesn't exist yet: {test_dir}")
-        return
-
-    parsed_files = list(test_dir.glob("*.parsed.yaml"))
-    if parsed_files:
-        print(f"  Cleaning up {len(parsed_files)} existing parsed file(s)...")
-        for file in parsed_files:
-            file.unlink()
-            print(f"    Removed: {file.name}")
-    else:
-        print(f"  No existing parsed files to clean up")
-
-
-def run_compare_script():
-    """Run 9-compare.ps1 and return output and exit code"""
-    print(f"\n  Running: {compare_script}")
-    print(f"  Game: {test_game}, Language: {test_language}")
-    print(f"  This may take several minutes...\n")
+    parsed_file = TMP_TL_DIR / "test.parsed.yaml"
+    tags_file   = TMP_TL_DIR / "test.tags.yaml"
 
     try:
-        result = subprocess.run(
-            ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File",
-             str(compare_script), "-GameName", test_game, "-Language", test_language],
-            cwd=str(project_root),
-            capture_output=True,
-            text=True,
-            encoding='utf-8',
-            errors='replace',
-            timeout=600  # 10 minute timeout
-        )
+        with open(parsed_file, "w", encoding="utf-8") as f:
+            yaml.dump(PARSED_YAML_CONTENT, f, allow_unicode=True, default_flow_style=False)
+        with open(tags_file, "w", encoding="utf-8") as f:
+            yaml.dump(TAGS_YAML_CONTENT, f, allow_unicode=True, default_flow_style=False)
 
-        return result.stdout, result.stderr, result.returncode
-    except subprocess.TimeoutExpired:
-        print("  ERROR: Script timed out after 10 minutes!")
-        return "", "Timeout", 1
-    except Exception as e:
-        print(f"  ERROR: Failed to run script: {e}")
-        return "", str(e), 1
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
+        torch_lib = project_root / "venv" / "Lib" / "site-packages" / "torch" / "lib"
+        if torch_lib.exists():
+            env["PATH"] = f"{torch_lib};{env.get('PATH', '')}"
 
+        durations = {}
 
-def test_compare_workflow():
-    """Run the full comparison workflow and validate results"""
+        for model_key in installed_models:
+            key = _KEY_OVERRIDES.get(model_key, model_key[:2].lower())
+            model_name = models_config["available_models"][model_key]["name"]
+            print(f"\n  [{installed_models.index(model_key)+1}/{len(installed_models)}] {model_name} -> key: {key}")
+            wall_start = time.time()
+            result = subprocess.run(
+                [str(python_exe), str(compare_script),
+                 "--model", model_key, "--key", key,
+                 "--tl-dir", str(TMP_TL_DIR)],
+                env=env, capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=300
+            )
+            wall_elapsed = time.time() - wall_start
+            if result.stdout:
+                print(result.stdout)
+            assert result.returncode == 0, (
+                f"Model {model_key} failed (exit {result.returncode}):\n{result.stderr}"
+            )
+            match = re.search(r"BENCHMARK_DURATION:(\d+\.?\d*)", result.stdout)
+            durations[model_key] = float(match.group(1)) if match else wall_elapsed
 
-    print("\n" + "=" * 70)
-    print("INTEGRATION TEST: Model Comparison Workflow (9-compare.ps1)")
-    print("=" * 70)
-
-    # Step 1: Load configuration
-    print("\n[1/5] Loading models configuration...")
-    models_config = load_models_config()
-    if not models_config:
-        print("  [FAIL] Could not load models configuration")
-        return False
-
-    current_config_path = project_root / "models" / "current_config.yaml"
-    if not current_config_path.exists():
-        print("  [FAIL] current_config.yaml not found - please run 0-setup.ps1 first")
-        return False
-    with open(current_config_path, 'r', encoding='utf-8') as f:
-        current_config = yaml.safe_load(f)
-    installed_models = current_config.get('installed_models', [])
-    expected_model_count = len(installed_models)
-
-    if expected_model_count == 0:
-        print("  [FAIL] No models installed - please run 0-setup.ps1 first")
-        return False
-
-    print(f"  ✓ Found {expected_model_count} installed models")
-    for model_key in installed_models:
-        model_info = models_config['available_models'][model_key]
-        print(f"    - {model_info['name']}")
-
-    # Step 2: Cleanup
-    print("\n[2/5] Cleaning up existing files...")
-    cleanup_parsed_files()
-
-    # Step 3: Run comparison
-    print("\n[3/5] Running comparison workflow...")
-    stdout, stderr, exit_code = run_compare_script()
-
-    # Display output
-    if stdout:
-        for line in stdout.split('\n'):
-            print(f"  {line}")
-
-    if stderr and stderr != "Timeout":
-        print(f"\nSTDERR:\n{stderr}")
-
-    if exit_code != 0:
-        print(f"\n  [FAIL] Script failed with exit code {exit_code}")
-        return False
-
-    print(f"\n  ✓ Script completed successfully (exit code: 0)")
-
-    # Step 4: Verify output files
-    print("\n[4/5] Verifying output files...")
-
-    if not test_dir.exists():
-        print(f"  [FAIL] Test directory not created: {test_dir}")
-        return False
-
-    parsed_files = list(test_dir.glob("*.parsed.yaml"))
-    if len(parsed_files) == 0:
-        print(f"  [FAIL] No parsed files created")
-        return False
-
-    print(f"  ✓ Found {len(parsed_files)} parsed file(s)")
-
-    # Check first file for numbered keys
-    first_file = parsed_files[0]
-    print(f"\n  Examining: {first_file.name}")
-
-    with open(first_file, 'r', encoding='utf-8') as f:
-        content = yaml.safe_load(f)
-
-    # Find any block with 'en' key (dialogue, narrator, or string)
-    # The current block ID creation uses char_name or "block-" prefix, not "dialogue-".
-    # We'll just take the first block that has an 'en' key.
-    dialogue_blocks = [k for k in content.keys() if 'en' in content[k]]
-    if not dialogue_blocks:
-        print(f"  [FAIL] No translatable blocks (with 'en' key) found in parsed file")
-        return False
-
-    first_block_id = dialogue_blocks[0]
-    first_block = content[first_block_id]
-
-    print(f"    First block: {first_block_id}")
-    print(f"    Keys in block: {list(first_block.keys())}")
-
-    # Check for new format keys (ay, he, ma, etc.)
-    found_keys = []
-    for model_key in installed_models:
-        key = model_key[:2].lower()
-        if key in first_block:
-            found_keys.append(key)
-            print(f"      ✓ Found key '{key}': {first_block[key][:50]}...")
-
-    if len(found_keys) == 0:
-        print(f"  [FAIL] No numbered translation keys (r0, r1, etc.) found")
-        return False
-
-    print(f"\n  ✓ Found {len(found_keys)} translation keys: {', '.join(found_keys)}")
-
-    if len(found_keys) != expected_model_count:
-        print(f"  [WARNING] Expected {expected_model_count} keys, found {len(found_keys)}")
-        print(f"            Some models may have failed")
-    else:
-        print(f"  ✓ All {expected_model_count} models produced translations")
-
-    # Step 5: Verify output format
-    print("\n[5/5] Verifying output format...")
-
-    output_text = stdout.lower()
-
-    checks = [
-        ("model comparison", "model comparison table"),
-        ("duration", "duration tracking"),
-        ("fastest:", "performance comparison"),
-        ("benchmark complete" or "comparison complete", "completion message")
-    ]
-
-    all_checks_passed = True
-    for keyword, description in checks:
-        if keyword in output_text:
-            print(f"  ✓ Found {description}")
-        else:
-            print(f"  [WARNING] Missing {description} (keyword: '{keyword}')")
-            all_checks_passed = False
-
-    if not all_checks_passed:
-        print(f"\n  [WARNING] Some output checks failed, but core functionality works")
-
-    print("\n  ✓ Verification complete!")
-
-
-
-def test_key_format():
-    """Test that keys are in correct format (r0, r1, r2, not 01, 02)"""
-
-    print("\n" + "=" * 70)
-    print("TEST: Key format validation")
-    print("=" * 70)
-
-    if not test_dir.exists():
-        print("  [SKIP] No test files available")
-        return True
-
-    parsed_files = list(test_dir.glob("*.parsed.yaml"))
-    if not parsed_files:
-        print("  [SKIP] No parsed files to check")
-        return True
-
-    print(f"  Checking {len(parsed_files)} parsed file(s)...")
-
-    for parsed_file in parsed_files:
-        with open(parsed_file, 'r', encoding='utf-8') as f:
+        with open(parsed_file, "r", encoding="utf-8") as f:
             content = yaml.safe_load(f)
 
-        for block_id, block_data in content.items():
-            # Filter out non-dialogue blocks or blocks without 'en' key
-            if 'en' in block_data:
-                # Check for correct format (ay, he, ma, etc.)
-                for key in block_data.keys():
-                    if key == 'en': # Skip the English key
-                        continue
-                    if re.match(r'^[a-z]{2}$', key):
-                        # Correct format
-                        pass
-                    elif re.match(r'^[a-z]{2}\d+$', key): # Check for old format with number suffix like r0, ay0
-                        print(f"  [FAIL] Found old format key '{key}' in {parsed_file.name}")
-                        print(f"         Should be a two-letter abbreviation (e.g., '{key[:2]}')")
-                        return False
-                    else: # Catch any other unexpected key format
-                        print(f"  [FAIL] Found unexpected key format '{key}' in {parsed_file.name}")
-                        return False
+        block = content[TEST_BLOCK_ID]
 
-    print(f"  ✓ All keys use correct format (e.g., ay, he)")
+        for model_key in installed_models:
+            key = _KEY_OVERRIDES.get(model_key, model_key[:2].lower())
+            assert key in block, f"Missing key '{key}' for model {model_key}"
+            assert block[key].strip(), f"Empty translation for key '{key}' (model {model_key})"
 
+        print("\n" + "=" * 60)
+        print("  MODEL RANKING (fastest first)")
+        print("=" * 60)
+        ranked = sorted(durations.items(), key=lambda x: x[1])
+        for rank, (model_key, dur) in enumerate(ranked, 1):
+            key = _KEY_OVERRIDES.get(model_key, model_key[:2].lower())
+            model_name = models_config["available_models"][model_key]["name"]
+            translation = block.get(key, "")[:50].encode("ascii", "replace").decode("ascii")
+            print(f"  {rank}. [{key}] {model_name:<22} {dur:6.2f}s  \"{translation}\"")
+        print("=" * 60)
+        print(f"\n  All {len(installed_models)} models produced translations.")
 
-
-
+    finally:
+        shutil.rmtree(TMP_GAME_DIR, ignore_errors=True)

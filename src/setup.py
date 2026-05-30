@@ -422,13 +422,21 @@ class ProjectSetup:
         cmd = [str(self.venv_python), "-m", "pip"] + command
         subprocess.run(cmd, check=True, capture_output=quiet, text=True)
 
-    def _check_package_installed(self, package_name):
+    def _get_torch_lib_path(self) -> str:
+        return str(VENV_PATH / "Lib" / "site-packages" / "torch" / "lib")
+
+    def _check_package_installed(self, package_name, extra_path: str = None):
         """Check if a Python package is installed in the virtual environment."""
         try:
+            import os
+            env = os.environ.copy()
+            if extra_path:
+                env["PATH"] = extra_path + os.pathsep + env.get("PATH", "")
             result = subprocess.run(
                 [str(self.venv_python), "-c", f"import {package_name}"],
                 capture_output=True,
-                text=True
+                text=True,
+                env=env,
             )
             return result.returncode == 0
         except:

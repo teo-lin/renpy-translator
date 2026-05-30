@@ -175,38 +175,39 @@ Tests for the new `scripts/config_selector.py` utility functions:
 **12 tests** covering all three selection functions (`select_item`, `select_multiple_items`, `select_languages_single_row`).
 
 
+=====================================================================
+=====================================================================
 
-======================================================================
 TEST SUMMARY
 ============
 
-  [PASS] test_e2e_benchmark.py             took   0.44s on CUDA
-  [PASS] test_e2e_compare.py               took 4m 52s on CUDA
-  [PASS] test_e2e_example.py               took  53.06s on CUDA
-  [PASS] test_int_aya23.py                 took  11.46s on CUDA
-  [PASS] test_int_ayaExpanse8b.py          took   8.85s on CUDA
+  [PASS] test_e2e_benchmark.py             took   0.50s on CUDA
+  [PASS] test_e2e_compare.py                 took 3m 7s on CUDA
+  [PASS] test_e2e_example.py                   took  19.77s on CUDA
+  [PASS] test_int_aya23.py                 took  12.15s on CUDA
+  [PASS] test_int_ayaExpanse8b.py          took   9.33s on CUDA
   [PASS] test_int_helsinkyRo.py            took   7.10s on CUDA
-  [PASS] test_int_llama_cpp.py             took  49.18s on CUDA
-  [PASS] test_int_madlad400.py             took  34.01s on CUDA
-  [PASS] test_int_mbartRo.py               took  21.04s on CUDA
-  [PASS] test_int_nllb200.py               took  36.74s on CUDA
-  [PASS] test_int_seamless96.py            took  51.02s on CUDA
-  [PASS] test_unit_compare.py              took   5.22s
-  [PASS] test_unit_config.py               took   0.52s
-  [PASS] test_unit_config_selector.py      took   0.40s
-  [PASS] test_unit_correct.py              took   0.44s
-  [PASS] test_unit_extract.py              took   0.68s
-  [PASS] test_unit_hardware.py             took   0.65s
-  [PASS] test_unit_llama_cpp_translator.py took   0.45s
+  [PASS] test_int_llama_cpp.py             took 1m 4s on CUDA
+  [PASS] test_int_madlad400.py             took  33.73s on CUDA
+  [PASS] test_int_mbartRo.py               took  20.68s on CUDA
+  [PASS] test_int_nllb1300.py              took  38.04s on CUDA
+  [PASS] test_int_nllb200.py               took  34.45s on CUDA
+  [PASS] test_int_opusTCBig.py             took  10.52s on CUDA
+  [PASS] test_int_seamless96.py            took  46.33s on CUDA
+  [PASS] test_unit_compare.py              took   4.77s
+  [PASS] test_unit_config.py               took   0.48s
+  [PASS] test_unit_config_selector.py      took   0.43s
+  [PASS] test_unit_correct.py              took   0.43s
+  [PASS] test_unit_extract.py              took   0.66s
+  [PASS] test_unit_hardware.py             took   0.58s
+  [PASS] test_unit_llama_cpp_translator.py took   0.46s
   [PASS] test_unit_merge.py                took   0.45s
-  [PASS] test_unit_renpy_tags.py           took   0.41s
-  [PASS] test_unit_setup.py                took   0.47s
-  [PASS] test_unit_translate.py            took   0.55s
-  [PASS] test_unit_translate_batch.py      took   2.51s
-  [PASS] test_unit_translate_new.py        took   0.63s
+  [PASS] test_unit_renpy_tags.py           took   0.42s
+  [PASS] test_unit_setup.py                took   0.49s
+  [PASS] test_unit_translate.py            took   0.57s
+  [PASS] test_unit_translate_batch.py      took   2.46s
+  [PASS] test_unit_translate_new.py        took   0.68s
 
-======================================================================
-Total: 24 tests | Passed: 24 | Skipped: 0 | Failed: 0 | Total Time: 9m 38s
-==========================================================================
-
----
+================
+Total: 28 tests | Passed: 28 | Skipped: 0 | Failed: 0 | Total Time: 24m 22s
+===========================================================================
